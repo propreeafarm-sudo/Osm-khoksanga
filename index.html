@@ -1384,6 +1384,12 @@ function renderDashboard(){
       <div class="card-pad dash-hero-grid" id="dash1-body"></div>
     </div>
 
+    <div class="grid grid-3" style="margin-bottom:20px;">
+      <div class="stat-tile"><div class="stat-ring"><i class="fa-solid fa-users"></i></div><div><div class="stat-num">${state.osmMembers.filter(m=>!['ลาออก','เสียชีวิต'].includes(m.statusType)).length.toLocaleString('th-TH')}</div><div class="stat-label">อสม. ในฐานข้อมูล</div></div></div>
+      <div class="stat-tile"><div class="stat-ring tone-green"><i class="fa-solid fa-house"></i></div><div><div class="stat-num">${state.households.length.toLocaleString('th-TH')}</div><div class="stat-label">หลังคาเรือนที่บันทึกแล้ว</div></div></div>
+      <div class="stat-tile"><div class="stat-ring tone-amber"><i class="fa-solid fa-cloud"></i></div><div><div class="stat-num">${cloudConfig().url?'เชื่อมแล้ว':'ยังไม่เชื่อม'}</div><div class="stat-label">สถานะฐานข้อมูล Cloud</div></div></div>
+    </div>
+
     <div class="grid grid-2">
       <div class="card">
         <div class="card-head"><h3><span class="ring-ic"><i class="fa-solid fa-users"></i></span> จำนวน อสม. ในเขตพื้นที่</h3></div>
@@ -1410,6 +1416,21 @@ function computeAttendanceStats(dateObj, activityType){
   const iso = toISODate(dateObj);
   const activeMembers = state.osmMembers.filter(m => m.statusType !== 'ลาออก' && m.statusType !== 'เสียชีวิต');
   const total = activeMembers.length;
+  if(activityType === 'กิจกรรมโรงเรียน อสม.'){
+    const session = (state.schoolSessions||[]).find(s => String(s.date||'').slice(0,10) === iso);
+    if(session){
+      const records=(state.schoolAttendance||[]).filter(r=>r.sessionId===session.id);
+      let attended=0, leave=0, absent=0;
+      records.forEach(r=>{
+        if(!activeMembers.find(m=>m.id===r.osmId)) return;
+        if(['มา','สาย','ผู้แทน'].includes(r.status)) attended++;
+        else if(r.status==='ลา') leave++;
+        else if(r.status==='ขาด') absent++;
+      });
+      absent = Math.max(absent, total - attended - leave);
+      return {attended,leave,absent,total};
+    }
+  }
   const records = state.attendance.filter(a => a.date === iso && a.activityType === activityType);
   let attended = 0, leave = 0;
   records.forEach(r=>{
@@ -1687,7 +1708,7 @@ function handleHhSearch(v){ hhSearchTerm = v; renderHhTable(); }
 function renderHhTable(){
   const wrap = document.getElementById('hh-table-wrap');
   const term = hhSearchTerm.trim().toLowerCase();
-  let list = state.osmMembers.filter(m => state.households.some(h=>h.osmId===m.id));
+  let list = state.osmMembers.slice();
   if(term) list = list.filter(m => (m.firstName+' '+m.lastName).toLowerCase().includes(term) || (m.village||'').toLowerCase().includes(term) || (m.idCard||'').includes(term));
   list.sort((a,b)=>(a.firstName||'').localeCompare(b.firstName||'','th'));
   document.getElementById('hh-count-badge').textContent = list.length.toLocaleString('th-TH') + ' รายการ';
@@ -1698,11 +1719,11 @@ function renderHhTable(){
     return;
   }
   wrap.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>ชื่อ อสม.</th><th>เลขบัตรประชาชน</th><th>ชื่อหมู่บ้าน</th><th>หมู่ที่</th><th>จำนวนหลังคาเรือน</th><th></th></tr></thead>
+    <thead><tr><th>ชื่อ อสม.</th><th>บ้านเลขที่ อสม.</th><th>ชื่อหมู่บ้าน</th><th>หมู่ที่</th><th>หลังคาเรือนที่รับผิดชอบ</th><th></th></tr></thead>
     <tbody>${list.map(m=>{ const cnt = state.households.filter(h=>h.osmId===m.id).length; return `<tr>
         <td class="cell-name">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</td>
-        <td>${escapeHtml(m.idCard)}</td><td>${escapeHtml(m.village)}</td><td>${escapeHtml(m.moo)}</td>
-        <td><span class="badge badge-info">${cnt} หลัง</span></td>
+        <td>${escapeHtml(m.houseNo)||'-'}</td><td>${escapeHtml(m.village)}</td><td>${escapeHtml(m.moo)}</td>
+        <td><span class="badge ${cnt?'badge-info':'badge-neutral'}">${cnt} หลัง</span></td>
         <td><button class="btn btn-outline btn-sm" onclick="openHouseholdDetail('${m.id}')"><i class="fa-regular fa-eye"></i> ดูเพิ่มเติม</button></td>
       </tr>`; }).join('')}</tbody></table></div>`;
 }
@@ -2450,8 +2471,13 @@ function cloudSessionToLocal(s){return {
 function cloudAttendanceToLocal(a){return {
  id:String(a.record_id||a.id||''),sessionId:String(a.session_id||a.sessionId||''),osmId:String(a.osm_id||a.osmId||''),status:String(a.status||'มา'),checkinAt:String(a.checkin_at||a.checkinAt||''),note:String(a.note||''),updatedAt:String(a.updated_at||'')
 };}
-async function cloudPullAll(opts){opts=opts||{};const c=cloudConfig();if(!c.url||!c.secret){if(!opts.silent)toast('กรุณาตั้งค่า Cloud URL และ Shared Secret ก่อน','info');return false;}try{if(!opts.silent)toast('กำลังดึงฐานข้อมูลจาก Google Sheets...','info');const out=await cloudPost('getBootstrap',{});const d=out.data||{};if(Array.isArray(d.members))state.osmMembers=d.members.map(cloudMemberToLocal).filter(x=>x.id);if(Array.isArray(d.sessions))state.schoolSessions=d.sessions.map(cloudSessionToLocal).filter(x=>x.id);if(Array.isArray(d.attendance))state.schoolAttendance=d.attendance.map(cloudAttendanceToLocal).filter(x=>x.id);persistState();if(state.currentUser)renderCurrentView();if(!opts.silent)toast(`ดึงข้อมูลสำเร็จ: อสม. ${state.osmMembers.length} คน`,'success');return true;}catch(e){console.error(e);if(!opts.silent)toast('ดึงข้อมูลไม่สำเร็จ: '+e.message,'error');return false;}}
-async function cloudPushAll(){const c=cloudConfig();if(!c.url||!c.secret){toast('กรุณาตั้งค่า Cloud ก่อน','info');return false;}try{const members=state.osmMembers.map(m=>({id:m.id,citizenId:m.idCard,firstName:m.firstName,lastName:m.lastName,phone:m.phone,moo:m.moo,villageName:m.village,position:m.position,active:!['ลาออก','เสียชีวิต'].includes(m.statusType),houseNo:m.houseNo,gender:m.gender,birthDate:m.birthDate,age:m.age,tambon:m.tambon,amphoe:m.amphoe,province:m.province,statusType:m.statusType}));const sessions=(state.schoolSessions||[]).map(s=>({session:s,stats:schoolSessionStats(s.id)}));const attendance=(state.schoolAttendance||[]).map(r=>{const m=osmById(r.osmId)||{},s=schoolSessionById(r.sessionId)||{};return {record:r,member:{id:m.id,firstName:m.firstName,lastName:m.lastName,moo:m.moo},session:{id:s.id,title:s.title,date:s.date}}});const out=await cloudPost('sync',{members,sessions,attendance});toast(`Sync สำเร็จ: อสม. ${out.data?.members||0} คน`,'success');return true;}catch(e){toast('Sync ไม่สำเร็จ: '+e.message,'error');return false;}}
+function cloudHouseholdToLocal(h){let members=[];try{members=Array.isArray(h.members)?h.members:JSON.parse(String(h.members_json||'[]'))}catch(e){members=[]}return {
+ id:String(h.household_id||h.id||''),osmId:String(h.osm_id||h.osmId||''),houseNo:String(h.house_no||h.houseNo||''),members,
+ note:String(h.note||''),sourceType:String(h.source_type||h.sourceType||''),verified:!(h.verified===false||String(h.verified).toLowerCase()==='false'),
+ recordedDate:String(h.updated_at||'').slice(0,10)||toISODate(new Date())
+};}
+async function cloudPullAll(opts){opts=opts||{};const c=cloudConfig();if(!c.url||!c.secret){if(!opts.silent)toast('กรุณาตั้งค่า Cloud URL และ Shared Secret ก่อน','info');return false;}try{if(!opts.silent)toast('กำลังดึงฐานข้อมูลจาก Google Sheets...','info');const out=await cloudPost('getBootstrap',{});const d=out.data||{};if(Array.isArray(d.members))state.osmMembers=d.members.map(cloudMemberToLocal).filter(x=>x.id);if(Array.isArray(d.households))state.households=d.households.map(cloudHouseholdToLocal).filter(x=>x.id&&x.osmId);if(Array.isArray(d.sessions))state.schoolSessions=d.sessions.map(cloudSessionToLocal).filter(x=>x.id);if(Array.isArray(d.attendance))state.schoolAttendance=d.attendance.map(cloudAttendanceToLocal).filter(x=>x.id);persistState();renderCurrentView();if(!opts.silent)toast(`ดึงข้อมูลสำเร็จ: อสม. ${state.osmMembers.length} คน • หลังคาเรือน ${state.households.length} หลัง`,'success');return true;}catch(e){console.error(e);if(!opts.silent)toast('ดึงข้อมูลไม่สำเร็จ: '+e.message,'error');return false;}}
+async function cloudPushAll(){const c=cloudConfig();if(!c.url||!c.secret){toast('กรุณาตั้งค่า Cloud ก่อน','info');return false;}try{const members=state.osmMembers.map(m=>({id:m.id,citizenId:m.idCard,firstName:m.firstName,lastName:m.lastName,phone:m.phone,moo:m.moo,villageName:m.village,position:m.position,active:!['ลาออก','เสียชีวิต'].includes(m.statusType),houseNo:m.houseNo,gender:m.gender,birthDate:m.birthDate,age:m.age,tambon:m.tambon,amphoe:m.amphoe,province:m.province,statusType:m.statusType}));const households=(state.households||[]).map(h=>({id:h.id,osmId:h.osmId,houseNo:h.houseNo,members:h.members||[],note:h.note||'',sourceType:h.sourceType||'ระบบ',verified:h.verified!==false,active:true}));const sessions=(state.schoolSessions||[]).map(s=>({session:s,stats:schoolSessionStats(s.id)}));const attendance=(state.schoolAttendance||[]).map(r=>{const m=osmById(r.osmId)||{},s=schoolSessionById(r.sessionId)||{};return {record:r,member:{id:m.id,firstName:m.firstName,lastName:m.lastName,moo:m.moo},session:{id:s.id,title:s.title,date:s.date}}});const out=await cloudPost('sync',{members,households,sessions,attendance});toast(`Sync สำเร็จ: อสม. ${out.data?.members||0} คน • หลังคาเรือน ${out.data?.households||0} หลัง`,'success');return true;}catch(e){toast('Sync ไม่สำเร็จ: '+e.message,'error');return false;}}
 async function cloudPushAttendance(r,m,s){try{return await cloudPost('attendance',{record:r,member:{id:m.id,firstName:m.firstName,lastName:m.lastName,moo:m.moo},session:{id:s.id,title:s.title,date:s.date}})}catch(e){console.warn(e);return {offline:true,error:e.message}}}
 async function cloudPushSession(id){const s=schoolSessionById(id);if(!s)return;try{await cloudPost('session',{session:s,stats:schoolSessionStats(id)})}catch(e){console.warn(e)}}
 function openCloudSetup(){const c=cloudConfig();openModal(`<div class="modal-header"><h3><i class="fa-solid fa-cloud"></i> เชื่อมฐานข้อมูล Google Sheets / GAS</h3><button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><form id="cloud-form"><div class="modal-body"><div class="cloud-panel"><b>ฐานข้อมูลกลางโรงเรียน อสม.</b><p class="privacy-note">หลังรัน setupBackend() ใน Code.gs ระบบ GAS จะนำเข้าทะเบียน อสม. 79 คนให้เอง จากนั้นใส่ Web App URL และ API Secret ที่นี่ แล้วกด “ดึงฐานข้อมูล”</p></div><div class="form-group" style="margin-top:14px"><label>Web App URL</label><input id="cloud-url" class="input" value="${escapeHtml(c.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="form-group"><label>Shared Secret</label><input id="cloud-secret" class="input" type="password" value="${escapeHtml(c.secret||'')}" placeholder="API SECRET จาก setupBackend()"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button type="button" class="btn btn-outline" id="cloud-pull-btn"><i class="fa-solid fa-cloud-arrow-down"></i> ดึงฐานข้อมูล</button><button type="button" class="btn btn-outline" id="cloud-push-btn"><i class="fa-solid fa-cloud-arrow-up"></i> Sync ขึ้น Cloud</button></div><div id="cloud-status" class="privacy-note" style="margin-top:10px">ข้อมูลส่วนบุคคลจะโหลดเฉพาะหลัง Admin เข้าสู่ระบบ และไม่ถูกฝังไว้ใน source code สาธารณะ</div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ปิด</button><button class="btn btn-primary">บันทึกการเชื่อมต่อ</button></div></form>`,{size:'sm'});const saveCfg=()=>setCloudConfig(document.getElementById('cloud-url').value,document.getElementById('cloud-secret').value);document.getElementById('cloud-form').addEventListener('submit',async e=>{e.preventDefault();saveCfg();toast('บันทึก Cloud configuration แล้ว','success');await cloudPullAll();});document.getElementById('cloud-pull-btn').addEventListener('click',async()=>{saveCfg();await cloudPullAll();});document.getElementById('cloud-push-btn').addEventListener('click',async()=>{saveCfg();await cloudPushAll();});}
