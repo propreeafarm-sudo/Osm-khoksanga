@@ -892,6 +892,7 @@ const state = {
     {id:'u-admin', username:'adminosmkhoksanga', password:'osm055271911#', role:'admin', userType:'ผู้ดูแลระบบ',
      firstName:'ผู้ดูแลระบบ', lastName:'ระบบ อสม.', idCard:'', phone:'', moo:'', village:'', createdAt:new Date().toISOString()}
   ],
+  // ข้อมูล อสม. จริงจะดึงจาก GAS หลัง Admin login เพื่อไม่เปิดเผยเลขบัตร/เบอร์โทรใน source ของ GitHub Pages
   osmMembers: [],
   households: [],
   attendance: [],
@@ -1291,6 +1292,7 @@ document.getElementById('login-form').addEventListener('submit', function(e){
   state.currentUser = user;
   toast('เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ '+ (user.firstName||user.username), 'success');
   enterApp();
+  if(cloudConfig().url && cloudConfig().secret) cloudPullAll({silent:true});
 });
 
 document.getElementById('register-form').addEventListener('submit', function(e){
@@ -1571,6 +1573,8 @@ function openOsmDetail(id){
         <div class="detail-item"><span>6. ชื่อหมู่บ้าน</span><b>${escapeHtml(m.village)}</b></div>
         <div class="detail-item"><span>7. ตำบล</span><b>${escapeHtml(m.tambon)}</b></div>
         <div class="detail-item"><span>8. จังหวัด</span><b>${escapeHtml(m.province)}</b></div>
+        <div class="detail-item"><span>เบอร์โทรศัพท์</span><b>${escapeHtml(m.phone)||'-'}</b></div>
+        <div class="detail-item"><span>ตำแหน่งในหมู่บ้าน</span><b>${escapeHtml(m.position)||'อสม.'}</b></div>
         <div class="detail-item"><span>9. ปีที่เริ่มเป็น อสม.</span><b>พ.ศ. ${escapeHtml(m.startYear)||'-'}</b></div>
         <div class="detail-item"><span>10. สถานะการเป็น อสม.</span><b>${statusBadge(m.statusType)}</b></div>
         <div class="detail-item"><span>11. สถานะสมาชิก ฌกส. (ตัว อสม.)</span><b>${escapeHtml(m.chongkosoSelf)}</b></div>
@@ -1596,6 +1600,7 @@ function openOsmForm(id){
           <div class="form-group"><label>นามสกุล <span class="req">*</span></label><input class="input" id="of-lastname" value="${escapeHtml(m.lastName||'')}"></div>
         </div>
         <div class="form-group"><label>เลขบัตรประจำตัวประชาชน <span class="req">*</span></label><input class="input" id="of-idcard" maxlength="13" inputmode="numeric" value="${escapeHtml(m.idCard||'')}"></div>
+        <div class="form-row-2"><div class="form-group"><label>เบอร์โทรศัพท์ อสม.</label><input class="input" id="of-phone" value="${escapeHtml(m.phone||'')}" placeholder="เช่น 081-2345678"></div><div class="form-group"><label>ตำแหน่ง</label><input class="input" id="of-position" value="${escapeHtml(m.position||'อสม.')}"></div></div>
         <div class="form-row-2">
           <div class="form-group"><label>บ้านเลขที่</label><input class="input" id="of-houseno" value="${escapeHtml(m.houseNo||'')}"></div>
           <div class="form-group"><label>หมู่ที่ <span class="req">*</span></label><input class="input" id="of-moo" value="${escapeHtml(m.moo||'')}"></div>
@@ -1630,7 +1635,7 @@ function openOsmForm(id){
     e.preventDefault();
     const v = {
       firstName: document.getElementById('of-firstname').value.trim(), lastName: document.getElementById('of-lastname').value.trim(),
-      idCard: document.getElementById('of-idcard').value.trim(), houseNo: document.getElementById('of-houseno').value.trim(),
+      idCard: document.getElementById('of-idcard').value.trim(), phone: document.getElementById('of-phone').value.trim(), position: document.getElementById('of-position').value.trim() || 'อสม.', houseNo: document.getElementById('of-houseno').value.trim(),
       moo: document.getElementById('of-moo').value.trim(), village: document.getElementById('of-village').value.trim(),
       tambon: document.getElementById('of-tambon').value.trim(), province: document.getElementById('of-province').value.trim(),
       startYear: document.getElementById('of-startyear').value.trim(), statusType: document.getElementById('of-statustype').value,
@@ -1645,13 +1650,14 @@ function openOsmForm(id){
     if(dup){ errEl.textContent = 'เลขบัตรประจำตัวประชาชนนี้มีอยู่ในระบบแล้ว'; errEl.style.display='block'; return; }
     if(editing){ Object.assign(m, v); toast('แก้ไขข้อมูล อสม. เรียบร้อยแล้ว','success'); }
     else { state.osmMembers.push(Object.assign({id: uid('osm'), recordedDate: toISODate(new Date())}, v)); toast('เพิ่มข้อมูล อสม. เรียบร้อยแล้ว','success'); }
+    persistState();
     closeModal(); renderCurrentView();
   });
 }
 
 function deleteOsmMember(id){
   confirmDialog('ต้องการลบข้อมูล อสม. รายนี้ใช่หรือไม่ ข้อมูลกิจกรรมและหลังคาเรือนที่เกี่ยวข้องจะยังคงอยู่ในระบบ', ()=>{
-    state.osmMembers = state.osmMembers.filter(m=>m.id!==id);
+    state.osmMembers = state.osmMembers.filter(m=>m.id!==id); persistState();
     toast('ลบข้อมูล อสม. เรียบร้อยแล้ว','success'); closeModal(); renderCurrentView();
   }, {confirmLabel:'ลบข้อมูล'});
 }
@@ -2429,9 +2435,26 @@ function findMemberForSelfCheck(value){const v=(value||'').replace(/\D/g,'');ret
 async function submitSelfCheckin(sessionId,value){const s=schoolSessionById(sessionId);if(!s)throw new Error('ไม่พบรอบเรียน');if(s.closedAt)throw new Error('รอบเช็กชื่อนี้ปิดแล้ว');const matches=findMemberForSelfCheck(value);if(matches.length!==1)throw new Error(matches.length>1?'ข้อมูลซ้ำ กรุณาใช้เบอร์โทรศัพท์หรือเลขบัตร 13 หลัก':'ไม่พบข้อมูล อสม. กรุณาติดต่อผู้รับผิดชอบ');const m=matches[0];let r=schoolRecord(sessionId,m.id);const now=new Date();const sessionTime=s.startTime||'09:00';const [hh,mm]=sessionTime.split(':').map(Number);const sd=new Date(s.date+'T00:00:00');sd.setHours(hh||9,mm||0,0,0);const late=now.getTime()>sd.getTime()+30*60000;const status=late?'สาย':'มา';if(!r){r={id:uid('sa'),sessionId,osmId:m.id,status,note:'เช็กชื่อด้วยตนเองผ่าน QR',checkinAt:now.toISOString(),updatedAt:now.toISOString()};state.schoolAttendance.push(r)}else{r.status=status;r.checkinAt=now.toISOString();r.updatedAt=now.toISOString();r.note=r.note||'เช็กชื่อด้วยตนเองผ่าน QR'}persistState();await cloudPushAttendance(r,m,s);return {m,status,time:now};}
 function renderPublicCheckin(sessionId){const s=schoolSessionById(sessionId);document.body.innerHTML=`<main class="checkin-shell"><div class="checkin-card"><div class="checkin-brand"><div class="logo-orb"><i class="fa-solid fa-school-flag"></i></div><h2 style="margin-top:12px">โรงเรียน อสม. บ้านโคกสง่า</h2><p>${s?escapeHtml(s.title):'ระบบเช็กชื่อออนไลน์'}</p></div>${!s?'<div class="alert alert-danger">ไม่พบรอบเรียนนี้ กรุณาสแกน QR ใหม่</div>':s.closedAt?'<div class="alert alert-warning"><b>ปิดรับการเช็กชื่อแล้ว</b><br>กรุณาติดต่อผู้รับผิดชอบหากต้องการแก้ไขข้อมูล</div>':`<form id="public-checkin-form"><div class="form-group"><label>ยืนยันตัวตน</label><input id="public-id" class="input" inputmode="numeric" autocomplete="off" placeholder="เลขบัตรประชาชน 4 ตัวท้าย หรือเบอร์โทรศัพท์" required></div><button class="btn btn-primary" style="width:100%;justify-content:center" type="submit"><i class="fa-solid fa-location-dot"></i> ลงชื่อเข้าเรียน</button><div class="privacy-note">ข้อมูลนี้ใช้เพื่อยืนยันการเข้าร่วมโรงเรียน อสม. เท่านั้น ระบบไม่แสดงเลขบัตรประชาชนเต็มบนหน้าจอนี้</div><div id="public-error" class="field-error" style="display:none;margin-top:12px"></div></form>`}</div></main>`;if(s&&!s.closedAt)document.getElementById('public-checkin-form').addEventListener('submit',async e=>{e.preventDefault();const btn=e.target.querySelector('button'),er=document.getElementById('public-error');btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก';try{const x=await submitSelfCheckin(sessionId,document.getElementById('public-id').value);document.querySelector('.checkin-card').innerHTML=`<div class="checkin-success"><i class="fa-solid fa-circle-check"></i><h2 style="margin-top:14px">เช็กชื่อสำเร็จ</h2><h3>${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}</h3><p>สถานะ: <b>${x.status}</b><br>เวลา ${x.time.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.</p><p class="privacy-note">สามารถปิดหน้านี้ได้</p></div>`}catch(err){er.textContent=err.message;er.style.display='block';btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-location-dot"></i> ลงชื่อเข้าเรียน';}});}
 async function cloudPost(action,payload){const c=cloudConfig();if(!c.url)return {offline:true};const body={action,secret:c.secret,payload};const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});const out=await res.json();if(!out.ok)throw new Error(out.error||'Cloud sync failed');return out;}
+function cloudMemberToLocal(m){return {
+  id:String(m.osm_id||m.id||''), idCard:String(m.citizen_id||m.citizenId||''),
+  firstName:String(m.first_name||m.firstName||''), lastName:String(m.last_name||m.lastName||''),
+  phone:String(m.phone||''), moo:String(m.moo||''), village:String(m.village_name||m.villageName||''),
+  position:String(m.position||'อสม.'), houseNo:String(m.house_no||m.houseNo||''), gender:String(m.gender||''),
+  birthDate:String(m.birth_date||m.birthDate||''), age:Number(m.age||0), tambon:String(m.tambon||TAMBON_DEFAULT),
+  amphoe:String(m.amphoe||AMPHOE_DEFAULT), province:String(m.province||PROVINCE_DEFAULT),
+  statusType:String(m.status_type||m.statusType||'อสม.ตัวจริง'), recordedDate:String(m.updated_at||'').slice(0,10)||toISODate(new Date())
+};}
+function cloudSessionToLocal(s){return {
+ id:String(s.session_id||s.id||''),title:String(s.title||''),date:String(s.date||'').slice(0,10),startTime:String(s.start_time||s.startTime||''),endTime:String(s.end_time||s.endTime||''),topic:String(s.topic||''),location:String(s.location||''),owner:String(s.owner||''),closedAt:String(s.closed_at||s.closedAt||''),updatedAt:String(s.updated_at||'')
+};}
+function cloudAttendanceToLocal(a){return {
+ id:String(a.record_id||a.id||''),sessionId:String(a.session_id||a.sessionId||''),osmId:String(a.osm_id||a.osmId||''),status:String(a.status||'มา'),checkinAt:String(a.checkin_at||a.checkinAt||''),note:String(a.note||''),updatedAt:String(a.updated_at||'')
+};}
+async function cloudPullAll(opts){opts=opts||{};const c=cloudConfig();if(!c.url||!c.secret){if(!opts.silent)toast('กรุณาตั้งค่า Cloud URL และ Shared Secret ก่อน','info');return false;}try{if(!opts.silent)toast('กำลังดึงฐานข้อมูลจาก Google Sheets...','info');const out=await cloudPost('getBootstrap',{});const d=out.data||{};if(Array.isArray(d.members))state.osmMembers=d.members.map(cloudMemberToLocal).filter(x=>x.id);if(Array.isArray(d.sessions))state.schoolSessions=d.sessions.map(cloudSessionToLocal).filter(x=>x.id);if(Array.isArray(d.attendance))state.schoolAttendance=d.attendance.map(cloudAttendanceToLocal).filter(x=>x.id);persistState();if(state.currentUser)renderCurrentView();if(!opts.silent)toast(`ดึงข้อมูลสำเร็จ: อสม. ${state.osmMembers.length} คน`,'success');return true;}catch(e){console.error(e);if(!opts.silent)toast('ดึงข้อมูลไม่สำเร็จ: '+e.message,'error');return false;}}
+async function cloudPushAll(){const c=cloudConfig();if(!c.url||!c.secret){toast('กรุณาตั้งค่า Cloud ก่อน','info');return false;}try{const members=state.osmMembers.map(m=>({id:m.id,citizenId:m.idCard,firstName:m.firstName,lastName:m.lastName,phone:m.phone,moo:m.moo,villageName:m.village,position:m.position,active:!['ลาออก','เสียชีวิต'].includes(m.statusType),houseNo:m.houseNo,gender:m.gender,birthDate:m.birthDate,age:m.age,tambon:m.tambon,amphoe:m.amphoe,province:m.province,statusType:m.statusType}));const sessions=(state.schoolSessions||[]).map(s=>({session:s,stats:schoolSessionStats(s.id)}));const attendance=(state.schoolAttendance||[]).map(r=>{const m=osmById(r.osmId)||{},s=schoolSessionById(r.sessionId)||{};return {record:r,member:{id:m.id,firstName:m.firstName,lastName:m.lastName,moo:m.moo},session:{id:s.id,title:s.title,date:s.date}}});const out=await cloudPost('sync',{members,sessions,attendance});toast(`Sync สำเร็จ: อสม. ${out.data?.members||0} คน`,'success');return true;}catch(e){toast('Sync ไม่สำเร็จ: '+e.message,'error');return false;}}
 async function cloudPushAttendance(r,m,s){try{return await cloudPost('attendance',{record:r,member:{id:m.id,firstName:m.firstName,lastName:m.lastName,moo:m.moo},session:{id:s.id,title:s.title,date:s.date}})}catch(e){console.warn(e);return {offline:true,error:e.message}}}
 async function cloudPushSession(id){const s=schoolSessionById(id);if(!s)return;try{await cloudPost('session',{session:s,stats:schoolSessionStats(id)})}catch(e){console.warn(e)}}
-function openCloudSetup(){const c=cloudConfig();openModal(`<div class="modal-header"><h3><i class="fa-solid fa-cloud"></i> เชื่อมระบบออนไลน์</h3><button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><form id="cloud-form"><div class="modal-body"><div class="cloud-panel"><b>Google Apps Script Web App</b><p class="privacy-note">ใส่ Web App URL จากไฟล์ backend ที่จัดเตรียมไว้ ระบบจะส่งข้อมูลเช็กชื่อจากโทรศัพท์หลายเครื่องเข้าสู่ Google Sheet กลาง</p></div><div class="form-group" style="margin-top:14px"><label>Web App URL</label><input id="cloud-url" class="input" value="${escapeHtml(c.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="form-group"><label>Shared Secret</label><input id="cloud-secret" class="input" value="${escapeHtml(c.secret||'')}" placeholder="ตั้งรหัสลับเดียวกับ backend"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary">บันทึกการเชื่อมต่อ</button></div></form>`,{size:'sm'});document.getElementById('cloud-form').addEventListener('submit',e=>{e.preventDefault();setCloudConfig(document.getElementById('cloud-url').value,document.getElementById('cloud-secret').value);closeModal();toast('บันทึก Cloud configuration แล้ว','success')});}
+function openCloudSetup(){const c=cloudConfig();openModal(`<div class="modal-header"><h3><i class="fa-solid fa-cloud"></i> เชื่อมฐานข้อมูล Google Sheets / GAS</h3><button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><form id="cloud-form"><div class="modal-body"><div class="cloud-panel"><b>ฐานข้อมูลกลางโรงเรียน อสม.</b><p class="privacy-note">หลังรัน setupBackend() ใน Code.gs ระบบ GAS จะนำเข้าทะเบียน อสม. 79 คนให้เอง จากนั้นใส่ Web App URL และ API Secret ที่นี่ แล้วกด “ดึงฐานข้อมูล”</p></div><div class="form-group" style="margin-top:14px"><label>Web App URL</label><input id="cloud-url" class="input" value="${escapeHtml(c.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="form-group"><label>Shared Secret</label><input id="cloud-secret" class="input" type="password" value="${escapeHtml(c.secret||'')}" placeholder="API SECRET จาก setupBackend()"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button type="button" class="btn btn-outline" id="cloud-pull-btn"><i class="fa-solid fa-cloud-arrow-down"></i> ดึงฐานข้อมูล</button><button type="button" class="btn btn-outline" id="cloud-push-btn"><i class="fa-solid fa-cloud-arrow-up"></i> Sync ขึ้น Cloud</button></div><div id="cloud-status" class="privacy-note" style="margin-top:10px">ข้อมูลส่วนบุคคลจะโหลดเฉพาะหลัง Admin เข้าสู่ระบบ และไม่ถูกฝังไว้ใน source code สาธารณะ</div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ปิด</button><button class="btn btn-primary">บันทึกการเชื่อมต่อ</button></div></form>`,{size:'sm'});const saveCfg=()=>setCloudConfig(document.getElementById('cloud-url').value,document.getElementById('cloud-secret').value);document.getElementById('cloud-form').addEventListener('submit',async e=>{e.preventDefault();saveCfg();toast('บันทึก Cloud configuration แล้ว','success');await cloudPullAll();});document.getElementById('cloud-pull-btn').addEventListener('click',async()=>{saveCfg();await cloudPullAll();});document.getElementById('cloud-push-btn').addEventListener('click',async()=>{saveCfg();await cloudPushAll();});}
 function handleCheckinHash(){const m=location.hash.match(/^#checkin=(.+)$/);if(m){renderPublicCheckin(decodeURIComponent(m[1]));return true}return false}
 
 // autosave legacy modules too, without requiring edits to every existing form
