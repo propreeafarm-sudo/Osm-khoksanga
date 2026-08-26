@@ -4519,7 +4519,7 @@ function fbCfg(){
   catch(e){ return {email:'',autoSync:true,publicCheckin:false}; }
 }
 function fbSetCfg(o){ localStorage.setItem(FB_CFG_KEY, JSON.stringify(Object.assign(fbCfg(),o))); }
-function fbOK(){ const F=window.FBX; return !!(F && F.ready && F.db && !F.fatal); }
+function fbOK(){ const F=window.FBX; return !!(F && F.ready && F.db && !F.fatal && !F.loading); }
 function fbStaff(){
   const F=window.FBX;
   if(!(F && F.ready && !F.anon)) return false;
@@ -4800,7 +4800,8 @@ function fbPaint(){
   const chip=document.getElementById('fb-chip'); if(!chip) return;
   const F=window.FBX;
   let ic='fa-cloud-slash', txt='ออฟไลน์', col='var(--text-faint)';
-  if(!F || F.fatal){ ic='fa-triangle-exclamation'; txt='Firebase ผิดพลาด'; col='var(--danger)'; }
+  if(F && F.loading){ ic='fa-circle-notch fa-spin'; txt='กำลังโหลด'; col='var(--info)'; }
+  else if(!F || F.fatal){ ic='fa-triangle-exclamation'; txt='Firebase ผิดพลาด'; col='var(--danger)'; }
   else if(fbBusy){ ic='fa-spinner fa-spin'; txt='กำลังซิงก์'; col='var(--info)'; }
   else if(fbStatusMsg){ ic='fa-triangle-exclamation'; txt='ต้องตั้งค่า'; col='var(--warning)'; }
   else if(fbNeedUp){ ic='fa-cloud-arrow-up'; txt='รออัปโหลด'; col='var(--warning)'; }
@@ -6459,18 +6460,27 @@ async function dgRun(){
   try{
     /* 1 — SDK */
     dgSet('sdk','wait','กำลังตรวจ...'); await pause(280);
-    const F=window.FBX;
-    if(!F){
-      dgSet('sdk','err','ยังโหลด Firebase SDK ไม่เสร็จ',
-        'รอสัก 5 วินาทีแล้วกดตรวจใหม่ • ถ้ายังไม่หาย แปลว่าเบราว์เซอร์เข้า www.gstatic.com ไม่ได้ ลองเปลี่ยนเครือข่ายหรือปิด VPN/ตัวกรองเว็บ');
+    let F=window.FBX;
+    // รอโหลดให้เสร็จก่อน สูงสุด 15 วินาที
+    if(F && F.loading){
+      dgSet('sdk','wait','กำลังดาวน์โหลด Firebase SDK... (รอได้ถึง 15 วินาที)');
+      for(let i=0;i<30 && window.FBX && window.FBX.loading;i++) await pause(500);
+      F=window.FBX;
+    }
+    if(!F || F.loading){
+      dgSet('sdk','err','ดาวน์โหลด Firebase SDK ไม่เสร็จภายในเวลาที่กำหนด',
+        'เครือข่ายช้าหรือถูกปิดกั้น ลองเปลี่ยนเป็นเน็ตมือถือ (แชร์อินเทอร์เน็ต) แล้วกดตรวจใหม่'+dgLogHtml());
       return dgDone();
     }
     if(F.fatal){
-      dgSet('sdk','err','เริ่มต้น Firebase ไม่สำเร็จ: '+escapeHtml(F.fatal),
-        'ตรวจว่า Firestore Database ถูกสร้างแล้วใน Firebase Console → Build → Firestore Database');
+      dgSet('sdk','err',escapeHtml(F.fatal),
+        (/gstatic|ทุกแหล่ง/.test(F.fatal)
+          ? 'เครือข่ายนี้เข้า CDN ไม่ได้ — ลองเปลี่ยนเป็นเน็ตมือถือ ปิด VPN หรือปิดโปรแกรมกรองเว็บ/แอนตี้ไวรัส แล้วโหลดหน้าใหม่'
+          : 'ตรวจว่าสร้าง Firestore Database แล้วใน Firebase Console → Build → Firestore Database (เลือก Production mode)')
+        +dgLogHtml());
       return dgDone();
     }
-    dgSet('sdk','ok','โหลดสำเร็จ • โปรเจกต์ osm-khoksanga');
+    dgSet('sdk','ok','โหลดสำเร็จ • โปรเจกต์ osm-khoksanga'+(F.src?' • แหล่ง '+escapeHtml(F.src):''));
 
     /* 2 — เครือข่าย */
     dgSet('net','wait','กำลังตรวจ...'); await pause(200);
@@ -6574,6 +6584,14 @@ async function dgRun(){
     toast('ตรวจสอบไม่สำเร็จ: '+(e.message||e),'error');
   }
   dgDone();
+}
+function dgLogHtml(){
+  const L=window.FBX_LOG||[];
+  if(!L.length) return '';
+  return `<div style="margin-top:10px;font-size:11.5px;line-height:1.7;border-top:1px dashed currentColor;padding-top:8px">
+    <b>บันทึกการโหลด</b><br>${L.map(x=>
+      `${x.ok?'✓':'✗'} ${escapeHtml(x.src)}${x.ms!=null?' ('+x.ms+' ms)':''}${x.err?' — '+escapeHtml(x.err):''}`
+    ).join('<br>')}</div>`;
 }
 function dgDone(){
   dgRunning=false;
@@ -7229,17 +7247,42 @@ function renderCurrentView(){
 </script>
 <script type="module">
 /* ============================================================================================
-   FIREBASE BOOTSTRAP  —  osm-khoksanga
-   โหลด SDK แบบ ES module แล้วเปิด API ให้สคริปต์หลักเรียกใช้ผ่าน window.FBX
+   FIREBASE LOADER v2 — โหลดแบบมีแหล่งสำรอง และรายงานสาเหตุได้เมื่อล้มเหลว
+   ใช้ dynamic import() เพื่อให้จับ error ได้ (static import ล้มเหลวแล้วทั้งโมดูลจะเงียบ)
    ============================================================================================ */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-         signOut, onAuthStateChanged }
-  from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-         collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch, query, where,
-         query, where }
-  from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+window.FBX_LOG = [];
+window.FBX = { loading:true, fatal:'', ready:false, anon:false, user:null };
+
+const FB_VERSIONS = ['12.18.0','11.10.0','10.14.1'];
+function fbSources(v){
+  return [
+    { name:`gstatic ${v}`,
+      app :`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`,
+      auth:`https://www.gstatic.com/firebasejs/${v}/firebase-auth.js`,
+      fs  :`https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js` },
+    { name:`esm.sh ${v}`,
+      app :`https://esm.sh/firebase@${v}/app`,
+      auth:`https://esm.sh/firebase@${v}/auth`,
+      fs  :`https://esm.sh/firebase@${v}/firestore` }
+  ];
+}
+
+async function fbLoadSdk(){
+  for(const v of FB_VERSIONS){
+    for(const s of fbSources(v)){
+      const t0=Date.now();
+      try{
+        const [A,U,F] = await Promise.all([ import(s.app), import(s.auth), import(s.fs) ]);
+        window.FBX_LOG.push({ src:s.name, ok:true, ms:Date.now()-t0 });
+        return { A, U, F, src:s.name };
+      }catch(e){
+        window.FBX_LOG.push({ src:s.name, ok:false, ms:Date.now()-t0,
+          err:String((e && (e.message||e.name)) || e).slice(0,180) });
+      }
+    }
+  }
+  return null;
+}
 
 const firebaseConfig = {
   apiKey: "AIzaSyCQNLpbolXEhWU_NteueYRX4wVcyDzxXjE",
@@ -7251,27 +7294,51 @@ const firebaseConfig = {
   measurementId: "G-84H5ENX4BP"
 };
 
-let app, db, auth;
-try{
-  app = initializeApp(firebaseConfig);
-  // แคชถาวรในเครื่อง → ใช้งานต่อได้แม้เน็ตหลุดกลางกิจกรรม
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-  });
-  auth = getAuth(app);
-}catch(e){
-  console.error('Firebase init failed', e);
-  window.FBX = { fatal: String(e && e.message || e) };
+function fbFail(msg){
+  window.FBX = { loading:false, fatal:msg, ready:false, anon:false, user:null };
   window.dispatchEvent(new CustomEvent('fbx-state'));
+  window.dispatchEvent(new CustomEvent('fbx-loaded'));
+  console.error('[FBX]', msg, window.FBX_LOG);
 }
 
-if(app){
+(async ()=>{
+  let M;
+  try{ M = await fbLoadSdk(); }
+  catch(e){ return fbFail('โหลด Firebase SDK ไม่สำเร็จ: '+(e.message||e)); }
+  if(!M) return fbFail('โหลด Firebase SDK ไม่สำเร็จจากทุกแหล่ง — เครือข่ายนี้อาจปิดกั้น www.gstatic.com และ esm.sh');
+
+  const { initializeApp } = M.A;
+  const { getAuth, signInAnonymously, signInWithEmailAndPassword,
+          createUserWithEmailAndPassword, signOut, onAuthStateChanged } = M.U;
+  const { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
+          collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch,
+          query, where } = M.F;
+
+  let app, db, auth;
+  try{ app = initializeApp(firebaseConfig); }
+  catch(e){ return fbFail('เริ่มต้น Firebase ไม่สำเร็จ: '+(e.message||e)); }
+
+  // แคชถาวรอาจใช้ไม่ได้ในบางเบราว์เซอร์ (โหมดส่วนตัว) → ถอยไปใช้ค่าปกติ
+  try{
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+    window.FBX_LOG.push({ src:'firestore cache', ok:true, note:'persistent' });
+  }catch(e){
+    window.FBX_LOG.push({ src:'firestore cache', ok:false, err:String(e.message||e).slice(0,140) });
+    try{ db = getFirestore(app); }
+    catch(e2){ return fbFail('เชื่อมต่อ Firestore ไม่สำเร็จ: '+(e2.message||e2)+' — ตรวจว่าสร้าง Firestore Database แล้ว'); }
+  }
+
+  try{ auth = getAuth(app); }
+  catch(e){ return fbFail('เริ่มต้น Authentication ไม่สำเร็จ: '+(e.message||e)); }
+
   window.FBX = {
-    app, db, auth,
-    collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch,
+    app, db, auth, src:M.src, loading:false, fatal:'',
+    collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch, query, where,
     signInAnonymously, signInWithEmailAndPassword, signOut,
     createUser: createUserWithEmailAndPassword,
-    user: null, ready: false, error: '', anon: false
+    user:null, ready:false, anon:false
   };
 
   onAuthStateChanged(auth, u=>{
@@ -7281,12 +7348,15 @@ if(app){
     window.dispatchEvent(new CustomEvent('fbx-state'));
   });
 
-  // Analytics (ไม่บังคับ — ล้มเหลวได้โดยไม่กระทบระบบ)
-  import('https://www.gstatic.com/firebasejs/12.18.0/firebase-analytics.js')
+  // Analytics ไม่บังคับ — ล้มเหลวได้โดยไม่กระทบระบบ
+  const av = (M.src.match(/[\d.]+$/)||['12.18.0'])[0];
+  import(`https://www.gstatic.com/firebasejs/${av}/firebase-analytics.js`)
     .then(m=>{ try{ m.getAnalytics(app); }catch(e){} }).catch(()=>{});
 
   window.dispatchEvent(new CustomEvent('fbx-loaded'));
-}
+  window.dispatchEvent(new CustomEvent('fbx-state'));
+  console.info('[FBX] พร้อมใช้งาน • แหล่ง:', M.src);
+})();
 </script>
 
 </body>
