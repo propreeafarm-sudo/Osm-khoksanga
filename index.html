@@ -4770,7 +4770,9 @@ function fbOpenPanel(){
         <i class="fa-solid fa-plug-circle-check"></i> เชื่อมต่อ Firebase</button>
     </form>`}
   </div>
-  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">ปิด</button></div>`,{size:'sm'});
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="dgOpen()"><i class="fa-solid fa-stethoscope"></i> ตรวจสอบการเชื่อมต่อ</button>
+    <button class="btn btn-outline" onclick="closeModal()">ปิด</button></div>`,{size:'sm'});
 
   const f=document.getElementById('fb-login');
   if(f) f.addEventListener('submit',async e=>{
@@ -5876,6 +5878,702 @@ function handleCheckinHash(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,260));
   else setTimeout(go,260);
 })();
+
+
+/* ============================================================================================
+   IMPORT & REGISTRY OVERVIEW  v1.0
+   นำเข้ารายชื่อ อสม. จาก Excel / CSV / วางข้อมูล / Google Sheets เดิม
+   และการ์ดภาพรวมทะเบียนบนแดชบอร์ดแบบเรียลไทม์
+   ============================================================================================ */
+const IMP_FIELDS = [
+  {k:'fullName',  t:'ชื่อ–นามสกุล (รวมช่องเดียว)', hints:['ชื่อ-นามสกุล','ชื่อ - นามสกุล','ชื่อสกุล','ชื่อ-สกุล','ชื่อ – นามสกุล','fullname','name']},
+  {k:'firstName', t:'ชื่อ',            hints:['ชื่อ','firstname','first name','ชื่อจริง']},
+  {k:'lastName',  t:'นามสกุล',         hints:['นามสกุล','สกุล','lastname','last name']},
+  {k:'idCard',    t:'เลขบัตรประชาชน',   hints:['เลขบัตร','บัตรประชาชน','ประจำตัวประชาชน','idcard','cid','เลข 13','เลขประจำตัว']},
+  {k:'phone',     t:'เบอร์โทรศัพท์',    hints:['เบอร','โทรศัพท','โทร','phone','mobile','tel']},
+  {k:'houseNo',   t:'บ้านเลขที่',       hints:['บ้านเลขที่','เลขที่','houseno','บ้านเลข']},
+  {k:'moo',       t:'หมู่ที่',          hints:['หมู่ที่','หมู่','moo','village no']},
+  {k:'village',   t:'ชื่อหมู่บ้าน',      hints:['ชื่อหมู่บ้าน','หมู่บ้าน','village','บ้าน']},
+  {k:'position',  t:'ตำแหน่ง',          hints:['ตำแหน่ง','position']},
+  {k:'statusType',t:'สถานะการเป็น อสม.', hints:['สถานะการเป็น','สถานะ อสม','สถานะ','status']},
+  {k:'startYear', t:'ปีที่เริ่มเป็น อสม.',hints:['ปีที่เริ่ม','เริ่มเป็น','ปีเริ่ม','startyear','ปีที่บรรจุ']},
+  {k:'gender',    t:'เพศ',             hints:['เพศ','gender','sex']},
+  {k:'birthDate', t:'วันเกิด',          hints:['วันเกิด','เกิด','birth','วดป.เกิด']},
+  {k:'chongkosoSelf',  t:'ฌกส. (ตัว อสม.)',  hints:['ฌกส','ฌาปนกิจ']},
+  {k:'chongkosoSpouse',t:'ฌกส. (คู่สมรส)',   hints:['คู่สมรส','สมรส','spouse']}
+];
+let impRows=[], impHead=[], impMap={}, impMode='file', impDup='skip', impSrc='';
+
+function impNorm(s){ return String(s==null?'':s).trim().toLowerCase().replace(/[\s._\-()]/g,''); }
+function impGuess(head){
+  const map={};
+  const used=new Set();
+  IMP_FIELDS.forEach(f=>{
+    for(let i=0;i<head.length;i++){
+      if(used.has(i)) continue;
+      const h=impNorm(head[i]); if(!h) continue;
+      if(f.hints.some(x=>h.includes(impNorm(x)))){ map[f.k]=i; used.add(i); return; }
+    }
+  });
+  // ถ้าเดา "ชื่อ" ไปชนกับ "ชื่อหมู่บ้าน" ให้แก้
+  if(map.firstName!=null && map.village==null){
+    const h=impNorm(head[map.firstName]);
+    if(h.includes('หมู่บ้าน')){ map.village=map.firstName; delete map.firstName; }
+  }
+  // ถ้ามีช่องรวมชื่อ-สกุล แล้วไม่มีช่องแยก ให้ใช้ช่องรวม
+  if(map.fullName!=null && map.firstName!=null && map.lastName!=null) delete map.fullName;
+  return map;
+}
+
+/* ---------------------------------------------------------------- UI */
+function impOpen(){
+  impRows=[]; impHead=[]; impMap={}; impSrc='';
+  openModal(impShell(),{size:'lg'});
+  impRenderBody();
+}
+function impShell(){
+  return `
+  <div class="modal-header"><h3><i class="fa-solid fa-file-import"></i> นำเข้ารายชื่อ อสม.</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body" id="imp-body"></div>
+  <div class="modal-footer" id="imp-foot"></div>`;
+}
+function impSetMode(m){ impMode=m; impRows=[]; impHead=[]; impMap={}; impRenderBody(); }
+
+function impRenderBody(){
+  const b=document.getElementById('imp-body'); if(!b) return;
+  b.innerHTML=`
+  <div class="schp-tabs" style="margin-bottom:18px">
+    <button class="schp-tab ${impMode==='file'?'on':''}" onclick="impSetMode('file')"><i class="fa-solid fa-file-excel"></i> อัปโหลดไฟล์</button>
+    <button class="schp-tab ${impMode==='paste'?'on':''}" onclick="impSetMode('paste')"><i class="fa-solid fa-paste"></i> วางจาก Excel</button>
+    <button class="schp-tab ${impMode==='gas'?'on':''}" onclick="impSetMode('gas')"><i class="fa-brands fa-google-drive"></i> Google Sheets เดิม</button>
+  </div>
+  <div id="imp-step1"></div>
+  <div id="imp-step2"></div>`;
+
+  const s1=document.getElementById('imp-step1');
+  if(impMode==='file'){
+    s1.innerHTML=`
+    <label for="imp-file" style="display:block;border:2px dashed var(--border-strong);border-radius:var(--radius-md);
+      padding:34px 20px;text-align:center;cursor:pointer;background:var(--bg-surface-2)">
+      <i class="fa-solid fa-cloud-arrow-up" style="font-size:34px;color:var(--brand-navy-600);display:block;margin-bottom:12px"></i>
+      <b style="font-size:15px">เลือกไฟล์ Excel หรือ CSV</b>
+      <div style="font-size:12.5px;color:var(--text-secondary);margin-top:6px">รองรับ .xlsx .xls .csv — ระบบจะจับคู่หัวคอลัมน์ให้อัตโนมัติ</div>
+    </label>
+    <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="impReadFile(this)">
+    <p style="text-align:center;margin-top:14px">
+      <button class="btn btn-outline btn-sm" onclick="impTemplate()"><i class="fa-solid fa-download"></i> ดาวน์โหลดแบบฟอร์มตัวอย่าง</button></p>`;
+  }
+  if(impMode==='paste'){
+    s1.innerHTML=`
+    <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;margin:0 0 10px">
+      เปิดไฟล์ Excel → เลือกทั้งตาราง<b>รวมแถวหัวคอลัมน์</b> → Ctrl+C → คลิกในช่องด้านล่าง → Ctrl+V</p>
+    <textarea id="imp-paste" class="input" rows="9" style="font-family:monospace;font-size:12px"
+      placeholder="ชื่อ	นามสกุล	เลขบัตรประชาชน	หมู่ที่	ชื่อหมู่บ้าน&#10;สมชาย	ใจดี	3471000000001	1	โคกสง่า"></textarea>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="impReadPaste()">
+      <i class="fa-solid fa-wand-magic-sparkles"></i> อ่านข้อมูล</button>`;
+  }
+  if(impMode==='gas'){
+    const c=cloudConfig();
+    s1.innerHTML=`
+    <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;margin:0 0 14px">
+      ดึงทะเบียน อสม. จาก Google Apps Script เดิมที่เคยตั้งไว้ ถ้าดึงไม่สำเร็จให้ใช้วิธีอัปโหลดไฟล์แทน</p>
+    <div class="form-group"><label>Web App URL</label>
+      <input id="imp-url" class="input" value="${escapeHtml(c.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
+    <div class="form-group"><label>Shared Secret</label>
+      <input id="imp-sec" class="input" type="password" value="${escapeHtml(c.secret||'')}" placeholder="API SECRET"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="impReadGas()">
+      <i class="fa-solid fa-cloud-arrow-down"></i> ดึงข้อมูล</button>
+    <div id="imp-gas-msg" style="font-size:12.5px;margin-top:12px"></div>`;
+  }
+  document.getElementById('imp-foot').innerHTML=`<button class="btn btn-outline" onclick="closeModal()">ปิด</button>`;
+}
+
+/* ---------------------------------------------------------------- readers */
+function impReadFile(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  impSrc=f.name;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+      impLoadAoa(aoa);
+    }catch(err){ toast('อ่านไฟล์ไม่สำเร็จ: '+(err.message||err),'error'); }
+  };
+  rd.readAsArrayBuffer(f);
+}
+function impReadPaste(){
+  const txt=document.getElementById('imp-paste').value;
+  if(!txt.trim()){ toast('กรุณาวางข้อมูลก่อน','error'); return; }
+  const sep = txt.indexOf('\t')>=0 ? '\t' : (txt.indexOf(',')>=0 ? ',' : '\t');
+  const aoa=txt.replace(/\r/g,'').split('\n').filter(l=>l.trim()).map(l=>l.split(sep));
+  impSrc='วางจาก Excel'; impLoadAoa(aoa);
+}
+async function impReadGas(){
+  const url=document.getElementById('imp-url').value.trim();
+  const sec=document.getElementById('imp-sec').value.trim();
+  const msg=document.getElementById('imp-gas-msg');
+  if(!url||!sec){ msg.innerHTML='<span style="color:var(--danger)">กรุณากรอก URL และ Secret</span>'; return; }
+  setCloudConfig(url,sec);
+  msg.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังเชื่อมต่อ...';
+  try{
+    const out=await cloudPost('getBootstrap',{});
+    const arr=(out.data&&out.data.members)||[];
+    if(!arr.length){ msg.innerHTML='<span style="color:var(--warning)">เชื่อมต่อได้ แต่ไม่พบรายชื่อ อสม. ในชีต</span>'; return; }
+    const rows=arr.map(cloudMemberToLocal).filter(x=>x.firstName||x.idCard);
+    impRows=rows.map(r=>r); impHead=null; impSrc='Google Sheets';
+    msg.innerHTML=`<span style="color:var(--success)"><i class="fa-solid fa-circle-check"></i> พบ ${rows.length} รายชื่อ</span>`;
+    impPreviewDirect(rows);
+  }catch(e){
+    msg.innerHTML=`<span style="color:var(--danger)">ดึงข้อมูลไม่สำเร็จ: ${escapeHtml(String(e.message||e))}<br>
+      แนะนำให้ใช้วิธี “อัปโหลดไฟล์” แทน</span>`;
+  }
+}
+function impLoadAoa(aoa){
+  if(!aoa||aoa.length<2){ toast('ข้อมูลไม่ครบ ต้องมีแถวหัวคอลัมน์และอย่างน้อย 1 แถวข้อมูล','error'); return; }
+  // หาแถวหัวคอลัมน์ = แถวแรกที่มีข้อความ >= 2 ช่อง
+  let hi=0;
+  for(let i=0;i<Math.min(aoa.length,10);i++){
+    const n=aoa[i].filter(c=>String(c||'').trim()).length;
+    if(n>=2){ hi=i; break; }
+  }
+  impHead=aoa[hi].map(c=>String(c||'').trim());
+  impRows=aoa.slice(hi+1).filter(r=>r.some(c=>String(c||'').trim()));
+  impMap=impGuess(impHead);
+  impRenderMap();
+}
+
+/* ---------------------------------------------------------------- mapping + preview */
+function impRenderMap(){
+  const s2=document.getElementById('imp-step2'); if(!s2) return;
+  const opts=i=>impHead.map((h,j)=>`<option value="${j}" ${i===j?'selected':''}>${escapeHtml(h||'คอลัมน์ '+(j+1))}</option>`).join('');
+  s2.innerHTML=`
+  <hr style="border:0;border-top:1px solid var(--border);margin:20px 0">
+  <div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:16px">
+    <i class="fa-solid fa-circle-check"></i> อ่านข้อมูลได้ <b>${impRows.length}</b> แถว จาก ${escapeHtml(impSrc||'ไฟล์')}
+    — ตรวจการจับคู่คอลัมน์ด้านล่างแล้วกดนำเข้า</div>
+  <h4 style="margin:0 0 10px;font-size:14px">จับคู่คอลัมน์</h4>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:18px">
+    ${IMP_FIELDS.map(f=>`
+      <div class="form-group" style="margin:0">
+        <label style="font-size:11.5px">${f.t}</label>
+        <select class="input" onchange="impMap['${f.k}']=this.value===''?undefined:+this.value;impPreview()">
+          <option value="">— ไม่ใช้ —</option>${opts(impMap[f.k])}
+        </select></div>`).join('')}
+  </div>
+  <h4 style="margin:0 0 10px;font-size:14px">ตัวอย่างผลลัพธ์ (5 แถวแรก)</h4>
+  <div id="imp-prev" style="overflow:auto;border:1px solid var(--border);border-radius:10px"></div>
+  <div style="margin-top:16px">
+    <label style="font-size:13px;font-weight:700;display:block;margin-bottom:7px">ถ้าเลขบัตรซ้ำกับที่มีอยู่แล้ว</label>
+    <div class="schp-tabs">
+      <button class="schp-tab ${impDup==='skip'?'on':''}" onclick="impDup='skip';impRenderMap()">ข้ามไป</button>
+      <button class="schp-tab ${impDup==='update'?'on':''}" onclick="impDup='update';impRenderMap()">อัปเดตทับ</button>
+      <button class="schp-tab ${impDup==='add'?'on':''}" onclick="impDup='add';impRenderMap()">เพิ่มซ้ำ</button>
+    </div>
+  </div>`;
+  impPreview();
+  document.getElementById('imp-foot').innerHTML=`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="impRun()"><i class="fa-solid fa-file-import"></i> นำเข้า ${impRows.length} รายการ</button>`;
+}
+function impBuild(row){
+  const g=k=>impMap[k]==null?'':String(row[impMap[k]]==null?'':row[impMap[k]]).trim();
+  let fn=g('firstName'), ln=g('lastName');
+  if(!fn && impMap.fullName!=null){
+    const full=g('fullName').replace(/^(นาย|นาง|นางสาว|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s*/,'');
+    const p=full.split(/\s+/); fn=p[0]||''; ln=p.slice(1).join(' ');
+  }
+  const st=g('statusType');
+  return {
+    firstName:fn, lastName:ln,
+    idCard:g('idCard').replace(/\D/g,''),
+    phone:g('phone').replace(/\D/g,''),
+    houseNo:g('houseNo'), moo:g('moo').replace(/[^\d]/g,'')||g('moo'),
+    village:g('village'), position:g('position')||'อสม.',
+    statusType: OSM_STATUS_TYPES.includes(st)?st:'อสม.ตัวจริง',
+    startYear:g('startYear'), gender:g('gender'), birthDate:g('birthDate'),
+    chongkosoSelf:g('chongkosoSelf')||'ไม่ได้เป็นสมาชิก',
+    chongkosoSpouse:g('chongkosoSpouse')||'ไม่ได้เป็นสมาชิก',
+    tambon:TAMBON_DEFAULT, amphoe:AMPHOE_DEFAULT, province:PROVINCE_DEFAULT
+  };
+}
+function impPreview(){
+  const p=document.getElementById('imp-prev'); if(!p) return;
+  const cols=['firstName','lastName','idCard','phone','moo','village','statusType'];
+  const lab={firstName:'ชื่อ',lastName:'นามสกุล',idCard:'เลขบัตร',phone:'เบอร์โทร',moo:'หมู่',village:'หมู่บ้าน',statusType:'สถานะ'};
+  const rows=impRows.slice(0,5).map(impBuild);
+  p.innerHTML=`<table class="table" style="font-size:12.5px;margin:0">
+    <thead><tr>${cols.map(c=>`<th>${lab[c]}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${cols.map(c=>{
+      const bad=(c==='idCard'&&r.idCard&&!validateIdCard(r.idCard))||(c==='firstName'&&!r.firstName);
+      return `<td style="${bad?'color:var(--danger);font-weight:700':''}">${escapeHtml(r[c]||'')||'<span style="color:var(--text-faint)">–</span>'}</td>`;
+    }).join('')}</tr>`).join('')}</tbody></table>`;
+}
+function impPreviewDirect(rows){
+  // จาก GAS: มีโครงสร้างพร้อมใช้อยู่แล้ว
+  const s2=document.getElementById('imp-step2');
+  s2.innerHTML=`<hr style="border:0;border-top:1px solid var(--border);margin:20px 0">
+  <div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px">
+    <i class="fa-solid fa-circle-check"></i> พบ <b>${rows.length}</b> รายชื่อจาก Google Sheets</div>
+  <div style="overflow:auto;border:1px solid var(--border);border-radius:10px">
+    <table class="table" style="font-size:12.5px;margin:0"><thead><tr><th>ชื่อ</th><th>นามสกุล</th><th>เลขบัตร</th><th>หมู่</th><th>หมู่บ้าน</th></tr></thead>
+    <tbody>${rows.slice(0,5).map(r=>`<tr><td>${escapeHtml(r.firstName||'')}</td><td>${escapeHtml(r.lastName||'')}</td>
+      <td>${escapeHtml(r.idCard||'')}</td><td>${escapeHtml(r.moo||'')}</td><td>${escapeHtml(r.village||'')}</td></tr>`).join('')}</tbody></table></div>`;
+  document.getElementById('imp-foot').innerHTML=`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="impRunDirect()"><i class="fa-solid fa-file-import"></i> นำเข้า ${rows.length} รายการ</button>`;
+}
+
+/* ---------------------------------------------------------------- run */
+function impRun(){
+  const built=impRows.map(impBuild).filter(r=>r.firstName||r.idCard);
+  impCommit(built);
+}
+function impRunDirect(){ impCommit(impRows.filter(r=>r.firstName||r.idCard)); }
+
+function impCommit(list){
+  let add=0,upd=0,skip=0,bad=0;
+  list.forEach(r=>{
+    if(!r.firstName && !r.idCard){ bad++; return; }
+    const cid=String(r.idCard||'').replace(/\D/g,'');
+    const exist = cid ? state.osmMembers.find(m=>String(m.idCard||'').replace(/\D/g,'')===cid) : null;
+    if(exist){
+      if(impDup==='skip'){ skip++; return; }
+      if(impDup==='update'){ Object.assign(exist,r,{id:exist.id}); upd++; return; }
+    }
+    state.osmMembers.push(Object.assign({id:uid('osm'),recordedDate:toISODate(new Date()),createdAt:new Date().toISOString()},r));
+    add++;
+  });
+  schLog('นำเข้ารายชื่อ อสม.',`เพิ่ม ${add} • อัปเดต ${upd} • ข้าม ${skip} (จาก ${impSrc||'ไฟล์'})`);
+  persistState();
+  closeModal();
+  renderCurrentView();
+  toast(`นำเข้าสำเร็จ — เพิ่มใหม่ ${add} คน${upd?` • อัปเดต ${upd} คน`:''}${skip?` • ข้ามซ้ำ ${skip} คน`:''}`,'success');
+  if(typeof fbStaff==='function' && fbStaff()){ setTimeout(()=>{ fbPush().catch(()=>{}); },400); }
+}
+function impTemplate(){
+  const rows=[{'ชื่อ':'สมชาย','นามสกุล':'ใจดี','เลขบัตรประชาชน':'3471000000001','เบอร์โทรศัพท์':'0812345678',
+    'บ้านเลขที่':'12','หมู่ที่':'1','ชื่อหมู่บ้าน':'โคกสง่า','ตำแหน่ง':'อสม.','สถานะการเป็น อสม.':'อสม.ตัวจริง',
+    'ปีที่เริ่มเป็น อสม.':'2560','เพศ':'ชาย'}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'ทะเบียน อสม.');
+  downloadWorkbook(wb,'แบบฟอร์มนำเข้าทะเบียน_อสม.xlsx');
+}
+
+/* ============================================================================================
+   การ์ดภาพรวมทะเบียนบนแดชบอร์ด (อัปเดตเรียลไทม์)
+   ============================================================================================ */
+function dashRegistryCard(){
+  const host=document.getElementById('view-dashboard'); if(!host) return;
+  const all=state.osmMembers||[];
+  const active=all.filter(m=>!['ลาออก','เสียชีวิต'].includes(m.statusType));
+  const hh=(state.households||[]).length;
+  const hhSum=(state.households||[]).reduce((a,h)=>a+(Array.isArray(h.members)?h.members.length:0),0);
+  const moos=[...new Set(active.map(m=>String(m.moo||'').trim()).filter(Boolean))].sort((a,b)=>parseInt(a,10)-parseInt(b,10));
+  const acc=(state.osmAccounts||[]).filter(a=>a.status==='approved').length;
+  const noHh=active.filter(m=>!(state.households||[]).some(h=>h.osmId===m.id)).length;
+
+  const live = (typeof fbStaff==='function' && fbStaff())
+    ? '<span class="schp-pill" style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-color:transparent"><i class="fa-solid fa-bolt"></i> อัปเดตเรียลไทม์</span>'
+    : '<span class="schp-pill" style="background:var(--sch-amber-bg);color:var(--sch-amber);border-color:transparent"><i class="fa-solid fa-cloud-slash"></i> ยังไม่เชื่อม Firebase</span>';
+
+  const el=document.createElement('div');
+  el.id='dash-registry';
+  el.innerHTML = all.length===0 ? `
+    <div class="schp-empty" style="margin-bottom:20px">
+      <div class="ic"><i class="fa-solid fa-users-slash"></i></div>
+      <h3>ยังไม่มีรายชื่อ อสม. ในทะเบียน</h3>
+      <p>แดชบอร์ดและรายงานทั้งหมดคำนวณจากทะเบียนนี้<br>นำเข้ารายชื่อทั้งหมดครั้งเดียวจากไฟล์ Excel ที่มีอยู่ได้เลย</p>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="impOpen()"><i class="fa-solid fa-file-import"></i> นำเข้ารายชื่อ อสม.</button>`:''}
+    </div>` : `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-pad">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+          <div><h3 style="margin:0;font-size:17px;font-weight:800">ภาพรวมทะเบียน อสม.</h3>
+            <p style="margin:4px 0 0;font-size:12.5px;color:var(--text-secondary)">
+              ข้อมูล ณ ${formatThaiDate(new Date())}</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${live}
+            ${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="impOpen()"><i class="fa-solid fa-file-import"></i> นำเข้ารายชื่อ</button>`:''}
+          </div>
+        </div>
+        <div class="schp-kpis" style="margin:0">
+          <div class="schp-kpi" style="--k:var(--brand-navy-700)"><div class="k-lab">อสม. ในทะเบียน</div>
+            <div class="k-val">${all.length}</div><div class="k-sub">ปฏิบัติงานอยู่ ${active.length} คน</div></div>
+          <div class="schp-kpi" style="--k:var(--sch-violet)"><div class="k-lab">หมู่บ้านที่ดูแล</div>
+            <div class="k-val">${moos.length}</div><div class="k-sub">${moos.length?'หมู่ '+moos.join(', '):'ยังไม่ระบุหมู่'}</div></div>
+          <div class="schp-kpi" style="--k:var(--sch-emerald)"><div class="k-lab">หลังคาเรือนที่รับผิดชอบ</div>
+            <div class="k-val">${hh}</div><div class="k-sub">${hhSum?`ประชากรรวม ${hhSum} คน`:'ยังไม่บันทึกสมาชิกครัวเรือน'}</div></div>
+          <div class="schp-kpi" style="--k:${noHh?'var(--sch-amber)':'var(--sch-emerald)'}"><div class="k-lab">ยังไม่มีหลังคาเรือน</div>
+            <div class="k-val">${noHh}</div><div class="k-sub">คน ที่ยังไม่ได้บันทึก</div></div>
+          <div class="schp-kpi" style="--k:var(--info)"><div class="k-lab">บัญชีผู้ใช้งาน อสม.</div>
+            <div class="k-val">${acc}</div><div class="k-sub">จาก ${active.length} คน</div></div>
+        </div>
+        ${moos.length?`
+        <h4 style="margin:20px 0 10px;font-size:14px">จำนวน อสม. รายหมู่บ้าน</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${moos.map(mo=>{
+            const n=active.filter(m=>String(m.moo||'').trim()===mo).length;
+            const v=active.find(m=>String(m.moo||'').trim()===mo)?.village||'';
+            return `<span class="badge badge-info" style="padding:8px 13px;font-size:12.5px">
+              หมู่ ${escapeHtml(mo)}${v?' '+escapeHtml(v):''} <b style="margin-right:5px">${n}</b> คน</span>`;
+          }).join('')}
+        </div>`:''}
+      </div>
+    </div>`;
+
+  const old=document.getElementById('dash-registry'); if(old) old.remove();
+  const head=host.querySelector('.page-head');
+  if(head&&head.nextSibling) host.insertBefore(el,head.nextSibling);
+  else host.insertBefore(el,host.firstChild);
+}
+
+/* ---------------------------------------------------------------- hook เข้า routing */
+function renderCurrentView(){
+  switch(state.currentView){
+    case 'dashboard': renderDashboard(); dashRegistryCard(); break;
+    case 'osm-list': renderOsmListView(); impInjectButton(); break;
+    case 'osm-households': renderHouseholdsView(); break;
+    case 'activity-checkin': renderCheckinView(); break;
+    case 'activity-report': renderActivityReportView(); break;
+    case 'school-sessions': renderSchoolSessionsView(); break;
+    case 'school-roster': renderSchoolRosterView(); break;
+    case 'school-report': renderSchoolReportView(); break;
+    case 'school-docs': renderSchoolDocsView(); break;
+    case 'school-members': renderOsmAccountsView(); break;
+    case 'member-home': renderMemberHome(); break;
+    case 'member-history': renderMemberHistory(); break;
+    case 'member-leave': renderMemberLeave(); break;
+    case 'meetings': renderMeetingsView(); break;
+    case 'export': renderExportView(); break;
+    case 'admin': renderAdminView(); break;
+  }
+}
+function impInjectButton(){
+  if(!isAdmin()) return;
+  const acts=document.querySelector('#view-osm-list .page-head-actions');
+  if(!acts || acts.querySelector('.imp-btn')) return;
+  const b=document.createElement('button');
+  b.className='btn btn-outline imp-btn';
+  b.innerHTML='<i class="fa-solid fa-file-import"></i> นำเข้ารายชื่อ';
+  b.onclick=impOpen;
+  acts.insertBefore(b,acts.firstChild);
+}
+
+
+/* ============================================================================================
+   FIREBASE DIAGNOSTIC & SETUP WIZARD  v1.0
+   ตรวจการเชื่อมต่อจริงทีละขั้น แล้วบอกวิธีแก้แบบเจาะจง
+   ============================================================================================ */
+let dgRows=[], dgRunning=false;
+
+function dgSet(id, state, msg, fix){
+  const r=dgRows.find(x=>x.id===id); if(!r) return;
+  r.state=state; r.msg=msg||''; r.fix=fix||'';
+  dgPaint();
+}
+function dgPaint(){
+  const b=document.getElementById('dg-list'); if(!b) return;
+  b.innerHTML=dgRows.map(r=>{
+    const ic={wait:'fa-circle-notch fa-spin',ok:'fa-circle-check',warn:'fa-triangle-exclamation',
+              err:'fa-circle-xmark',idle:'fa-circle'}[r.state]||'fa-circle';
+    const col={wait:'var(--info)',ok:'var(--success)',warn:'var(--warning)',
+               err:'var(--danger)',idle:'var(--text-faint)'}[r.state]||'var(--text-faint)';
+    return `<div style="display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)">
+      <i class="fa-solid ${ic}" style="color:${col};font-size:17px;margin-top:2px;width:20px;text-align:center"></i>
+      <div style="flex:1;min-width:0">
+        <b style="font-size:13.5px">${r.t}</b>
+        ${r.msg?`<div style="font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.65">${r.msg}</div>`:''}
+        ${r.fix?`<div style="font-size:12.5px;background:var(--sch-amber-bg);color:var(--sch-amber);
+          border-radius:8px;padding:9px 12px;margin-top:8px;line-height:1.7">${r.fix}</div>`:''}
+      </div></div>`;
+  }).join('');
+}
+
+function dgOpen(){
+  dgRows=[
+    {id:'sdk',  t:'๑. โหลด Firebase SDK',            state:'idle'},
+    {id:'net',  t:'๒. การเชื่อมต่ออินเทอร์เน็ต',      state:'idle'},
+    {id:'auth', t:'๓. เข้าสู่ระบบบัญชีเจ้าหน้าที่',    state:'idle'},
+    {id:'staff',t:'๔. สิทธิ์เจ้าหน้าที่ (staff)',      state:'idle'},
+    {id:'read', t:'๕. ทดสอบอ่านข้อมูลจาก Firestore',  state:'idle'},
+    {id:'write',t:'๖. ทดสอบเขียนข้อมูลลง Firestore',  state:'idle'},
+    {id:'data', t:'๗. เปรียบเทียบข้อมูล เครื่อง ↔ Cloud', state:'idle'}
+  ];
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-stethoscope"></i> ตรวจสอบการเชื่อมต่อ Firebase</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;margin:0 0 16px">
+      ระบบจะทดสอบการเชื่อมต่อจริงทีละขั้น ถ้าติดตรงไหนจะบอกวิธีแก้ให้ทันที</p>
+    <div id="dg-list"></div>
+    <div id="dg-extra" style="margin-top:16px"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ปิด</button>
+    <button class="btn btn-primary" id="dg-run" onclick="dgRun()"><i class="fa-solid fa-play"></i> เริ่มตรวจสอบ</button>
+  </div>`,{size:'md'});
+  dgPaint();
+  setTimeout(dgRun,250);
+}
+
+async function dgRun(){
+  if(dgRunning) return;
+  dgRunning=true;
+  const btn=document.getElementById('dg-run');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจ'; }
+  const extra=document.getElementById('dg-extra'); if(extra) extra.innerHTML='';
+  dgRows.forEach(r=>{ r.state='idle'; r.msg=''; r.fix=''; });
+  dgPaint();
+  const pause=ms=>new Promise(r=>setTimeout(r,ms));
+
+  try{
+    /* 1 — SDK */
+    dgSet('sdk','wait','กำลังตรวจ...'); await pause(280);
+    const F=window.FBX;
+    if(!F){
+      dgSet('sdk','err','ยังโหลด Firebase SDK ไม่เสร็จ',
+        'รอสัก 5 วินาทีแล้วกดตรวจใหม่ • ถ้ายังไม่หาย แปลว่าเบราว์เซอร์เข้า www.gstatic.com ไม่ได้ ลองเปลี่ยนเครือข่ายหรือปิด VPN/ตัวกรองเว็บ');
+      return dgDone();
+    }
+    if(F.fatal){
+      dgSet('sdk','err','เริ่มต้น Firebase ไม่สำเร็จ: '+escapeHtml(F.fatal),
+        'ตรวจว่า Firestore Database ถูกสร้างแล้วใน Firebase Console → Build → Firestore Database');
+      return dgDone();
+    }
+    dgSet('sdk','ok','โหลดสำเร็จ • โปรเจกต์ osm-khoksanga');
+
+    /* 2 — เครือข่าย */
+    dgSet('net','wait','กำลังตรวจ...'); await pause(200);
+    if(navigator.onLine===false)
+      dgSet('net','warn','เบราว์เซอร์รายงานว่าออฟไลน์',
+        'ระบบยังใช้งานต่อได้ ข้อมูลจะค้างในเครื่องและซิงก์เองเมื่อเน็ตกลับมา');
+    else dgSet('net','ok','ออนไลน์');
+
+    /* 3 — เข้าสู่ระบบ */
+    dgSet('auth','wait','กำลังตรวจ...'); await pause(250);
+    if(!F.ready){
+      dgSet('auth','err','ยังไม่ได้เข้าสู่ระบบ Firebase',
+        'กดปุ่ม “เข้าสู่ระบบ Firebase” ด้านล่าง แล้วกรอกอีเมล/รหัสผ่านของบัญชีเจ้าหน้าที่ที่สร้างไว้ใน Authentication → Users');
+      dgLoginBox(); return dgDone();
+    }
+    if(F.anon){
+      dgSet('auth','warn','เข้าสู่ระบบแบบนิรนาม (Anonymous) — แก้ไขข้อมูลไม่ได้',
+        'ต้องเข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่จึงจะบันทึกข้อมูลได้');
+      dgLoginBox(); return dgDone();
+    }
+    dgSet('auth','ok','เข้าสู่ระบบแล้ว: '+escapeHtml(F.user?.email||'-'));
+
+    const uid=F.user?.uid||'';
+
+    /* 4 — staff */
+    dgSet('staff','wait','กำลังตรวจ...'); await pause(250);
+    let staffOk=null;
+    try{
+      const d=await F.getDoc(F.doc(F.db,'staff',uid));
+      staffOk=d.exists();
+    }catch(e){ staffOk=null; }
+    if(staffOk===true) dgSet('staff','ok','พบ UID นี้ใน collection staff แล้ว');
+    else if(staffOk===false)
+      dgSet('staff','warn','ไม่พบ UID นี้ใน collection staff',
+        'ถ้าคุณใช้ Rules ชุด v2 ต้องเพิ่ม UID ก่อน มิฉะนั้นจะบันทึกข้อมูลไม่ได้ — ดูวิธีและปุ่มคัดลอก UID ด้านล่าง');
+    else dgSet('staff','ok','ข้ามการตรวจ (Rules ชุดที่ใช้อยู่ไม่ต้องใช้ collection staff)');
+
+    /* 5 — อ่าน */
+    dgSet('read','wait','กำลังอ่าน osm_members...'); await pause(150);
+    let cloudCounts={};
+    try{
+      for(const [k,col] of Object.entries(FB_MAP)){
+        const snap=await F.getDocs(F.collection(F.db,col));
+        cloudCounts[k]=snap.size;
+      }
+      dgSet('read','ok','อ่านได้ทุก collection • อสม. บน Cloud '+(cloudCounts.osmMembers||0)+' รายการ');
+    }catch(e){
+      const m=String(e.code||e.message||e);
+      dgSet('read','err','อ่านไม่ได้: '+escapeHtml(m),
+        /permission/i.test(m)
+          ? 'Security Rules ยังไม่อนุญาต — เปิด Firebase Console → Firestore → Rules แล้ววางกฎจากไฟล์ที่ให้ไว้ → Publish'
+          : 'ตรวจว่าสร้าง Firestore Database แล้ว และเลือก Production mode ไม่ใช่ Datastore mode');
+      dgUidBox(uid); return dgDone();
+    }
+
+    /* 6 — เขียน */
+    dgSet('write','wait','กำลังทดสอบเขียน...'); await pause(150);
+    try{
+      const ref=F.doc(F.db,'app_config','_diagnostic');
+      await F.setDoc(ref,{at:new Date().toISOString(),by:uid});
+      await F.deleteDoc(ref);
+      dgSet('write','ok','เขียนและลบทดสอบสำเร็จ — สิทธิ์เจ้าหน้าที่ใช้งานได้เต็มรูปแบบ');
+    }catch(e){
+      const m=String(e.code||e.message||e);
+      dgSet('write','err','เขียนไม่ได้: '+escapeHtml(m),
+        /permission/i.test(m)
+          ? 'บัญชีนี้ยังไม่ถูกนับเป็น “เจ้าหน้าที่” — ถ้าใช้ Rules v2 ให้เพิ่ม UID ลง collection <b>staff</b> ตามวิธีด้านล่าง'
+          : 'ลองใหม่อีกครั้ง หรือตรวจการเชื่อมต่ออินเทอร์เน็ต');
+      dgUidBox(uid); return dgDone();
+    }
+
+    /* 7 — เทียบข้อมูล */
+    dgSet('data','wait','กำลังเปรียบเทียบ...'); await pause(200);
+    const lab={osmMembers:'ทะเบียน อสม.',households:'หลังคาเรือน',schoolSessions:'รอบเรียน',
+      schoolAttendance:'บันทึกเช็กชื่อ',meetings:'การประชุม',attendance:'กิจกรรมอื่น',
+      osmAccounts:'บัญชี อสม.',osmLeaves:'ใบลา'};
+    const lines=Object.keys(FB_MAP).map(k=>{
+      const L=(state[k]||[]).length, C=cloudCounts[k]||0;
+      const s=L===C?'✓':(L>C?'↑':'↓');
+      const c=L===C?'var(--success)':'var(--warning)';
+      return `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0">
+        <span>${lab[k]||k}</span>
+        <span style="color:${c};font-weight:700">เครื่อง ${L} • Cloud ${C} ${s}</span></div>`;
+    }).join('');
+    const need=Object.keys(FB_MAP).some(k=>(state[k]||[]).length!==(cloudCounts[k]||0));
+    dgSet('data', need?'warn':'ok', need?'ข้อมูลสองฝั่งยังไม่ตรงกัน':'ข้อมูลตรงกันทั้งสองฝั่ง');
+    const extra2=document.getElementById('dg-extra');
+    if(extra2) extra2.innerHTML=`
+      <div style="background:var(--bg-surface-2);border-radius:10px;padding:12px 14px">${lines}</div>
+      ${need?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px">
+        <button class="btn btn-primary" onclick="closeModal();fbUploadAll()"><i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดจากเครื่องนี้</button>
+        <button class="btn btn-outline" onclick="closeModal();fbDownloadAll()"><i class="fa-solid fa-cloud-arrow-down"></i> ดึงจาก Cloud มาทับ</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-faint);margin:9px 0 0;line-height:1.7">
+        ถ้าเครื่องนี้คือเครื่องที่มีข้อมูลล่าสุด ให้เลือก “อัปโหลดจากเครื่องนี้”</p>`
+      :`<div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px">
+        <i class="fa-solid fa-circle-check"></i> <b>ระบบพร้อมใช้งานเต็มรูปแบบ</b> — ข้อมูลจะซิงก์เรียลไทม์ทุกเครื่องที่เข้าสู่ระบบ</div>`}`;
+    if(!need){ fbStatusMsg=''; fbPaint(); }
+  }catch(e){
+    console.error(e);
+    toast('ตรวจสอบไม่สำเร็จ: '+(e.message||e),'error');
+  }
+  dgDone();
+}
+function dgDone(){
+  dgRunning=false;
+  const b=document.getElementById('dg-run');
+  if(b){ b.disabled=false; b.innerHTML='<i class="fa-solid fa-rotate"></i> ตรวจสอบอีกครั้ง'; }
+}
+function dgLoginBox(){
+  const e=document.getElementById('dg-extra'); if(!e) return;
+  e.innerHTML=`<button class="btn btn-primary" style="width:100%;justify-content:center"
+    onclick="closeModal();fbOpenPanel()"><i class="fa-solid fa-plug-circle-check"></i> เข้าสู่ระบบ Firebase</button>`;
+}
+function dgUidBox(uid){
+  const e=document.getElementById('dg-extra'); if(!e) return;
+  e.innerHTML=`
+  <div style="background:var(--bg-surface-2);border-radius:10px;padding:14px">
+    <b style="font-size:13px">วิธีเพิ่มสิทธิ์เจ้าหน้าที่ (ทำครั้งเดียว)</b>
+    <ol style="font-size:12.5px;line-height:1.9;margin:10px 0 0;padding-right:18px">
+      <li>คัดลอก UID ด้านล่าง</li>
+      <li>เปิด Firebase Console → Firestore Database → Start collection</li>
+      <li>Collection ID พิมพ์ว่า <b>staff</b></li>
+      <li>Document ID วาง UID ที่คัดลอกมา</li>
+      <li>เพิ่ม field ชื่อ <b>name</b> เป็น string ใส่ชื่อเจ้าหน้าที่ → Save</li>
+      <li>กลับมากด “ตรวจสอบอีกครั้ง”</li>
+    </ol>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <input class="input" id="dg-uid" readonly value="${escapeHtml(uid)}" style="font-family:monospace;font-size:12px">
+      <button class="btn btn-outline" onclick="navigator.clipboard.writeText(document.getElementById('dg-uid').value).then(()=>toast('คัดลอก UID แล้ว','success'))"><i class="fa-solid fa-copy"></i></button>
+    </div>
+  </div>`;
+}
+
+/* ============================================================================================
+   แถบสรุปขั้นตอนเริ่มต้นใช้งาน (แสดงบนแดชบอร์ดจนกว่าจะครบ)
+   ============================================================================================ */
+function dgChecklist(){
+  if(!isAdmin()) return;
+  const host=document.getElementById('view-dashboard'); if(!host) return;
+  const old=document.getElementById('dg-checklist'); if(old) old.remove();
+
+  const steps=[
+    { ok: (typeof fbStaff==='function' && fbStaff()), t:'เชื่อมต่อ Firebase',
+      d:'เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่เพื่อเปิดการซิงก์เรียลไทม์',
+      btn:'ตรวจสอบการเชื่อมต่อ', fn:'dgOpen()' },
+    { ok: (state.osmMembers||[]).length>=10, t:'นำเข้าทะเบียน อสม.',
+      d:`ขณะนี้มี ${(state.osmMembers||[]).length} คนในทะเบียน`,
+      btn:'นำเข้ารายชื่อ', fn:'impOpen()' },
+    { ok: (state.schoolSessions||[]).length>0, t:'สร้างรอบเรียนโรงเรียน อสม.',
+      d:'วางแผนทั้งปีได้ในคลิกเดียว',
+      btn:'ไปสร้างรอบเรียน', fn:"switchView('school-sessions')" },
+    { ok: (state.schoolCfg&&state.schoolCfg.principal), t:'กรอกผู้ลงนามในเอกสาร',
+      d:'ใช้พิมพ์ท้ายเอกสารราชการทุกฉบับ',
+      btn:'ตั้งค่า', fn:'schOpenSettings()' }
+  ];
+  const done=steps.filter(s=>s.ok).length;
+  if(done===steps.length) return;
+
+  const el=document.createElement('div');
+  el.id='dg-checklist';
+  el.innerHTML=`
+  <div class="card" style="margin-bottom:20px;border-right:5px solid var(--brand-navy-600)">
+    <div class="card-pad">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div><h3 style="margin:0;font-size:16px;font-weight:800">
+          <i class="fa-solid fa-list-check" style="color:var(--brand-navy-600)"></i> ขั้นตอนเริ่มต้นใช้งาน</h3>
+          <p style="margin:4px 0 0;font-size:12.5px;color:var(--text-secondary)">เสร็จแล้ว ${done} จาก ${steps.length} ขั้นตอน</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dg-checklist').remove()" title="ซ่อนชั่วคราว">
+          <i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="schp-live-bar" style="margin-bottom:16px">
+        <i style="width:${done/steps.length*100}%;background:var(--sch-emerald)"></i>
+        <i style="width:${(1-done/steps.length)*100}%;background:var(--bg-surface-2)"></i></div>
+      <div style="display:grid;gap:10px">
+        ${steps.map(s=>`
+        <div style="display:flex;gap:12px;align-items:center;padding:11px 13px;border-radius:10px;
+          background:${s.ok?'var(--sch-emerald-bg)':'var(--bg-surface-2)'}">
+          <i class="fa-solid ${s.ok?'fa-circle-check':'fa-circle'}"
+            style="color:${s.ok?'var(--sch-emerald)':'var(--text-faint)'};font-size:17px"></i>
+          <div style="flex:1;min-width:0">
+            <b style="font-size:13.5px">${s.t}</b>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${s.d}</div></div>
+          ${s.ok?'':`<button class="btn btn-outline btn-sm" onclick="${s.fn}">${s.btn}</button>`}
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+
+  const reg=document.getElementById('dash-registry');
+  if(reg) reg.parentNode.insertBefore(el,reg);
+  else {
+    const head=host.querySelector('.page-head');
+    if(head&&head.nextSibling) host.insertBefore(el,head.nextSibling);
+    else host.insertBefore(el,host.firstChild);
+  }
+}
+
+/* hook เข้าแดชบอร์ด */
+function renderCurrentView(){
+  switch(state.currentView){
+    case 'dashboard': renderDashboard(); dashRegistryCard(); dgChecklist(); break;
+    case 'osm-list': renderOsmListView(); impInjectButton(); break;
+    case 'osm-households': renderHouseholdsView(); break;
+    case 'activity-checkin': renderCheckinView(); break;
+    case 'activity-report': renderActivityReportView(); break;
+    case 'school-sessions': renderSchoolSessionsView(); break;
+    case 'school-roster': renderSchoolRosterView(); break;
+    case 'school-report': renderSchoolReportView(); break;
+    case 'school-docs': renderSchoolDocsView(); break;
+    case 'school-members': renderOsmAccountsView(); break;
+    case 'member-home': renderMemberHome(); break;
+    case 'member-history': renderMemberHistory(); break;
+    case 'member-leave': renderMemberLeave(); break;
+    case 'meetings': renderMeetingsView(); break;
+    case 'export': renderExportView(); break;
+    case 'admin': renderAdminView(); break;
+  }
+}
+
+/* เพิ่มปุ่มตรวจสอบในแผง Firebase */
+const _fbOpenPanelOrig = null;
+function dgAttachButton(){
+  const f=document.querySelector('#modal-box .modal-footer');
+  if(!f || f.querySelector('.dg-btn')) return;
+  const b=document.createElement('button');
+  b.className='btn btn-outline dg-btn';
+  b.innerHTML='<i class="fa-solid fa-stethoscope"></i> ตรวจสอบการเชื่อมต่อ';
+  b.onclick=dgOpen;
+  f.insertBefore(b,f.firstChild);
+}
 
 </script>
 <script type="module">
