@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
 /* ============================================================
    DESIGN TOKENS
@@ -634,6 +635,221 @@ body.sidebar-collapsed .sidebar-user .icon-btn{width:36px;height:36px;}
 
 <style>
 .checkin-shell{max-width:560px;margin:30px auto;padding:18px}.checkin-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:24px;padding:24px;box-shadow:var(--shadow-md)}.checkin-brand{text-align:center;margin-bottom:20px}.checkin-brand .logo-orb{width:72px;height:72px;border-radius:22px;margin:auto;display:grid;place-items:center;background:var(--brand-blue-100);font-size:30px;color:var(--brand-navy-800)}.checkin-success{text-align:center;padding:30px 10px}.checkin-success i{font-size:62px;color:var(--success)}.qr-box{display:grid;place-items:center;background:#fff;padding:18px;border-radius:18px;min-height:260px}.sync-pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;background:var(--info-bg);color:var(--info);font-size:12px;font-weight:700}.session-closed{opacity:.72}.checkin-code{font-size:26px;font-weight:900;letter-spacing:4px;text-align:center;color:var(--brand-navy-800);margin-top:8px}.privacy-note{font-size:12px;color:var(--text-secondary);line-height:1.6;margin-top:12px}.cloud-panel{border:1px dashed var(--border);border-radius:16px;padding:14px;background:var(--bg-surface-2)}
+
+/* ===== FIREBASE STATUS CHIP ===== */
+.fb-chip{width:auto!important;padding:0 12px;gap:7px;display:inline-flex;align-items:center;
+  font-size:12.5px;font-weight:700;white-space:nowrap;border-radius:var(--radius-full)}
+.fb-chip .fb-chip-t{display:inline}
+@media(max-width:720px){.fb-chip .fb-chip-t{display:none}.fb-chip{padding:0;width:40px!important;justify-content:center}}
+
+/* ===== SCHOOL PRO v3 ===== */
+/* ============================================================================
+   โรงเรียน อสม. PRO  —  Design layer  (v3.0)
+   ============================================================================ */
+:root{
+  --sch-emerald:#0E7C5A; --sch-emerald-bg:#E3F5EE;
+  --sch-amber:#B9720A;   --sch-amber-bg:#FBEDD9;
+  --sch-rose:#C81318;    --sch-rose-bg:#FDE4E4;
+  --sch-slate:#5B5878;   --sch-slate-bg:#EFF1F8;
+  --sch-violet:#4038A6;  --sch-violet-bg:#E9EDF9;
+}
+[data-theme="dark"]{
+  --sch-emerald-bg:#0F3A2C; --sch-amber-bg:#3E2C10; --sch-rose-bg:#3E1417;
+  --sch-slate-bg:#242552;  --sch-violet-bg:#232156;
+}
+
+/* ---------- Hero ---------- */
+.schp-hero{
+  position:relative;overflow:hidden;border-radius:var(--radius-lg);padding:26px 28px;
+  background:linear-gradient(125deg,var(--brand-navy-900) 0%,var(--brand-navy-700) 52%,#5A4FD0 100%);
+  color:#fff;margin-bottom:20px;box-shadow:var(--shadow-md);
+}
+.schp-hero::after{content:"";position:absolute;right:-70px;top:-70px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.07)}
+.schp-hero::before{content:"";position:absolute;right:60px;bottom:-110px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.05)}
+.schp-hero h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-.3px;position:relative;z-index:1}
+.schp-hero p{margin:8px 0 0;opacity:.86;max-width:620px;font-size:14px;line-height:1.65;position:relative;z-index:1}
+.schp-hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;position:relative;z-index:1}
+.schp-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:var(--radius-full);
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);font-size:12.5px;font-weight:600}
+.schp-pill i{opacity:.9}
+
+/* ---------- KPI ---------- */
+.schp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px;margin-bottom:18px}
+.schp-kpi{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:16px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+.schp-kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--k,var(--brand-navy-700))}
+.schp-kpi .k-lab{font-size:12px;color:var(--text-secondary);font-weight:600;letter-spacing:.2px}
+.schp-kpi .k-val{font-size:30px;font-weight:800;line-height:1.15;margin-top:4px;color:var(--k,var(--text-primary));font-variant-numeric:tabular-nums}
+.schp-kpi .k-sub{font-size:11.5px;color:var(--text-faint);margin-top:3px}
+
+/* ---------- Toolbar / segmented ---------- */
+.schp-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:var(--bg-surface);
+  border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+.schp-bar .fg{display:flex;flex-direction:column;gap:5px}
+.schp-bar .fg > label{font-size:11.5px;font-weight:700;color:var(--text-secondary)}
+.schp-bar .grow{flex:1;min-width:180px}
+.schp-tabs{display:inline-flex;background:var(--bg-surface-2);border:1px solid var(--border);
+  border-radius:var(--radius-full);padding:4px;gap:4px;flex-wrap:wrap}
+.schp-tab{border:0;background:transparent;color:var(--text-secondary);font-weight:700;font-size:13px;
+  padding:9px 17px;border-radius:var(--radius-full);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s}
+.schp-tab:hover{color:var(--text-primary)}
+.schp-tab.on{background:var(--brand-navy-700);color:#fff;box-shadow:var(--shadow-sm)}
+
+/* ---------- Session cards ---------- */
+.schp-sessions{display:grid;gap:14px}
+.schp-card{display:grid;grid-template-columns:86px 1fr auto;gap:18px;align-items:center;
+  background:var(--bg-surface);border:1px solid var(--border);border-left:5px solid var(--brand-navy-700);
+  border-radius:var(--radius-md);padding:16px 18px;box-shadow:var(--shadow-sm);transition:.18s}
+.schp-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.schp-card.is-open{border-left-color:var(--sch-emerald)}
+.schp-card.is-closed{border-left-color:var(--sch-slate);opacity:.92}
+.schp-card.is-future{border-left-color:var(--brand-blue-400)}
+.schp-date{text-align:center;background:var(--sch-violet-bg);border-radius:var(--radius-md);padding:10px 6px}
+.schp-date b{display:block;font-size:26px;font-weight:800;line-height:1;color:var(--brand-navy-700)}
+.schp-date span{display:block;font-size:11px;color:var(--text-secondary);margin-top:4px;font-weight:600}
+.schp-main h3{margin:0;font-size:16.5px;font-weight:800}
+.schp-main .meta{margin:6px 0 0;font-size:12.5px;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:12px}
+.schp-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:280px}
+.schp-progress{height:7px;border-radius:99px;background:var(--bg-surface-2);overflow:hidden;margin-top:10px;display:flex}
+.schp-progress i{display:block;height:100%}
+.schp-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--text-secondary)}
+.schp-legend span{display:inline-flex;align-items:center;gap:5px}
+.schp-legend em{width:9px;height:9px;border-radius:3px;display:inline-block;font-style:normal}
+
+/* ---------- Roster ---------- */
+.schp-roster{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-sm)}
+.schp-roster-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:13px 18px;background:var(--bg-surface-2);border-bottom:1px solid var(--border);font-size:13px}
+.schp-row{display:grid;grid-template-columns:40px 1fr auto auto;gap:14px;align-items:center;
+  padding:11px 18px;border-bottom:1px solid var(--border);transition:.12s}
+.schp-row:last-child{border-bottom:0}
+.schp-row:hover{background:var(--bg-surface-2)}
+.schp-row.done{background:linear-gradient(90deg,var(--sch-emerald-bg) 0%,transparent 42%)}
+.schp-row.miss{background:linear-gradient(90deg,var(--sch-rose-bg) 0%,transparent 42%)}
+.schp-idx{font-size:12.5px;color:var(--text-faint);font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.schp-person{display:flex;align-items:center;gap:11px;min-width:0}
+.schp-av{width:38px;height:38px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;
+  background:var(--brand-blue-100);color:var(--brand-navy-700)}
+.schp-person b{display:block;font-size:14px;line-height:1.3}
+.schp-person small{display:block;font-size:11.5px;color:var(--text-secondary);margin-top:2px}
+.schp-seg{display:inline-flex;gap:4px;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:var(--radius-full);padding:3px}
+.schp-sbtn{border:0;background:transparent;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text-secondary);
+  padding:7px 13px;border-radius:var(--radius-full);transition:.13s;white-space:nowrap}
+.schp-sbtn:hover{background:var(--bg-surface);color:var(--text-primary)}
+.schp-sbtn.on{color:#fff;box-shadow:var(--shadow-sm)}
+.schp-sbtn.on[data-s="มา"]{background:var(--sch-emerald)}
+.schp-sbtn.on[data-s="สาย"]{background:var(--sch-amber)}
+.schp-sbtn.on[data-s="ลา"]{background:var(--info)}
+.schp-sbtn.on[data-s="ขาด"]{background:var(--sch-rose)}
+.schp-sbtn.on[data-s="ผู้แทน"]{background:var(--brand-navy-700)}
+.schp-row-tools{display:flex;gap:6px;align-items:center}
+.schp-mini{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);
+  color:var(--text-secondary);cursor:pointer;display:grid;place-items:center;font-size:13px;transition:.13s}
+.schp-mini:hover{background:var(--brand-blue-100);color:var(--brand-navy-700);border-color:var(--brand-blue-200)}
+.schp-mini.has{background:var(--sch-emerald-bg);color:var(--sch-emerald);border-color:transparent}
+.schp-note{border:1px solid var(--border);background:var(--bg-surface);border-radius:9px;padding:7px 10px;font-size:12.5px;
+  width:150px;color:var(--text-primary);font-family:inherit}
+.schp-note:focus{outline:2px solid var(--brand-blue-200);border-color:var(--brand-navy-600)}
+
+/* ---------- Live progress ---------- */
+.schp-live{position:sticky;top:calc(var(--topbar-h) + 6px);z-index:20;background:var(--bg-surface);
+  border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 18px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+.schp-live-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;font-weight:700}
+.schp-live-bar{height:10px;border-radius:99px;background:var(--bg-surface-2);overflow:hidden;display:flex;margin-top:9px}
+.schp-live-bar i{height:100%;transition:width .3s ease}
+
+/* ---------- Scanner ---------- */
+.schp-scan-wrap{display:grid;grid-template-columns:minmax(280px,1fr) minmax(260px,340px);gap:18px}
+@media(max-width:900px){.schp-scan-wrap{grid-template-columns:1fr}}
+.schp-scan-box{background:#0A0921;border-radius:var(--radius-md);overflow:hidden;position:relative;min-height:300px;display:grid;place-items:center}
+.schp-scan-box video,.schp-scan-box canvas{width:100%!important;height:auto!important;display:block}
+.schp-scan-hint{color:#C6C3E8;text-align:center;padding:34px 22px;font-size:13.5px;line-height:1.7}
+.schp-scan-log{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:14px;max-height:420px;overflow:auto;box-shadow:var(--shadow-sm)}
+.schp-log-item{display:flex;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px dashed var(--border);font-size:13px}
+.schp-log-item:last-child{border-bottom:0}
+.schp-log-item i{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12px}
+.schp-log-ok i{background:var(--sch-emerald-bg);color:var(--sch-emerald)}
+.schp-log-warn i{background:var(--sch-amber-bg);color:var(--sch-amber)}
+.schp-log-err i{background:var(--sch-rose-bg);color:var(--sch-rose)}
+
+/* ---------- Quick code ---------- */
+.schp-quick{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:26px;text-align:center;box-shadow:var(--shadow-sm);max-width:560px;margin:0 auto}
+.schp-quick input{font-size:30px;text-align:center;letter-spacing:7px;font-weight:800;padding:16px;width:100%;
+  border:2px solid var(--border-strong);border-radius:var(--radius-md);background:var(--bg-surface-2);color:var(--text-primary);font-family:inherit}
+.schp-quick input:focus{outline:0;border-color:var(--brand-navy-600);background:var(--bg-surface)}
+.schp-hits{margin-top:14px;display:grid;gap:8px;text-align:right}
+.schp-hit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;
+  border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-surface-2);cursor:pointer;transition:.13s}
+.schp-hit:hover{background:var(--brand-blue-100);border-color:var(--brand-blue-200)}
+
+/* ---------- Matrix ---------- */
+.schp-matrix-wrap{overflow:auto;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-surface);box-shadow:var(--shadow-sm)}
+table.schp-matrix{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+table.schp-matrix th,table.schp-matrix td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap}
+table.schp-matrix thead th{position:sticky;top:0;background:var(--brand-navy-900);color:#fff;font-size:11.5px;font-weight:700;z-index:3}
+table.schp-matrix tbody th{position:sticky;right:0;background:var(--bg-surface);text-align:right;font-weight:700;z-index:2;
+  min-width:190px;border-left:1px solid var(--border);padding-right:12px}
+table.schp-matrix thead th:first-child{right:0;z-index:4;background:var(--brand-navy-900)}
+table.schp-matrix tbody tr:hover td{background:var(--bg-surface-2)}
+.mx{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;font-size:11px;font-weight:800}
+.mx-มา{background:var(--sch-emerald-bg);color:var(--sch-emerald)}
+.mx-สาย{background:var(--sch-amber-bg);color:var(--sch-amber)}
+.mx-ลา{background:var(--info-bg);color:var(--info)}
+.mx-ขาด{background:var(--sch-rose-bg);color:var(--sch-rose)}
+.mx-ผู้แทน{background:var(--sch-violet-bg);color:var(--brand-navy-700)}
+.mx-none{background:transparent;color:var(--text-faint)}
+
+/* ---------- Risk chips ---------- */
+.schp-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:var(--radius-full);font-size:11.5px;font-weight:700}
+.schp-chip.good{background:var(--sch-emerald-bg);color:var(--sch-emerald)}
+.schp-chip.watch{background:var(--sch-amber-bg);color:var(--sch-amber)}
+.schp-chip.risk{background:var(--sch-rose-bg);color:var(--sch-rose)}
+
+/* ---------- Doc center ---------- */
+.schp-docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:16px}
+.schp-doc{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:20px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:11px;transition:.18s}
+.schp-doc:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:var(--brand-blue-200)}
+.schp-doc-ic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:20px;
+  background:var(--sch-violet-bg);color:var(--brand-navy-700)}
+.schp-doc h4{margin:0;font-size:15px;font-weight:800}
+.schp-doc p{margin:0;font-size:12.5px;color:var(--text-secondary);line-height:1.65;flex:1}
+
+/* ---------- Signature pad ---------- */
+.schp-sigpad{width:100%;height:190px;border:2px dashed var(--border-strong);border-radius:var(--radius-md);
+  background:var(--bg-surface-2);touch-action:none;display:block;cursor:crosshair}
+.schp-sig-thumb{height:34px;max-width:110px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--border);padding:2px}
+
+/* ---------- Empty ---------- */
+.schp-empty{text-align:center;padding:56px 24px;background:var(--bg-surface);border:1px dashed var(--border-strong);border-radius:var(--radius-md)}
+.schp-empty .ic{width:78px;height:78px;margin:0 auto 16px;border-radius:50%;display:grid;place-items:center;
+  font-size:30px;background:var(--sch-violet-bg);color:var(--brand-navy-700)}
+.schp-empty h3{margin:0 0 6px;font-size:18px;font-weight:800}
+.schp-empty p{margin:0 0 18px;color:var(--text-secondary);font-size:13.5px}
+
+/* ---------- Public check-in extras ---------- */
+.schp-pin{display:flex;gap:8px;justify-content:center;margin:12px 0}
+.schp-pin input{width:46px;height:56px;text-align:center;font-size:24px;font-weight:800;border:2px solid var(--border-strong);
+  border-radius:12px;background:var(--bg-surface-2);color:var(--text-primary);font-family:inherit}
+.schp-pin input:focus{outline:0;border-color:var(--brand-navy-600)}
+
+/* ---------- Responsive ---------- */
+@media(max-width:820px){
+  .schp-card{grid-template-columns:64px 1fr;gap:12px}
+  .schp-actions{grid-column:1/-1;justify-content:flex-start;max-width:none}
+  .schp-row{grid-template-columns:1fr;gap:10px}
+  .schp-idx{display:none}
+  .schp-seg{overflow-x:auto;max-width:100%}
+  .schp-note{width:100%}
+  .schp-hero{padding:20px}
+  .schp-hero h2{font-size:20px}
+}
+@media print{
+  .schp-hero,.schp-bar,.schp-tabs,.schp-actions,.schp-live,.schp-doc,.schp-row-tools{display:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -2500,6 +2716,2156 @@ document.addEventListener('DOMContentLoaded', function(){
     el.addEventListener('click', ()=> switchView(el.dataset.view));
   });
 });
+
+/* ============================================================================================
+   โรงเรียน อสม. PRO  v3.0  —  ระบบเช็กชื่อและเอกสารดิจิทัล
+   รพ.สต.บ้านโคกสง่า อ.บ้านม่วง จ.สกลนคร
+   โมดูลนี้ override ของเดิม (function declaration ตัวหลังชนะ) จึงไม่กระทบโค้ดส่วนอื่น
+   ============================================================================================ */
+
+const SCH_ST      = ['มา','สาย','ลา','ผู้แทน','ขาด'];
+const SCH_PRESENT = ['มา','สาย','ผู้แทน'];
+const SCH_COLOR   = {'มา':'#0E7C5A','สาย':'#B9720A','ลา':'#2E5FD9','ผู้แทน':'#4038A6','ขาด':'#C81318'};
+const SCH_ICON    = {'มา':'fa-circle-check','สาย':'fa-clock','ลา':'fa-file-pen','ผู้แทน':'fa-user-group','ขาด':'fa-circle-xmark'};
+const SCH_ORG     = { name:'รพ.สต.บ้านโคกสง่า', tambon:'ดงหม้อทองใต้', amphoe:'บ้านม่วง', province:'สกลนคร',
+                      district:'สำนักงานสาธารณสุขอำเภอบ้านม่วง', prov_office:'สำนักงานสาธารณสุขจังหวัดสกลนคร' };
+
+let schTab        = 'list';        // list | scan | quick
+let schFilterMoo  = '';
+let schSearch     = '';
+let schHideDone   = false;
+let schYear       = new Date().getFullYear();
+let schScanner    = null;
+let schScanLog    = [];
+let schUndo       = [];
+let schChart      = null;
+
+/* ---------------------------------------------------------------- state */
+function schInit(){
+  state.schoolSessions   = Array.isArray(state.schoolSessions)   ? state.schoolSessions   : [];
+  state.schoolAttendance = Array.isArray(state.schoolAttendance) ? state.schoolAttendance : [];
+  state.schoolLog        = Array.isArray(state.schoolLog)        ? state.schoolLog        : [];
+  state.schoolCfg = Object.assign({
+    lateAfter:30, requireSign:false, geofence:false, lat:null, lng:null, radius:300,
+    principal:'', principalPos:'ผู้อำนวยการโรงพยาบาลส่งเสริมสุขภาพตำบลบ้านโคกสง่า',
+    reporter:'', reporterPos:'นักวิชาการสาธารณสุข'
+  }, state.schoolCfg||{});
+}
+function schLog(action, detail){
+  state.schoolLog.unshift({ id:uid('lg'), at:new Date().toISOString(),
+    by:(state.currentUser?currentUserFullName():'ระบบ'), action, detail:detail||'' });
+  if(state.schoolLog.length>800) state.schoolLog.length=800;
+}
+function schSave(){ try{ persistState(); }catch(e){ console.warn(e); } }
+
+/* ---------------------------------------------------------------- queries */
+function schSessions(){ return (state.schoolSessions||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))); }
+function schSessionById(id){ return (state.schoolSessions||[]).find(s=>s.id===id); }
+function schMembers(){
+  return state.osmMembers
+    .filter(m=>!['ลาออก','เสียชีวิต'].includes(m.statusType))
+    .slice().sort((a,b)=>
+      (parseInt(a.moo||'99',10)-parseInt(b.moo||'99',10)) ||
+      String(a.firstName||'').localeCompare(String(b.firstName||''),'th'));
+}
+function schRec(sid,oid){ return (state.schoolAttendance||[]).find(r=>r.sessionId===sid&&r.osmId===oid); }
+function schMoos(){ return [...new Set(schMembers().map(m=>String(m.moo||'').trim()).filter(Boolean))]
+  .sort((a,b)=>parseInt(a,10)-parseInt(b,10)); }
+
+function schStats(sid){
+  const total = schMembers().length;
+  const c = {'มา':0,'สาย':0,'ลา':0,'ผู้แทน':0,'ขาด':0};
+  let checked = 0;
+  (state.schoolAttendance||[]).filter(r=>r.sessionId===sid).forEach(r=>{
+    if(c[r.status]!==undefined){ c[r.status]++; checked++; }
+  });
+  const attended = c['มา']+c['สาย']+c['ผู้แทน'];
+  return { total, checked, attended, pending: Math.max(0,total-checked), ...c,
+           pct: total ? Math.round(attended/total*1000)/10 : 0 };
+}
+function schYearOf(oid, year){
+  const ss = (state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===year && !s.draft);
+  let a=0,late=0,lv=0,ab=0,rep=0,none=0;
+  ss.forEach(s=>{
+    const r=schRec(s.id,oid);
+    if(!r||!r.status){ none++; return; }
+    if(r.status==='มา') a++;
+    else if(r.status==='สาย'){ a++; late++; }
+    else if(r.status==='ผู้แทน'){ a++; rep++; }
+    else if(r.status==='ลา') lv++;
+    else if(r.status==='ขาด') ab++;
+  });
+  return { total:ss.length, attended:a, late, leave:lv, absent:ab, rep, none,
+           pct: ss.length ? Math.round(a/ss.length*1000)/10 : 0 };
+}
+function schYears(){
+  const y=[...new Set((state.schoolSessions||[]).map(s=>new Date(s.date).getFullYear()))].sort((a,b)=>b-a);
+  return y.length?y:[new Date().getFullYear()];
+}
+function schRiskLevel(r){
+  if(!r.total) return {c:'good',t:'ยังไม่มีข้อมูล'};
+  if(r.absent>=3 || r.pct<70) return {c:'risk', t:'ต้องติดตามด่วน'};
+  if(r.absent>=2 || r.pct<85) return {c:'watch',t:'เฝ้าระวัง'};
+  return {c:'good',t:'สม่ำเสมอ'};
+}
+function schSessionState(s){
+  if(s.closedAt) return 'closed';
+  const today=toISODate(new Date());
+  if(String(s.date)>today) return 'future';
+  return 'open';
+}
+function schCode(m){ // รหัสเช็กชื่อ 4 หลัก = ท้ายบัตร ปชช.
+  const id=String(m.idCard||'').replace(/\D/g,'');
+  return id.length>=4 ? id.slice(-4) : String(m.id||'').slice(-4).toUpperCase();
+}
+
+/* ---------------------------------------------------------------- QR helper */
+function schQrDataUrl(text,size){
+  return new Promise(res=>{
+    try{
+      const d=document.createElement('div');
+      d.style.cssText='position:fixed;left:-9999px;top:0';
+      document.body.appendChild(d);
+      new QRCode(d,{text:String(text),width:size||220,height:size||220,
+        correctLevel:(window.QRCode&&QRCode.CorrectLevel)?QRCode.CorrectLevel.M:undefined});
+      setTimeout(()=>{
+        const c=d.querySelector('canvas'), im=d.querySelector('img');
+        let u=''; try{ u = c?c.toDataURL('image/png'):(im?im.src:''); }catch(e){ u = im?im.src:''; }
+        d.remove(); res(u);
+      },160);
+    }catch(e){ res(''); }
+  });
+}
+
+/* ================================================================================
+   VIEW 1 : รอบเรียนประจำเดือน
+   ================================================================================ */
+function renderSchoolSessionsView(){
+  schInit();
+  const el   = document.getElementById('view-school-sessions');
+  const all  = schSessions();
+  const y    = schYear;
+  const list = all.filter(s=>new Date(s.date).getFullYear()===y);
+  const mem  = schMembers().length;
+  const done = list.filter(s=>s.closedAt).length;
+  const avg  = list.length ? Math.round(list.reduce((a,s)=>a+schStats(s.id).pct,0)/list.length*10)/10 : 0;
+  const admin= isAdmin();
+
+  el.innerHTML = `
+  <div class="schp-hero">
+    <h2><i class="fa-solid fa-school-flag"></i> โรงเรียน อสม. บ้านโคกสง่า</h2>
+    <p>ระบบเช็กชื่อและออกเอกสารดิจิทัลสำหรับกิจกรรมพัฒนาศักยภาพ อสม. ประจำเดือน — เช็กชื่อได้ทั้งแบบสแกน QR
+       และแบบเจ้าหน้าที่กดเอง พร้อมออกใบลงชื่อ รายงานสรุป และหนังสือแจ้งเตือนได้ทันทีโดยไม่ต้องใช้กระดาษ</p>
+    <div class="schp-hero-meta">
+      <span class="schp-pill"><i class="fa-solid fa-calendar-check"></i> ${list.length} ครั้ง ในปี ${beYear(y)}</span>
+      <span class="schp-pill"><i class="fa-solid fa-users"></i> ${mem} อสม. ในทะเบียน</span>
+      <span class="schp-pill"><i class="fa-solid fa-chart-line"></i> เข้าร่วมเฉลี่ย ${avg}%</span>
+      <span class="schp-pill"><i class="fa-solid fa-lock"></i> ปิดรอบแล้ว ${done}/${list.length}</span>
+    </div>
+  </div>
+
+  <div class="schp-bar">
+    <div class="fg"><label>ปีงบประมาณ / ปฏิทิน</label>
+      <select class="input" onchange="schYear=+this.value;renderSchoolSessionsView()">
+        ${[...new Set([...schYears(),new Date().getFullYear()])].sort((a,b)=>b-a)
+          .map(v=>`<option value="${v}" ${v===y?'selected':''}>พ.ศ. ${beYear(v)}</option>`).join('')}
+      </select></div>
+    <div class="fg grow"></div>
+    ${admin?`
+    <button class="btn btn-outline" onclick="schOpenSettings()"><i class="fa-solid fa-sliders"></i> ตั้งค่า</button>
+    <button class="btn btn-outline" onclick="schPlanYear()"><i class="fa-solid fa-calendar-days"></i> วางแผนทั้งปี</button>
+    <button class="btn btn-primary" onclick="openSchoolSessionForm()"><i class="fa-solid fa-plus"></i> สร้างรอบเรียน</button>`:''}
+  </div>
+
+  ${list.length ? `<div class="schp-sessions">${list.map(s=>schSessionCard(s,admin)).join('')}</div>` : `
+  <div class="schp-empty">
+    <div class="ic"><i class="fa-solid fa-calendar-plus"></i></div>
+    <h3>ยังไม่มีรอบเรียนในปี ${beYear(y)}</h3>
+    <p>เริ่มจากกด “วางแผนทั้งปี” เพื่อสร้างรอบเรียนครบ 12 เดือนในคลิกเดียว<br>หรือสร้างทีละรอบตามที่ต้องการ</p>
+    ${admin?`<button class="btn btn-primary" onclick="schPlanYear()"><i class="fa-solid fa-wand-magic-sparkles"></i> วางแผนทั้งปี</button>`:''}
+  </div>`}`;
+}
+
+function schSessionCard(s, admin){
+  const st = schStats(s.id), d = new Date(s.date), ss = schSessionState(s);
+  const seg = SCH_ST.map(k=>st[k]?`<i style="width:${st[k]/Math.max(1,st.total)*100}%;background:${SCH_COLOR[k]}"></i>`:'').join('')
+            + (st.pending?`<i style="width:${st.pending/Math.max(1,st.total)*100}%;background:var(--bg-surface-2)"></i>`:'');
+  const badge = ss==='closed' ? '<span class="badge" style="background:var(--sch-slate-bg);color:var(--sch-slate)"><i class="fa-solid fa-lock"></i> ปิดรอบแล้ว</span>'
+              : ss==='future'? '<span class="badge badge-info"><i class="fa-solid fa-hourglass-half"></i> รอถึงกำหนด</span>'
+              : '<span class="badge badge-success"><i class="fa-solid fa-circle-dot"></i> เปิดเช็กชื่อ</span>';
+  return `
+  <div class="schp-card is-${ss}">
+    <div class="schp-date"><b>${d.getDate()}</b><span>${THAI_MONTHS_SHORT[d.getMonth()]} ${String(beYear(d.getFullYear())).slice(-2)}</span></div>
+    <div class="schp-main">
+      <h3>${escapeHtml(s.title||'โรงเรียน อสม. ประจำเดือน')} ${badge}</h3>
+      <div class="meta">
+        <span><i class="fa-solid fa-clock"></i> ${escapeHtml(s.startTime||'09:00')}–${escapeHtml(s.endTime||'12:00')} น.</span>
+        <span><i class="fa-solid fa-location-dot"></i> ${escapeHtml(s.location||SCH_ORG.name)}</span>
+        ${s.topic?`<span><i class="fa-solid fa-book-open"></i> ${escapeHtml(s.topic)}</span>`:''}
+        ${s.pin?`<span><i class="fa-solid fa-key"></i> PIN ${escapeHtml(s.pin)}</span>`:''}
+      </div>
+      <div class="schp-progress">${seg||'<i style="width:100%;background:var(--bg-surface-2)"></i>'}</div>
+      <div class="schp-legend">
+        ${SCH_ST.map(k=>`<span><em style="background:${SCH_COLOR[k]}"></em>${k} ${st[k]}</span>`).join('')}
+        <span><em style="background:var(--border-strong)"></em>ยังไม่เช็ก ${st.pending}</span>
+        <span style="font-weight:800;color:var(--text-primary)">เข้าร่วม ${st.pct}%</span>
+      </div>
+    </div>
+    <div class="schp-actions">
+      <button class="btn btn-primary btn-sm" onclick="openSchoolRoster('${s.id}')"><i class="fa-solid fa-clipboard-user"></i> เช็กชื่อ</button>
+      <button class="btn btn-outline btn-sm" onclick="showSchoolQR('${s.id}')"><i class="fa-solid fa-qrcode"></i> QR</button>
+      <button class="btn btn-outline btn-sm" title="ใบลงชื่อ" onclick="schPrintSignSheet('${s.id}')"><i class="fa-solid fa-file-signature"></i></button>
+      <button class="btn btn-outline btn-sm" title="รายงานสรุป" onclick="schPrintSessionReport('${s.id}')"><i class="fa-solid fa-file-lines"></i></button>
+      ${admin?`
+      <button class="btn btn-outline btn-sm" title="${s.closedAt?'เปิดรอบใหม่':'ปิดรอบ'}" onclick="closeSchoolSession('${s.id}')"><i class="fa-solid fa-${s.closedAt?'lock-open':'lock'}"></i></button>
+      <button class="btn btn-outline btn-sm" title="แก้ไข" onclick="openSchoolSessionForm('${s.id}')"><i class="fa-solid fa-pen"></i></button>
+      <button class="btn btn-ghost btn-sm" title="ลบ" onclick="deleteSchoolSession('${s.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>`:''}
+    </div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- create / edit */
+function openSchoolSessionForm(id){
+  schInit();
+  const s = id ? schSessionById(id) : null;
+  const now = new Date();
+  const def = {
+    title: s?s.title:`โรงเรียน อสม. ประจำเดือน${THAI_MONTHS[now.getMonth()]} ${beYear(now.getFullYear())}`,
+    date: s?s.date:toISODate(now), startTime:s?.startTime||'09:00', endTime:s?.endTime||'12:00',
+    topic:s?.topic||'', location:s?.location||SCH_ORG.name, owner:s?.owner||currentUserFullName(),
+    speaker:s?.speaker||'', hours:s?.hours||3, pin:s?.pin||String(Math.floor(100000+Math.random()*900000))
+  };
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-calendar-${id?'pen':'plus'}"></i> ${id?'แก้ไข':'สร้าง'}รอบโรงเรียน อสม.</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="ssf"><div class="modal-body">
+    <div class="form-group"><label>ชื่อรอบเรียน <span class="req">*</span></label>
+      <input id="ss-title" class="input" value="${escapeHtml(def.title)}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="form-group"><label>วันที่จัด <span class="req">*</span></label><input id="ss-date" type="date" class="input" value="${def.date}"></div>
+      <div class="form-group"><label>เริ่ม</label><input id="ss-start" type="time" class="input" value="${def.startTime}"></div>
+      <div class="form-group"><label>สิ้นสุด</label><input id="ss-end" type="time" class="input" value="${def.endTime}"></div>
+    </div>
+    <div class="form-group"><label>หัวข้อ / สาระสำคัญ</label>
+      <input id="ss-topic" class="input" list="ss-topics" value="${escapeHtml(def.topic)}" placeholder="เช่น การเฝ้าระวังโรคไข้เลือดออกในชุมชน">
+      <datalist id="ss-topics">
+        ${['การเฝ้าระวังและควบคุมโรคไข้เลือดออก','การคัดกรองโรคเบาหวานและความดันโลหิตสูง','การดูแลผู้สูงอายุและผู้ป่วยติดเตียง',
+           'การส่งเสริมสุขภาพจิตในชุมชน','อนามัยแม่และเด็ก','การจัดการขยะและอนามัยสิ่งแวดล้อม','การปฐมพยาบาลเบื้องต้นและ CPR',
+           'การใช้แอปพลิเคชัน Smart อสม.','การป้องกันโรคไม่ติดต่อเรื้อรัง (NCDs)','การเฝ้าระวังโรคติดต่อทางเดินหายใจ',
+           'ยาและผลิตภัณฑ์สุขภาพที่ปลอดภัย','การดูแลสุขภาพช่องปาก'].map(t=>`<option value="${t}">`).join('')}
+      </datalist></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>สถานที่</label><input id="ss-loc" class="input" value="${escapeHtml(def.location)}"></div>
+      <div class="form-group"><label>จำนวนชั่วโมง</label><input id="ss-hours" type="number" step="0.5" min="0" class="input" value="${def.hours}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>ผู้รับผิดชอบ</label><input id="ss-owner" class="input" value="${escapeHtml(def.owner)}"></div>
+      <div class="form-group"><label>วิทยากร</label><input id="ss-speaker" class="input" value="${escapeHtml(def.speaker)}" placeholder="ชื่อวิทยากร"></div>
+    </div>
+    <div class="form-group"><label>รหัส PIN สำหรับเช็กชื่อผ่าน QR</label>
+      <div style="display:flex;gap:8px">
+        <input id="ss-pin" class="input" maxlength="6" inputmode="numeric" value="${def.pin}" style="letter-spacing:4px;font-weight:800">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('ss-pin').value=String(Math.floor(100000+Math.random()*900000))"><i class="fa-solid fa-rotate"></i></button>
+      </div>
+      <small style="color:var(--text-faint);font-size:11.5px">อสม. ต้องกรอก PIN นี้ตอนสแกน QR เพื่อกันการเช็กชื่อจากนอกสถานที่</small></div>
+    <div class="field-error" id="ss-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+  </div></form>`,{size:'md'});
+
+  document.getElementById('ssf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const g=x=>document.getElementById(x).value.trim();
+    const title=g('ss-title'), date=g('ss-date'), err=document.getElementById('ss-err');
+    if(!title||!date){ err.textContent='กรุณากรอกชื่อรอบเรียนและวันที่'; err.style.display='block'; return; }
+    const dup=(state.schoolSessions||[]).some(x=>x.id!==id && String(x.date).slice(0,7)===date.slice(0,7));
+    if(dup){ err.textContent='เดือนนี้มีรอบโรงเรียน อสม. อยู่แล้ว (1 เดือน 1 รอบ)'; err.style.display='block'; return; }
+    const data={ title, date, startTime:g('ss-start'), endTime:g('ss-end'), topic:g('ss-topic'),
+      location:g('ss-loc'), owner:g('ss-owner'), speaker:g('ss-speaker'),
+      hours:parseFloat(g('ss-hours'))||0, pin:g('ss-pin') };
+    if(id){ Object.assign(schSessionById(id),data); schLog('แก้ไขรอบเรียน',title); }
+    else  { state.schoolSessions.push(Object.assign({id:uid('school'),createdAt:new Date().toISOString()},data)); schLog('สร้างรอบเรียน',title); }
+    schSave(); closeModal(); renderCurrentView();
+    toast(id?'แก้ไขรอบเรียนเรียบร้อยแล้ว':'สร้างรอบเรียนเรียบร้อยแล้ว','success');
+  });
+}
+
+/* ---------------------------------------------------------------- วางแผนทั้งปี */
+function schPlanYear(){
+  schInit();
+  const y=schYear;
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-calendar-days"></i> วางแผนโรงเรียน อสม. ทั้งปี ${beYear(y)}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="spy"><div class="modal-body">
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin:0 0 14px">
+      ระบบจะสร้างรอบเรียนให้ครบ 12 เดือนโดยอัตโนมัติ เดือนที่มีรอบอยู่แล้วจะถูกข้ามไป
+      คุณสามารถแก้วันที่หรือหัวข้อของแต่ละเดือนได้ภายหลัง</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>จัดสัปดาห์ที่</label>
+        <select id="spy-week" class="input"><option value="1">สัปดาห์ที่ 1</option><option value="2" selected>สัปดาห์ที่ 2</option>
+        <option value="3">สัปดาห์ที่ 3</option><option value="4">สัปดาห์ที่ 4</option></select></div>
+      <div class="form-group"><label>วันประจำ</label>
+        <select id="spy-dow" class="input">${['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์']
+          .map((d,i)=>`<option value="${i}" ${i===3?'selected':''}>วัน${d}</option>`).join('')}</select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>เวลาเริ่ม</label><input id="spy-start" type="time" class="input" value="09:00"></div>
+      <div class="form-group"><label>เวลาสิ้นสุด</label><input id="spy-end" type="time" class="input" value="12:00"></div>
+    </div>
+    <div class="form-group"><label>สถานที่</label><input id="spy-loc" class="input" value="${SCH_ORG.name}"></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-wand-magic-sparkles"></i> สร้างรอบเรียนทั้งปี</button>
+  </div></form>`,{size:'sm'});
+
+  document.getElementById('spy').addEventListener('submit',e=>{
+    e.preventDefault();
+    const wk=+document.getElementById('spy-week').value, dow=+document.getElementById('spy-dow').value;
+    const st=document.getElementById('spy-start').value, en=document.getElementById('spy-end').value;
+    const loc=document.getElementById('spy-loc').value.trim();
+    let made=0;
+    for(let m=0;m<12;m++){
+      const key=`${y}-${String(m+1).padStart(2,'0')}`;
+      if((state.schoolSessions||[]).some(s=>String(s.date).slice(0,7)===key)) continue;
+      const first=new Date(y,m,1);
+      let day=1+((dow-first.getDay())+7)%7+(wk-1)*7;
+      if(day>new Date(y,m+1,0).getDate()) day-=7;
+      state.schoolSessions.push({ id:uid('school'),
+        title:`โรงเรียน อสม. ประจำเดือน${THAI_MONTHS[m]} ${beYear(y)}`,
+        date:toISODate(new Date(y,m,day)), startTime:st, endTime:en, topic:'', location:loc,
+        owner:currentUserFullName(), speaker:'', hours:3,
+        pin:String(Math.floor(100000+Math.random()*900000)), createdAt:new Date().toISOString() });
+      made++;
+    }
+    schLog('วางแผนทั้งปี',`ปี ${beYear(y)} สร้าง ${made} รอบ`);
+    schSave(); closeModal(); renderCurrentView();
+    toast(made?`สร้างรอบเรียนใหม่ ${made} รอบ สำหรับปี ${beYear(y)}`:'ทุกเดือนมีรอบเรียนอยู่แล้ว', made?'success':'info');
+  });
+}
+
+function deleteSchoolSession(id){
+  const s=schSessionById(id); if(!s) return;
+  confirmDialog(`ต้องการลบ “${s.title}” และข้อมูลเช็กชื่อทั้งหมดของรอบนี้ใช่หรือไม่ การลบไม่สามารถย้อนกลับได้`,()=>{
+    state.schoolSessions=state.schoolSessions.filter(x=>x.id!==id);
+    state.schoolAttendance=state.schoolAttendance.filter(x=>x.sessionId!==id);
+    schLog('ลบรอบเรียน',s.title); schSave(); closeModal(); renderCurrentView();
+    toast('ลบรอบเรียนเรียบร้อยแล้ว','success');
+  },{confirmLabel:'ลบรอบเรียน'});
+}
+
+function closeSchoolSession(id){
+  const s=schSessionById(id); if(!s) return;
+  if(s.closedAt){
+    confirmDialog('ต้องการเปิดรอบเช็กชื่อนี้อีกครั้งใช่หรือไม่',()=>{
+      s.closedAt=''; schLog('เปิดรอบใหม่',s.title); schSave(); closeModal(); renderCurrentView();
+      toast('เปิดรอบเช็กชื่ออีกครั้งแล้ว','success');
+    },{confirmLabel:'เปิดรอบ'});
+    return;
+  }
+  const st=schStats(id);
+  confirmDialog(`ปิดรอบ “${s.title}” ใช่หรือไม่? ขณะนี้เช็กชื่อแล้ว ${st.checked}/${st.total} คน — ผู้ที่ยังไม่เช็กชื่ออีก ${st.pending} คน จะถูกบันทึกเป็น “ขาด” โดยอัตโนมัติ`,()=>{
+    schMembers().forEach(m=>{
+      const r=schRec(id,m.id);
+      if(!r) state.schoolAttendance.push({id:uid('sa'),sessionId:id,osmId:m.id,status:'ขาด',
+        note:'ระบบบันทึกอัตโนมัติเมื่อปิดรอบ',updatedAt:new Date().toISOString()});
+      else if(!r.status){ r.status='ขาด'; r.note=r.note||'ระบบบันทึกอัตโนมัติเมื่อปิดรอบ'; r.updatedAt=new Date().toISOString(); }
+    });
+    s.closedAt=new Date().toISOString();
+    schLog('ปิดรอบเรียน',`${s.title} — ขาด ${schStats(id)['ขาด']} คน`);
+    schSave(); try{ cloudPushSession(id); }catch(e){}
+    closeModal(); renderCurrentView(); toast('ปิดรอบและสรุปผู้ขาดเรียบร้อยแล้ว','success');
+  },{confirmLabel:'ปิดรอบและสรุปผล'});
+}
+
+/* ---------------------------------------------------------------- ตั้งค่า */
+function schOpenSettings(){
+  schInit(); const c=state.schoolCfg;
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-sliders"></i> ตั้งค่าโรงเรียน อสม.</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="scfg"><div class="modal-body">
+    <div class="form-group"><label>ถือว่า “สาย” เมื่อเช็กชื่อหลังเวลาเริ่ม (นาที)</label>
+      <input id="cf-late" type="number" min="0" class="input" value="${c.lateAfter}"></div>
+    <label style="display:flex;gap:9px;align-items:center;font-size:13.5px;margin:10px 0;cursor:pointer">
+      <input type="checkbox" id="cf-sign" ${c.requireSign?'checked':''} style="width:17px;height:17px">
+      บังคับให้ลงลายมือชื่อดิจิทัลทุกคน (ใช้แทนใบเซ็นชื่อกระดาษ)</label>
+    <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
+    <p style="font-size:12.5px;color:var(--text-secondary);margin:0 0 12px">ข้อมูลผู้ลงนามในเอกสารราชการ</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>ผู้รายงาน</label><input id="cf-rep" class="input" value="${escapeHtml(c.reporter||currentUserFullName())}"></div>
+      <div class="form-group"><label>ตำแหน่ง</label><input id="cf-reppos" class="input" value="${escapeHtml(c.reporterPos)}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>ผู้อนุมัติ / ผอ.รพ.สต.</label><input id="cf-pri" class="input" value="${escapeHtml(c.principal)}" placeholder="ชื่อ-นามสกุล"></div>
+      <div class="form-group"><label>ตำแหน่ง</label><input id="cf-pripos" class="input" value="${escapeHtml(c.principalPos)}"></div>
+    </div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า</button></div>
+  </form>`,{size:'sm'});
+  document.getElementById('scfg').addEventListener('submit',e=>{
+    e.preventDefault(); const g=x=>document.getElementById(x).value.trim();
+    Object.assign(state.schoolCfg,{ lateAfter:parseInt(g('cf-late'),10)||0,
+      requireSign:document.getElementById('cf-sign').checked,
+      reporter:g('cf-rep'), reporterPos:g('cf-reppos'), principal:g('cf-pri'), principalPos:g('cf-pripos') });
+    schSave(); closeModal(); toast('บันทึกการตั้งค่าแล้ว','success');
+  });
+}
+
+/* ================================================================================
+   VIEW 2 : เช็กชื่อ  (3 โหมด — รายชื่อ / สแกน QR / รหัส 4 หลัก)
+   ================================================================================ */
+function openSchoolRoster(id){ sessionStorage.setItem('school_active_session',id); schTab='list'; switchView('school-roster'); }
+function getActiveSchoolSession(){
+  const id=sessionStorage.getItem('school_active_session');
+  return schSessionById(id) || schSessions()[0] || null;
+}
+
+function renderSchoolRosterView(){
+  schInit();
+  const el=document.getElementById('view-school-roster');
+  const s=getActiveSchoolSession();
+  if(!s){
+    el.innerHTML=`<div class="schp-empty"><div class="ic"><i class="fa-solid fa-school-lock"></i></div>
+      <h3>ยังไม่มีรอบเรียน</h3><p>กรุณาสร้างรอบเรียนประจำเดือนก่อนจึงจะเช็กชื่อได้</p>
+      <button class="btn btn-primary" onclick="switchView('school-sessions')"><i class="fa-solid fa-calendar-plus"></i> ไปสร้างรอบเรียน</button></div>`;
+    return;
+  }
+  const st=schStats(s.id), locked=!!s.closedAt;
+  const seg=SCH_ST.map(k=>st[k]?`<i style="width:${st[k]/Math.max(1,st.total)*100}%;background:${SCH_COLOR[k]}"></i>`:'').join('');
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>${escapeHtml(s.title)}</h2>
+      <p>${formatThaiDate(s.date)} • ${escapeHtml(s.startTime||'09:00')}–${escapeHtml(s.endTime||'12:00')} น. • ${escapeHtml(s.location||SCH_ORG.name)}
+      ${locked?' • <b style="color:var(--sch-slate)">ปิดรอบแล้ว (แก้ไขไม่ได้)</b>':''}</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-outline" onclick="showSchoolQR('${s.id}')"><i class="fa-solid fa-qrcode"></i> QR รอบนี้</button>
+      <button class="btn btn-outline" onclick="schPrintSignSheet('${s.id}')"><i class="fa-solid fa-file-signature"></i> ใบลงชื่อ</button>
+      ${locked?'':`<button class="btn btn-primary" onclick="closeSchoolSession('${s.id}')"><i class="fa-solid fa-lock"></i> ปิดรอบ &amp; สรุปผล</button>`}
+    </div>
+  </div>
+
+  <div class="schp-live">
+    <div class="schp-live-top">
+      <span><i class="fa-solid fa-gauge-high" style="color:var(--brand-navy-700)"></i>
+        เช็กชื่อแล้ว <b style="font-size:17px">${st.checked}</b> / ${st.total} คน
+        <span style="color:var(--text-faint);font-weight:600">• เหลืออีก ${st.pending} คน</span></span>
+      <span style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px">
+        ${SCH_ST.map(k=>`<span style="color:${SCH_COLOR[k]}"><i class="fa-solid ${SCH_ICON[k]}"></i> ${k} <b>${st[k]}</b></span>`).join('')}
+        <span style="font-weight:800">เข้าร่วม ${st.pct}%</span></span>
+    </div>
+    <div class="schp-live-bar">${seg}<i style="width:${st.pending/Math.max(1,st.total)*100}%;background:var(--bg-surface-2)"></i></div>
+  </div>
+
+  <div class="schp-bar">
+    <div class="fg"><label>รอบเรียน</label>
+      <select class="input" onchange="sessionStorage.setItem('school_active_session',this.value);schStopScan();renderSchoolRosterView()">
+        ${schSessions().map(x=>`<option value="${x.id}" ${x.id===s.id?'selected':''}>${formatThaiDateShort(x.date)} — ${escapeHtml(x.title)}</option>`).join('')}
+      </select></div>
+    <div class="fg grow"><label>วิธีเช็กชื่อ</label>
+      <div class="schp-tabs">
+        <button class="schp-tab ${schTab==='list'?'on':''}" onclick="schSetTab('list')"><i class="fa-solid fa-list-check"></i> รายชื่อทั้งห้อง</button>
+        <button class="schp-tab ${schTab==='scan'?'on':''}" onclick="schSetTab('scan')"><i class="fa-solid fa-camera"></i> สแกนบัตร QR</button>
+        <button class="schp-tab ${schTab==='quick'?'on':''}" onclick="schSetTab('quick')"><i class="fa-solid fa-keyboard"></i> รหัส 4 หลัก</button>
+      </div></div>
+    ${schUndo.length&&!locked?`<button class="btn btn-outline" onclick="schUndoLast()"><i class="fa-solid fa-rotate-left"></i> ย้อนกลับ</button>`:''}
+  </div>
+
+  <div id="schp-panel"></div>`;
+
+  const p=document.getElementById('schp-panel');
+  if(schTab==='list')  schRenderList(p,s,locked);
+  if(schTab==='scan')  schRenderScan(p,s,locked);
+  if(schTab==='quick') schRenderQuick(p,s,locked);
+}
+
+function schSetTab(t){ if(t!=='scan') schStopScan(); schTab=t; renderSchoolRosterView(); }
+
+/* ---------------------------------------------------------------- โหมด 1: รายชื่อ */
+function schRenderList(p,s,locked){
+  const term=schSearch.toLowerCase().trim();
+  let mem=schMembers().filter(m=>{
+    if(schFilterMoo && String(m.moo||'')!==schFilterMoo) return false;
+    if(schHideDone && schRec(s.id,m.id)?.status) return false;
+    if(!term) return true;
+    return `${m.firstName} ${m.lastName} ${m.village||''} ${m.moo||''} ${schCode(m)}`.toLowerCase().includes(term);
+  });
+  p.innerHTML=`
+  <div class="schp-bar">
+    <div class="fg grow"><label>ค้นหา อสม.</label>
+      <input class="input" id="schp-q" placeholder="ชื่อ นามสกุล หมู่บ้าน หรือรหัส 4 หลัก" value="${escapeHtml(schSearch)}"
+        oninput="schSearch=this.value;schRefreshRows('${s.id}',${locked})"></div>
+    <div class="fg"><label>หมู่ที่</label>
+      <select class="input" onchange="schFilterMoo=this.value;renderSchoolRosterView()">
+        <option value="">ทุกหมู่</option>
+        ${schMoos().map(m=>`<option value="${m}" ${schFilterMoo===m?'selected':''}>หมู่ ${m}</option>`).join('')}
+      </select></div>
+    <div class="fg"><label>&nbsp;</label>
+      <label style="display:flex;gap:7px;align-items:center;font-size:13px;padding:10px 0;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" ${schHideDone?'checked':''} onchange="schHideDone=this.checked;renderSchoolRosterView()" style="width:16px;height:16px">
+        ซ่อนคนที่เช็กแล้ว</label></div>
+    ${locked?'':`
+    <button class="btn btn-outline" onclick="schMarkAll('${s.id}','มา')"><i class="fa-solid fa-users-line"></i> มาทั้งหมด</button>
+    <button class="btn btn-outline" onclick="schClearAll('${s.id}')"><i class="fa-solid fa-eraser"></i> ล้าง</button>`}
+  </div>
+
+  <div class="schp-roster">
+    <div class="schp-roster-head">
+      <b><i class="fa-solid fa-clipboard-user"></i> รายชื่อ อสม. (<span id="schp-count">${mem.length}</span> คน)</b>
+      <span style="color:var(--text-secondary);font-size:12px">
+        <i class="fa-solid fa-circle-check" style="color:var(--sch-emerald)"></i> บันทึกอัตโนมัติทันทีที่กด</span>
+    </div>
+    <div id="schp-rows">${schRowsHtml(s,locked)}</div>
+  </div>`;
+}
+function schFilteredMembers(s){
+  const term=schSearch.toLowerCase().trim();
+  return schMembers().filter(m=>{
+    if(schFilterMoo && String(m.moo||'')!==schFilterMoo) return false;
+    if(schHideDone && schRec(s.id,m.id)?.status) return false;
+    if(!term) return true;
+    return `${m.firstName} ${m.lastName} ${m.village||''} ${m.moo||''} ${schCode(m)}`.toLowerCase().includes(term);
+  });
+}
+function schRowsHtml(s,locked){
+  const mem=schFilteredMembers(s);
+  return mem.length ? mem.map((m,i)=>schRosterRow(s,m,i,locked)).join('')
+    : '<div class="schp-empty" style="border:0">ไม่พบรายชื่อตามเงื่อนไขที่เลือก</div>';
+}
+function schRefreshRows(sid,locked){
+  const s=schSessionById(sid); if(!s) return;
+  const box=document.getElementById('schp-rows'); if(box) box.innerHTML=schRowsHtml(s,locked);
+  const cnt=document.getElementById('schp-count'); if(cnt) cnt.textContent=schFilteredMembers(s).length;
+}
+
+function schRosterRow(s,m,i,locked){
+  const r=schRec(s.id,m.id)||{};
+  const cls=r.status?(SCH_PRESENT.includes(r.status)?'done':(r.status==='ขาด'?'miss':'')):'';
+  return `
+  <div class="schp-row ${cls}" id="row-${m.id}">
+    <div class="schp-idx">${i+1}</div>
+    <div class="schp-person">
+      <div class="schp-av">${escapeHtml(initials(m.firstName,m.lastName))}</div>
+      <div style="min-width:0">
+        <b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</b>
+        <small>หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')} • รหัส ${schCode(m)}
+        ${r.checkinAt?` • <i class="fa-solid fa-clock"></i> ${new Date(r.checkinAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.`:''}</small>
+      </div>
+    </div>
+    <div class="schp-seg">
+      ${SCH_ST.map(k=>`<button class="schp-sbtn ${r.status===k?'on':''}" data-s="${k}" ${locked?'disabled':''}
+        onclick="schSet('${s.id}','${m.id}','${k}')">${k}</button>`).join('')}
+    </div>
+    <div class="schp-row-tools">
+      ${r.sign?`<img src="${r.sign}" class="schp-sig-thumb" alt="ลายมือชื่อ" title="ลายมือชื่อดิจิทัล">`:''}
+      <button class="schp-mini ${r.sign?'has':''}" title="ลงลายมือชื่อ" ${locked?'disabled':''}
+        onclick="schSignModal('${s.id}','${m.id}')"><i class="fa-solid fa-signature"></i></button>
+      <input class="schp-note" placeholder="หมายเหตุ" value="${escapeHtml(r.note||'')}" ${locked?'disabled':''}
+        onchange="schSetNote('${s.id}','${m.id}',this.value)">
+    </div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- actions */
+function schSet(sid,oid,status,opts){
+  opts=opts||{};
+  const s=schSessionById(sid); if(!s) return;
+  if(s.closedAt){ toast('รอบนี้ปิดแล้ว ไม่สามารถแก้ไขได้','error'); return; }
+  let r=schRec(sid,oid);
+  schUndo.push({sid,oid,prev:r?{status:r.status,note:r.note,checkinAt:r.checkinAt}:null});
+  if(schUndo.length>40) schUndo.shift();
+  const now=new Date().toISOString();
+  if(!r){
+    r={id:uid('sa'),sessionId:sid,osmId:oid,status,note:opts.note||'',
+       checkinAt:SCH_PRESENT.includes(status)?now:'',source:opts.source||'เจ้าหน้าที่',updatedAt:now};
+    state.schoolAttendance.push(r);
+  }else{
+    r.status=status; r.updatedAt=now;
+    if(opts.note) r.note=opts.note;
+    if(opts.source) r.source=opts.source;
+    if(SCH_PRESENT.includes(status)&&!r.checkinAt) r.checkinAt=now;
+  }
+  schSave();
+  if(!opts.silent) renderSchoolRosterView();
+  return r;
+}
+function schSetNote(sid,oid,note){
+  let r=schRec(sid,oid);
+  if(!r){ r={id:uid('sa'),sessionId:sid,osmId:oid,status:'',note,updatedAt:new Date().toISOString()}; state.schoolAttendance.push(r); }
+  else r.note=note;
+  schSave();
+}
+function schUndoLast(){
+  const u=schUndo.pop(); if(!u) return;
+  const i=(state.schoolAttendance||[]).findIndex(r=>r.sessionId===u.sid&&r.osmId===u.oid);
+  if(i<0) return;
+  if(u.prev) Object.assign(state.schoolAttendance[i],u.prev);
+  else state.schoolAttendance.splice(i,1);
+  schSave(); renderSchoolRosterView(); toast('ย้อนกลับรายการล่าสุดแล้ว','info');
+}
+function schMarkAll(sid,status){
+  const s=schSessionById(sid); if(s.closedAt){ toast('รอบนี้ปิดแล้ว','error'); return; }
+  confirmDialog(`ทำเครื่องหมาย “${status}” ให้ อสม. ที่ยังไม่ได้เช็กชื่อทั้งหมดใช่หรือไม่? (คนที่เช็กไว้แล้วจะไม่ถูกเปลี่ยน)`,()=>{
+    schMembers().forEach(m=>{ if(!schRec(sid,m.id)?.status) schSet(sid,m.id,status,{silent:true,source:'เหมารวม'}); });
+    schLog('เช็กชื่อเหมารวม',`${s.title} → ${status}`);
+    schSave(); closeModal(); renderSchoolRosterView(); toast('บันทึกแล้ว แก้ไขรายคนได้ตามปกติ','success');
+  },{confirmLabel:'ยืนยัน'});
+}
+function schClearAll(sid){
+  confirmDialog('ล้างผลการเช็กชื่อทั้งหมดของรอบนี้ใช่หรือไม่',()=>{
+    state.schoolAttendance=state.schoolAttendance.filter(r=>r.sessionId!==sid);
+    schLog('ล้างผลเช็กชื่อ',schSessionById(sid)?.title||'');
+    schSave(); closeModal(); renderSchoolRosterView(); toast('ล้างข้อมูลเช็กชื่อแล้ว','success');
+  },{confirmLabel:'ล้างข้อมูล'});
+}
+function markAllSchoolPresent(sid){ schMarkAll(sid,'มา'); }
+function setSchoolStatus(sid,oid,st){ schSet(sid,oid,st); }
+function setSchoolNote(sid,oid,n){ schSetNote(sid,oid,n); }
+
+/* ---------------------------------------------------------------- ลายมือชื่อ */
+function schSignModal(sid,oid){
+  const m=osmById(oid), r=schRec(sid,oid)||{};
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-signature"></i> ลงลายมือชื่อ</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <p style="margin:0 0 12px;font-size:14px"><b>${escapeHtml(m?.firstName||'')} ${escapeHtml(m?.lastName||'')}</b>
+      <span style="color:var(--text-secondary)">— หมู่ ${escapeHtml(m?.moo||'-')}</span></p>
+    <canvas id="sigpad" class="schp-sigpad"></canvas>
+    <p style="font-size:12px;color:var(--text-faint);margin:9px 0 0;text-align:center">
+      เซ็นชื่อด้วยนิ้วหรือปากกาสไตลัสในกรอบด้านบน — ลายมือชื่อนี้จะปรากฏในใบลงชื่อที่พิมพ์ออกมา</p>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="schSigClear()"><i class="fa-solid fa-eraser"></i> ล้าง</button>
+    ${r.sign?`<button class="btn btn-outline" onclick="schSigDelete('${sid}','${oid}')"><i class="fa-solid fa-trash"></i> ลบลายเซ็น</button>`:''}
+    <button class="btn btn-primary" onclick="schSigSave('${sid}','${oid}')"><i class="fa-solid fa-check"></i> บันทึกลายมือชื่อ</button>
+  </div>`,{size:'sm'});
+  setTimeout(()=>schSigInit(r.sign),60);
+}
+let _sigCtx=null,_sigDrawn=false;
+function schSigInit(existing){
+  const c=document.getElementById('sigpad'); if(!c) return;
+  const dpr=window.devicePixelRatio||1;
+  c.width=c.offsetWidth*dpr; c.height=c.offsetHeight*dpr;
+  const x=c.getContext('2d'); x.scale(dpr,dpr);
+  x.fillStyle='#fff'; x.fillRect(0,0,c.offsetWidth,c.offsetHeight);
+  x.lineWidth=2.4; x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#111';
+  _sigCtx=x; _sigDrawn=false;
+  if(existing){ const im=new Image(); im.onload=()=>{ x.drawImage(im,0,0,c.offsetWidth,c.offsetHeight); _sigDrawn=true; }; im.src=existing; }
+  let down=false;
+  const pt=e=>{ const b=c.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:t.clientX-b.left,y:t.clientY-b.top}; };
+  const start=e=>{ e.preventDefault(); down=true; _sigDrawn=true; const p=pt(e); x.beginPath(); x.moveTo(p.x,p.y); };
+  const move =e=>{ if(!down) return; e.preventDefault(); const p=pt(e); x.lineTo(p.x,p.y); x.stroke(); };
+  const end  =()=>{ down=false; };
+  c.addEventListener('mousedown',start); c.addEventListener('mousemove',move);
+  window.addEventListener('mouseup',end);
+  c.addEventListener('touchstart',start,{passive:false}); c.addEventListener('touchmove',move,{passive:false});
+  c.addEventListener('touchend',end);
+}
+function schSigClear(){
+  const c=document.getElementById('sigpad'); if(!c||!_sigCtx) return;
+  _sigCtx.fillStyle='#fff'; _sigCtx.fillRect(0,0,c.offsetWidth,c.offsetHeight); _sigDrawn=false;
+}
+function schSigSave(sid,oid){
+  const c=document.getElementById('sigpad');
+  if(!c||!_sigDrawn){ toast('กรุณาเซ็นชื่อก่อนบันทึก','error'); return; }
+  let r=schRec(sid,oid);
+  if(!r){ r=schSet(sid,oid,'มา',{silent:true,source:'ลงลายมือชื่อ'}); }
+  r.sign=c.toDataURL('image/png'); r.signAt=new Date().toISOString();
+  if(!r.status) r.status='มา';
+  schSave(); closeModal(); renderSchoolRosterView(); toast('บันทึกลายมือชื่อแล้ว','success');
+}
+function schSigDelete(sid,oid){
+  const r=schRec(sid,oid); if(r){ delete r.sign; delete r.signAt; schSave(); }
+  closeModal(); renderSchoolRosterView(); toast('ลบลายมือชื่อแล้ว','info');
+}
+
+/* ---------------------------------------------------------------- โหมด 2: สแกน QR */
+function schRenderScan(p,s,locked){
+  p.innerHTML=`
+  <div class="schp-scan-wrap">
+    <div>
+      <div class="schp-scan-box" id="scan-box">
+        <div class="schp-scan-hint" id="scan-hint">
+          <i class="fa-solid fa-qrcode" style="font-size:44px;opacity:.6;display:block;margin-bottom:14px"></i>
+          กดปุ่ม “เปิดกล้อง” แล้วให้ อสม. ยื่นบัตรประจำตัวที่มี QR<br>ระบบจะบันทึกการมาเรียนให้อัตโนมัติทันที
+        </div>
+      </div>
+      <div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="scan-start" onclick="schStartScan('${s.id}')" ${locked?'disabled':''}>
+          <i class="fa-solid fa-camera"></i> เปิดกล้อง</button>
+        <button class="btn btn-outline" onclick="schStopScan()"><i class="fa-solid fa-stop"></i> หยุด</button>
+        <button class="btn btn-outline" onclick="schPrintIdCards()"><i class="fa-solid fa-id-card"></i> พิมพ์บัตร QR อสม.</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-secondary);margin-top:12px;line-height:1.7">
+        <i class="fa-solid fa-circle-info"></i> โหมดนี้ทำงานได้แม้ไม่มีอินเทอร์เน็ต เพราะใช้ทะเบียน อสม. ที่อยู่ในเครื่องนี้
+        เหมาะกับการตั้งโต๊ะลงทะเบียนหน้างาน — เร็วกว่าการค้นชื่อทีละคนมาก</p>
+    </div>
+    <div>
+      <div class="schp-scan-log">
+        <b style="font-size:13px;display:block;margin-bottom:10px"><i class="fa-solid fa-clock-rotate-left"></i> รายการล่าสุด</b>
+        <div id="scan-log">${schScanLog.length?schScanLog.map(schScanLogItem).join(''):'<p style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0">ยังไม่มีการสแกน</p>'}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function schScanLogItem(x){
+  return `<div class="schp-log-item schp-log-${x.kind}"><i class="fa-solid ${x.kind==='ok'?'fa-check':x.kind==='warn'?'fa-clock':'fa-xmark'}"></i>
+    <div style="flex:1;min-width:0"><b style="display:block;font-size:13px">${escapeHtml(x.name)}</b>
+      <small style="color:var(--text-secondary);font-size:11.5px">${escapeHtml(x.msg)}</small></div>
+    <small style="color:var(--text-faint);font-size:11px">${x.time}</small></div>`;
+}
+function schPushLog(kind,name,msg){
+  schScanLog.unshift({kind,name,msg,time:new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'})});
+  if(schScanLog.length>30) schScanLog.length=30;
+  const el=document.getElementById('scan-log'); if(el) el.innerHTML=schScanLog.map(schScanLogItem).join('');
+}
+function schBeep(ok){
+  try{ const a=new (window.AudioContext||window.webkitAudioContext)();
+    const o=a.createOscillator(),g=a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.frequency.value=ok?880:220; g.gain.value=.12; o.start();
+    setTimeout(()=>{o.stop();a.close();},ok?110:260);
+  }catch(e){}
+}
+function schStartScan(sid){
+  if(typeof Html5Qrcode==='undefined'){
+    toast('ไลบรารีสแกน QR ยังโหลดไม่เสร็จ กรุณาเชื่อมอินเทอร์เน็ตแล้วรีเฟรชหนึ่งครั้ง','error'); return;
+  }
+  schStopScan();
+  const box=document.getElementById('scan-box'); if(!box) return;
+  box.innerHTML='<div id="qr-reader" style="width:100%"></div>';
+  schScanner=new Html5Qrcode('qr-reader');
+  let last='',lastAt=0;
+  schScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250}},
+    txt=>{
+      const now=Date.now();
+      if(txt===last && now-lastAt<2500) return;
+      last=txt; lastAt=now;
+      schHandleScan(sid,txt);
+    },()=>{}
+  ).catch(err=>{
+    box.innerHTML=`<div class="schp-scan-hint"><i class="fa-solid fa-triangle-exclamation" style="font-size:36px;display:block;margin-bottom:12px;color:#FBBF24"></i>
+      เปิดกล้องไม่สำเร็จ<br><small style="opacity:.75">${escapeHtml(String(err))}</small><br><br>
+      <small>หน้าเว็บต้องเปิดผ่าน https:// และอนุญาตให้ใช้กล้อง</small></div>`;
+  });
+}
+function schStopScan(){
+  if(schScanner){ try{ schScanner.stop().then(()=>schScanner.clear()).catch(()=>{}); }catch(e){} schScanner=null; }
+}
+function schHandleScan(sid,text){
+  const s=schSessionById(sid);
+  if(!s||s.closedAt){ schBeep(false); schPushLog('err','—','รอบนี้ปิดแล้ว'); return; }
+  const raw=String(text||'').trim();
+  const key=raw.replace(/^OSM:/i,'').trim();
+  let m=schMembers().find(x=>x.id===key);
+  if(!m){ const dg=key.replace(/\D/g,'');
+    if(dg.length===13) m=schMembers().find(x=>String(x.idCard||'').replace(/\D/g,'')===dg);
+    else if(dg.length>=9) m=schMembers().find(x=>String(x.phone||'').replace(/\D/g,'')===dg);
+  }
+  if(!m){ schBeep(false); schPushLog('err',raw.slice(0,24),'ไม่พบข้อมูลในทะเบียน อสม.'); return; }
+  const exist=schRec(sid,m.id);
+  const nm=`${m.firstName} ${m.lastName}`;
+  if(exist&&exist.status&&exist.source!=='เหมารวม'){
+    schBeep(false); schPushLog('warn',nm,`เช็กชื่อไปแล้ว (${exist.status})`); return;
+  }
+  const status=schIsLate(s)?'สาย':'มา';
+  schSet(sid,m.id,status,{silent:true,source:'สแกน QR'});
+  schBeep(true);
+  schPushLog(status==='สาย'?'warn':'ok',nm,`บันทึก “${status}” • หมู่ ${m.moo||'-'}`);
+  const st=schStats(sid);
+  const lb=document.querySelector('.schp-live-top b'); if(lb) lb.textContent=st.checked;
+}
+function schIsLate(s){
+  try{
+    const cfg=state.schoolCfg||{lateAfter:30};
+    const [h,mi]=String(s.startTime||'09:00').split(':').map(Number);
+    const d=new Date(s.date+'T00:00:00'); d.setHours(h||9,mi||0,0,0);
+    const today=toISODate(new Date());
+    if(String(s.date)!==today) return false;
+    return Date.now() > d.getTime()+(cfg.lateAfter||30)*60000;
+  }catch(e){ return false; }
+}
+
+/* ---------------------------------------------------------------- โหมด 3: รหัส 4 หลัก */
+function schRenderQuick(p,s,locked){
+  p.innerHTML=`
+  <div class="schp-quick">
+    <div style="width:66px;height:66px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;
+      background:var(--sch-violet-bg);color:var(--brand-navy-700);font-size:26px"><i class="fa-solid fa-keyboard"></i></div>
+    <h3 style="margin:0 0 5px;font-size:19px;font-weight:800">เช็กชื่อด้วยรหัส 4 หลัก</h3>
+    <p style="margin:0 0 18px;color:var(--text-secondary);font-size:13px;line-height:1.7">
+      ให้ อสม. บอกเลขบัตรประชาชน 4 ตัวท้าย แล้วพิมพ์ลงช่อง — ระบบจะขึ้นชื่อให้ยืนยันทันที</p>
+    <input id="qk" inputmode="numeric" maxlength="4" placeholder="0000" ${locked?'disabled':''} autocomplete="off">
+    <div class="schp-hits" id="qk-hits"></div>
+    <p style="font-size:12px;color:var(--text-faint);margin:16px 0 0">
+      พิมพ์ครบ 4 หลักระบบจะค้นหาอัตโนมัติ • กด Enter เพื่อยืนยันเมื่อพบคนเดียว</p>
+  </div>`;
+  const inp=document.getElementById('qk'); if(!inp) return;
+  inp.focus();
+  const run=()=>{
+    const v=inp.value.replace(/\D/g,''); const box=document.getElementById('qk-hits');
+    if(v.length<3){ box.innerHTML=''; return; }
+    const hits=schMembers().filter(m=>schCode(m).startsWith(v)||String(m.idCard||'').replace(/\D/g,'').endsWith(v));
+    if(!hits.length){ box.innerHTML='<div style="padding:14px;color:var(--danger);font-size:13px"><i class="fa-solid fa-circle-xmark"></i> ไม่พบ อสม. ที่มีรหัสนี้</div>'; return; }
+    box.innerHTML=hits.slice(0,8).map(m=>{
+      const r=schRec(s.id,m.id)||{};
+      return `<div class="schp-hit" onclick="schQuickPick('${s.id}','${m.id}')">
+        <span class="badge ${r.status?'badge-success':''}">${r.status||'ยังไม่เช็ก'}</span>
+        <span style="text-align:right"><b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</b>
+          <small style="display:block;color:var(--text-secondary);font-size:11.5px">หมู่ ${escapeHtml(m.moo||'-')} • รหัส ${schCode(m)}</small></span>
+      </div>`; }).join('');
+  };
+  inp.addEventListener('input',run);
+  inp.addEventListener('keydown',e=>{
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    const v=inp.value.replace(/\D/g,'');
+    const hits=schMembers().filter(m=>schCode(m).startsWith(v));
+    if(hits.length===1) schQuickPick(s.id,hits[0].id);
+    else toast(hits.length?'พบหลายคน กรุณาเลือกจากรายการ':'ไม่พบข้อมูล','info');
+  });
+}
+function schQuickPick(sid,oid){
+  const s=schSessionById(sid), m=osmById(oid);
+  const r=schRec(sid,oid);
+  if(r&&r.status&&SCH_PRESENT.includes(r.status)){
+    toast(`${m.firstName} เช็กชื่อไปแล้ว (${r.status})`,'info');
+  }else{
+    schSet(sid,oid,schIsLate(s)?'สาย':'มา',{silent:true,source:'รหัส 4 หลัก'});
+    schBeep(true);
+    toast(`บันทึก ${m.firstName} ${m.lastName} เรียบร้อย`,'success');
+  }
+  const inp=document.getElementById('qk');
+  renderSchoolRosterView();
+  setTimeout(()=>{ const i2=document.getElementById('qk'); if(i2){ i2.value=''; i2.focus(); } },40);
+}
+
+/* ---------------------------------------------------------------- QR รอบเรียน */
+function showSchoolQR(sid){
+  const s=schSessionById(sid); if(!s) return;
+  const url=sessionCheckinUrl(sid);
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-qrcode"></i> QR เช็กชื่อ — ${escapeHtml(s.title)}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body" style="text-align:center">
+    <div id="qr-holder" style="display:inline-block;padding:16px;background:#fff;border-radius:16px;border:1px solid var(--border)"></div>
+    <p style="margin:16px 0 6px;font-size:14px"><b>รหัส PIN สำหรับรอบนี้</b></p>
+    <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:var(--brand-navy-700)">${escapeHtml(s.pin||'—')}</div>
+    <p style="font-size:12.5px;color:var(--text-secondary);margin:14px 0 0;line-height:1.7">
+      ให้ อสม. สแกน QR นี้ด้วยมือถือตัวเอง แล้วกรอก PIN เพื่อยืนยันว่าอยู่ในที่ประชุมจริง<br>
+      <b style="color:var(--warning)"><i class="fa-solid fa-triangle-exclamation"></i> ต้องตั้งค่า Cloud (Google Sheets) ให้ใช้งานได้ก่อน</b>
+      จึงจะเช็กชื่อจากเครื่องของ อสม. ได้ — ถ้ายังตั้งไม่เสร็จ ให้ใช้โหมด “สแกนบัตร QR” ที่โต๊ะลงทะเบียนแทน</p>
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:10px;margin-top:14px;word-break:break-all;font-size:11.5px;color:var(--text-secondary)">${escapeHtml(url)}</div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="navigator.clipboard.writeText('${url.replace(/'/g,"\\'")}').then(()=>toast('คัดลอกลิงก์แล้ว','success'))"><i class="fa-solid fa-copy"></i> คัดลอกลิงก์</button>
+    <button class="btn btn-outline" onclick="schPrintQrPoster('${sid}')"><i class="fa-solid fa-print"></i> พิมพ์ป้าย QR</button>
+    <button class="btn btn-primary" onclick="closeModal()">ปิด</button>
+  </div>`,{size:'sm'});
+  setTimeout(()=>{ const h=document.getElementById('qr-holder');
+    if(h&&window.QRCode) new QRCode(h,{text:url,width:230,height:230,correctLevel:QRCode.CorrectLevel.M}); },60);
+}
+
+/* ---------------------------------------------------------------- public check-in (upgrade) */
+async function submitSelfCheckin(sessionId,value,pin){
+  const s=schSessionById(sessionId);
+  if(!s) throw new Error('ไม่พบรอบเรียนนี้');
+  if(s.closedAt) throw new Error('รอบเช็กชื่อนี้ปิดรับแล้ว');
+  if(s.pin && String(pin||'').trim()!==String(s.pin)) throw new Error('รหัส PIN ไม่ถูกต้อง กรุณาสอบถามเจ้าหน้าที่');
+  const v=String(value||'').replace(/\D/g,'');
+  const list=schMembers();
+  if(!list.length) throw new Error('เครื่องนี้ยังไม่มีทะเบียน อสม. กรุณาให้เจ้าหน้าที่เช็กชื่อให้');
+  const hit=list.filter(m=>{
+    const id=String(m.idCard||'').replace(/\D/g,''), ph=String(m.phone||'').replace(/\D/g,'');
+    return (v.length===4&&id.endsWith(v))||(v.length===13&&id===v)||(v.length>=9&&ph===v);
+  });
+  if(!hit.length) throw new Error('ไม่พบข้อมูล อสม. กรุณาติดต่อผู้รับผิดชอบ');
+  if(hit.length>1) throw new Error('ข้อมูลซ้ำ กรุณาใช้เบอร์โทรศัพท์ หรือเลขบัตร 13 หลัก');
+  const m=hit[0], now=new Date();
+  const status=schIsLate(s)?'สาย':'มา';
+  const r=schSet(sessionId,m.id,status,{silent:true,source:'เช็กชื่อเองผ่าน QR',note:'เช็กชื่อด้วยตนเองผ่าน QR'});
+  let saved=false;
+  try{ await fbWritePublicAttendance(r); saved=true; }catch(e){ console.warn(e); }
+  if(!saved){ try{ await cloudPushAttendance(r,m,s); saved=true; }catch(e){ console.warn(e); } }
+  if(!saved && !window.__localCheckin) throw new Error('บันทึกขึ้นฐานข้อมูลไม่สำเร็จ กรุณาแจ้งเจ้าหน้าที่');
+  return {m,status,time:now};
+}
+
+function renderPublicCheckin(sessionId){
+  schInit();
+  const s=schSessionById(sessionId);
+  const body=!s
+    ? '<div class="alert alert-danger"><b>ไม่พบรอบเรียนนี้</b><br>กรุณาสแกน QR ใหม่ หรือติดต่อเจ้าหน้าที่</div>'
+    : s.closedAt
+    ? '<div class="alert alert-warning"><b>ปิดรับการเช็กชื่อแล้ว</b><br>กรุณาติดต่อผู้รับผิดชอบหากต้องการแก้ไขข้อมูล</div>'
+    : `<form id="pcf">
+        <div class="form-group"><label>เลขบัตรประชาชน 4 ตัวท้าย (หรือเบอร์โทรศัพท์)</label>
+          <input id="p-id" class="input" inputmode="numeric" autocomplete="off" placeholder="เช่น 1234" required
+            style="text-align:center;font-size:22px;letter-spacing:5px;font-weight:800"></div>
+        ${s.pin?`<div class="form-group"><label>รหัส PIN ประจำรอบ (เจ้าหน้าที่แจ้งหน้างาน)</label>
+          <input id="p-pin" class="input" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="6 หลัก"
+            style="text-align:center;font-size:22px;letter-spacing:7px;font-weight:800" required></div>`:''}
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" type="submit">
+          <i class="fa-solid fa-location-dot"></i> ลงชื่อเข้าเรียน</button>
+        <div class="privacy-note">ข้อมูลนี้ใช้เพื่อยืนยันการเข้าร่วมโรงเรียน อสม. เท่านั้น ระบบไม่แสดงเลขบัตรประชาชนเต็มบนหน้าจอ</div>
+        <div id="p-err" class="field-error" style="display:none;margin-top:12px"></div>
+      </form>`;
+
+  document.body.innerHTML=`<main class="checkin-shell"><div class="checkin-card">
+    <div class="checkin-brand"><div class="logo-orb"><i class="fa-solid fa-school-flag"></i></div>
+      <h2 style="margin-top:12px">โรงเรียน อสม. บ้านโคกสง่า</h2>
+      <p>${s?escapeHtml(s.title):'ระบบเช็กชื่อออนไลน์'}</p>
+      ${s?`<p style="font-size:12.5px;opacity:.8">${formatThaiDate(s.date)} • ${escapeHtml(s.startTime||'')}–${escapeHtml(s.endTime||'')} น.</p>`:''}
+    </div>${body}</div></main>`;
+
+  const f=document.getElementById('pcf'); if(!f) return;
+  f.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=f.querySelector('button'), er=document.getElementById('p-err');
+    er.style.display='none'; btn.disabled=true;
+    btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก';
+    try{
+      const pin=document.getElementById('p-pin')?document.getElementById('p-pin').value:'';
+      const x=await submitSelfCheckin(sessionId,document.getElementById('p-id').value,pin);
+      document.querySelector('.checkin-card').innerHTML=`<div class="checkin-success">
+        <i class="fa-solid fa-circle-check"></i><h2 style="margin-top:14px">เช็กชื่อสำเร็จ</h2>
+        <h3>${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}</h3>
+        <p>สถานะ: <b>${x.status}</b><br>เวลา ${x.time.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.</p>
+        <p class="privacy-note">บันทึกเรียบร้อยแล้ว สามารถปิดหน้านี้ได้</p></div>`;
+    }catch(err){
+      er.textContent=err.message; er.style.display='block';
+      btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-location-dot"></i> ลงชื่อเข้าเรียน';
+    }
+  });
+}
+
+/* ================================================================================
+   VIEW 3 : รายงานและสถิติ
+   ================================================================================ */
+let schRepTab='matrix';
+function renderSchoolReportView(){
+  schInit();
+  const el=document.getElementById('view-school-report');
+  const ys=schYears(); if(!ys.includes(schYear)) schYear=ys[0];
+  const ss=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===schYear)
+            .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const mem=schMembers();
+  const rows=mem.map(m=>({m,r:schYearOf(m.id,schYear)}));
+  const avg=rows.length?Math.round(rows.reduce((a,x)=>a+x.r.pct,0)/rows.length*10)/10:0;
+  const risk=rows.filter(x=>schRiskLevel(x.r).c==='risk').length;
+  const watch=rows.filter(x=>schRiskLevel(x.r).c==='watch').length;
+  const perfect=rows.filter(x=>x.r.total&&x.r.attended===x.r.total).length;
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>รายงานและสถิติโรงเรียน อสม.</h2>
+      <p>ภาพรวมการมาเรียนตลอดปี ${beYear(schYear)} • ติดตามผู้ขาดซ้ำและออกรายงานส่งอำเภอ</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-outline" onclick="schPrintYearReport()"><i class="fa-solid fa-print"></i> พิมพ์รายงานปี</button>
+      <button class="btn btn-primary" onclick="exportSchoolReport()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+    </div>
+  </div>
+
+  <div class="schp-kpis">
+    <div class="schp-kpi" style="--k:var(--brand-navy-700)"><div class="k-lab">จัดกิจกรรมแล้ว</div><div class="k-val">${ss.length}</div><div class="k-sub">ครั้ง ในปี ${beYear(schYear)}</div></div>
+    <div class="schp-kpi" style="--k:var(--sch-emerald)"><div class="k-lab">เข้าร่วมเฉลี่ย</div><div class="k-val">${avg}%</div><div class="k-sub">ของ อสม. ทั้งหมด ${mem.length} คน</div></div>
+    <div class="schp-kpi" style="--k:var(--sch-amber)"><div class="k-lab">เฝ้าระวัง</div><div class="k-val">${watch}</div><div class="k-sub">ขาด 2 ครั้ง หรือต่ำกว่า 85%</div></div>
+    <div class="schp-kpi" style="--k:var(--sch-rose)"><div class="k-lab">ต้องติดตามด่วน</div><div class="k-val">${risk}</div><div class="k-sub">ขาด ≥3 ครั้ง หรือต่ำกว่า 70%</div></div>
+    <div class="schp-kpi" style="--k:var(--sch-violet)"><div class="k-lab">เข้าเรียนครบทุกครั้ง</div><div class="k-val">${perfect}</div><div class="k-sub">มีสิทธิ์รับเกียรติบัตร</div></div>
+  </div>
+
+  <div class="schp-bar">
+    <div class="fg"><label>ปี</label>
+      <select class="input" onchange="schYear=+this.value;renderSchoolReportView()">
+        ${ys.map(v=>`<option value="${v}" ${v===schYear?'selected':''}>พ.ศ. ${beYear(v)}</option>`).join('')}
+      </select></div>
+    <div class="fg grow"><label>มุมมองรายงาน</label>
+      <div class="schp-tabs">
+        <button class="schp-tab ${schRepTab==='matrix'?'on':''}" onclick="schRepTab='matrix';renderSchoolReportView()"><i class="fa-solid fa-table-cells"></i> ตารางรายเดือน</button>
+        <button class="schp-tab ${schRepTab==='person'?'on':''}" onclick="schRepTab='person';renderSchoolReportView()"><i class="fa-solid fa-user-check"></i> สรุปรายบุคคล</button>
+        <button class="schp-tab ${schRepTab==='trend'?'on':''}" onclick="schRepTab='trend';renderSchoolReportView()"><i class="fa-solid fa-chart-line"></i> แนวโน้ม &amp; รายหมู่</button>
+        <button class="schp-tab ${schRepTab==='risk'?'on':''}" onclick="schRepTab='risk';renderSchoolReportView()"><i class="fa-solid fa-user-clock"></i> กลุ่มต้องติดตาม</button>
+      </div></div>
+  </div>
+  <div id="schp-rep"></div>`;
+
+  const p=document.getElementById('schp-rep');
+  if(schRepTab==='matrix') schRepMatrix(p,ss,mem);
+  if(schRepTab==='person') schRepPerson(p,rows);
+  if(schRepTab==='trend')  schRepTrend(p,ss,mem);
+  if(schRepTab==='risk')   schRepRisk(p,rows);
+}
+
+function schRepMatrix(p,ss,mem){
+  if(!ss.length){ p.innerHTML='<div class="schp-empty">ยังไม่มีรอบเรียนในปีนี้</div>'; return; }
+  p.innerHTML=`
+  <p style="font-size:12.5px;color:var(--text-secondary);margin:0 0 12px">
+    <span class="mx mx-มา">ม</span> มา &nbsp; <span class="mx mx-สาย">ส</span> สาย &nbsp;
+    <span class="mx mx-ลา">ล</span> ลา &nbsp; <span class="mx mx-ผู้แทน">ท</span> ผู้แทน &nbsp;
+    <span class="mx mx-ขาด">✕</span> ขาด &nbsp; <span class="mx mx-none">–</span> ยังไม่บันทึก</p>
+  <div class="schp-matrix-wrap"><table class="schp-matrix">
+    <thead><tr><th>ชื่อ–สกุล</th><th>หมู่</th>
+      ${ss.map(s=>{const d=new Date(s.date);return `<th title="${escapeHtml(s.title)}">${THAI_MONTHS_SHORT[d.getMonth()]}</th>`}).join('')}
+      <th>เข้าร่วม</th><th>ขาด</th><th>ร้อยละ</th></tr></thead>
+    <tbody>${mem.map(m=>{
+      const r=schYearOf(m.id,schYear), lv=schRiskLevel(r);
+      return `<tr><th>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</th>
+        <td>${escapeHtml(m.moo||'-')}</td>
+        ${ss.map(s=>{const rec=schRec(s.id,m.id);const st=rec?.status;
+          const ab={'มา':'ม','สาย':'ส','ลา':'ล','ผู้แทน':'ท','ขาด':'✕'}[st]||'–';
+          return `<td><span class="mx mx-${st||'none'}" title="${escapeHtml(st||'ยังไม่บันทึก')}">${ab}</span></td>`}).join('')}
+        <td><b>${r.attended}</b>/${r.total}</td>
+        <td style="color:${r.absent?'var(--sch-rose)':'inherit'}"><b>${r.absent}</b></td>
+        <td><span class="schp-chip ${lv.c}">${r.pct}%</span></td></tr>`}).join('')}
+    </tbody></table></div>`;
+}
+
+function schRepPerson(p,rows){
+  const sorted=rows.slice().sort((a,b)=>a.r.pct-b.r.pct||b.r.absent-a.r.absent);
+  p.innerHTML=`<div class="card"><div class="report-table-wrap"><table class="table">
+    <thead><tr><th>ลำดับ</th><th>ชื่อ–สกุล</th><th>หมู่</th><th>เข้าร่วม</th><th>สาย</th><th>ลา</th><th>ผู้แทน</th><th>ขาด</th><th>ร้อยละ</th><th>สถานะ</th><th></th></tr></thead>
+    <tbody>${sorted.map((x,i)=>{const r=x.r,lv=schRiskLevel(r);return `
+      <tr><td>${i+1}</td>
+        <td><b>${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}</b>
+          <div style="font-size:11.5px;color:var(--text-secondary)">${escapeHtml(x.m.village||'')}</div></td>
+        <td>${escapeHtml(x.m.moo||'-')}</td>
+        <td><b>${r.attended}</b>/${r.total}</td><td>${r.late}</td><td>${r.leave}</td><td>${r.rep}</td>
+        <td style="color:${r.absent?'var(--sch-rose)':'inherit'};font-weight:${r.absent?800:400}">${r.absent}</td>
+        <td style="min-width:132px"><b>${r.pct}%</b>
+          <div class="mini-progress" style="color:${r.pct<70?'var(--danger)':r.pct<85?'var(--warning)':'var(--success)'}"><span style="width:${r.pct}%"></span></div></td>
+        <td><span class="schp-chip ${lv.c}">${lv.t}</span></td>
+        <td><button class="btn btn-ghost btn-sm" title="ประวัติรายบุคคล" onclick="schPersonDetail('${x.m.id}')"><i class="fa-solid fa-eye"></i></button></td>
+      </tr>`}).join('')}</tbody></table></div></div>`;
+}
+
+function schRepTrend(p,ss,mem){
+  const moos=schMoos();
+  const byMoo=moos.map(mo=>{
+    const ms=mem.filter(m=>String(m.moo||'')===mo);
+    const tot=ms.reduce((a,m)=>a+schYearOf(m.id,schYear).total,0);
+    const att=ms.reduce((a,m)=>a+schYearOf(m.id,schYear).attended,0);
+    return {mo,n:ms.length,pct:tot?Math.round(att/tot*1000)/10:0,att,tot};
+  }).sort((a,b)=>b.pct-a.pct);
+  p.innerHTML=`
+  <div class="card card-pad" style="margin-bottom:16px">
+    <h3 style="margin:0 0 4px;font-size:16px">แนวโน้มการเข้าร่วมรายเดือน ปี ${beYear(schYear)}</h3>
+    <p style="margin:0 0 14px;font-size:12.5px;color:var(--text-secondary)">ร้อยละของ อสม. ที่เข้าร่วม (มา + สาย + ผู้แทน) ในแต่ละครั้ง</p>
+    <div style="height:290px"><canvas id="sch-chart"></canvas></div>
+  </div>
+  <div class="card"><div class="report-table-wrap"><table class="table">
+    <thead><tr><th>หมู่ที่</th><th>จำนวน อสม.</th><th>เข้าร่วม (ครั้ง)</th><th>ทั้งหมด (ครั้ง)</th><th>ร้อยละ</th><th>ระดับ</th></tr></thead>
+    <tbody>${byMoo.length?byMoo.map(x=>`<tr><td><b>หมู่ ${escapeHtml(x.mo)}</b></td><td>${x.n}</td><td>${x.att}</td><td>${x.tot}</td>
+      <td style="min-width:140px"><b>${x.pct}%</b><div class="mini-progress" style="color:${x.pct<70?'var(--danger)':x.pct<85?'var(--warning)':'var(--success)'}"><span style="width:${x.pct}%"></span></div></td>
+      <td><span class="schp-chip ${x.pct<70?'risk':x.pct<85?'watch':'good'}">${x.pct<70?'ต้องติดตาม':x.pct<85?'เฝ้าระวัง':'ดี'}</span></td></tr>`).join('')
+      :'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-faint)">ยังไม่มีข้อมูลหมู่บ้าน</td></tr>'}</tbody>
+  </table></div></div>`;
+
+  setTimeout(()=>{
+    const cv=document.getElementById('sch-chart'); if(!cv||typeof Chart==='undefined') return;
+    if(schChart){ try{schChart.destroy();}catch(e){} }
+    const lab=ss.map(s=>THAI_MONTHS_SHORT[new Date(s.date).getMonth()]);
+    schChart=new Chart(cv,{type:'line',data:{labels:lab,datasets:[
+      {label:'ร้อยละการเข้าร่วม',data:ss.map(s=>schStats(s.id).pct),borderColor:'#4038A6',
+       backgroundColor:'rgba(64,56,166,.12)',fill:true,tension:.35,borderWidth:3,pointRadius:5,pointBackgroundColor:'#4038A6'},
+      {label:'จำนวนผู้ขาด (คน)',data:ss.map(s=>schStats(s.id)['ขาด']),borderColor:'#C81318',
+       backgroundColor:'transparent',tension:.35,borderWidth:2,borderDash:[6,4],pointRadius:4,yAxisID:'y1'}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{font:{family:'inherit'},usePointStyle:true}}},
+      scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},
+              y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false}}}}});
+  },80);
+}
+
+function schRepRisk(p,rows){
+  const risky=rows.filter(x=>schRiskLevel(x.r).c!=='good')
+    .sort((a,b)=>b.r.absent-a.r.absent||a.r.pct-b.r.pct);
+  if(!risky.length){
+    p.innerHTML=`<div class="schp-empty"><div class="ic" style="background:var(--sch-emerald-bg);color:var(--sch-emerald)"><i class="fa-solid fa-face-smile"></i></div>
+      <h3>ไม่มี อสม. ที่ต้องติดตาม</h3><p>อสม. ทุกคนเข้าร่วมโรงเรียน อสม. อย่างสม่ำเสมอในปี ${beYear(schYear)}</p></div>`;
+    return;
+  }
+  p.innerHTML=`
+  <div style="background:var(--sch-amber-bg);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--sch-amber)">
+    <b><i class="fa-solid fa-triangle-exclamation"></i> พบ อสม. ${risky.length} คน ที่ควรติดตาม</b>
+    — กดปุ่มออกหนังสือแจ้งเตือนเพื่อพิมพ์เอกสารราชการรายบุคคลได้ทันที
+  </div>
+  <div style="margin-bottom:14px"><button class="btn btn-primary" onclick="schPrintAbsenceLetters()">
+    <i class="fa-solid fa-file-lines"></i> ออกหนังสือแจ้งเตือนทั้งหมด (${risky.length} ฉบับ)</button></div>
+  <div class="card"><div class="report-table-wrap"><table class="table">
+    <thead><tr><th>ชื่อ–สกุล</th><th>หมู่</th><th>เบอร์โทร</th><th>ขาด</th><th>ลา</th><th>เข้าร่วม</th><th>ร้อยละ</th><th>ระดับ</th><th></th></tr></thead>
+    <tbody>${risky.map(x=>{const r=x.r,lv=schRiskLevel(r);return `<tr>
+      <td><b>${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}</b></td>
+      <td>${escapeHtml(x.m.moo||'-')}</td><td>${escapeHtml(x.m.phone||'-')}</td>
+      <td><b style="color:var(--sch-rose)">${r.absent}</b></td><td>${r.leave}</td><td>${r.attended}/${r.total}</td>
+      <td><b>${r.pct}%</b></td><td><span class="schp-chip ${lv.c}">${lv.t}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" title="ประวัติ" onclick="schPersonDetail('${x.m.id}')"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-ghost btn-sm" title="หนังสือแจ้งเตือน" onclick="schPrintAbsenceLetters('${x.m.id}')"><i class="fa-solid fa-envelope-open-text"></i></button>
+      </td></tr>`}).join('')}</tbody></table></div></div>`;
+}
+
+function schPersonDetail(oid){
+  const m=osmById(oid); if(!m) return;
+  const ss=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===schYear)
+           .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const r=schYearOf(oid,schYear), lv=schRiskLevel(r);
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-user-check"></i> ประวัติการมาเรียน — ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <span class="badge">หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</span>
+      <span class="badge">${escapeHtml(m.phone||'ไม่มีเบอร์')}</span>
+      <span class="schp-chip ${lv.c}">${lv.t} • ${r.pct}%</span>
+    </div>
+    <table class="table"><thead><tr><th>ครั้งที่</th><th>วันที่</th><th>หัวข้อ</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+      <tbody>${ss.map((s,i)=>{const rec=schRec(s.id,oid)||{};return `<tr>
+        <td>${i+1}</td><td>${formatThaiDateShort(s.date)}</td><td>${escapeHtml(s.topic||s.title||'')}</td>
+        <td>${rec.status?`<span class="mx mx-${rec.status}" style="width:auto;padding:3px 9px">${rec.status}</span>`:'<span style="color:var(--text-faint)">ยังไม่บันทึก</span>'}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${escapeHtml(rec.note||'')}</td></tr>`}).join('')
+        ||'<tr><td colspan="5" style="text-align:center;padding:20px">ยังไม่มีรอบเรียนในปีนี้</td></tr>'}</tbody></table>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="schPrintAbsenceLetters('${oid}')"><i class="fa-solid fa-envelope-open-text"></i> หนังสือแจ้งเตือน</button>
+    <button class="btn btn-primary" onclick="closeModal()">ปิด</button>
+  </div>`,{size:'md'});
+}
+
+/* ---------------------------------------------------------------- Excel */
+function exportSchoolReport(){
+  schInit();
+  const ss=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===schYear)
+           .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const mem=schMembers(), wb=XLSX.utils.book_new();
+
+  const sum=mem.map((m,i)=>{const r=schYearOf(m.id,schYear);return {
+    'ลำดับ':i+1,'ชื่อ-นามสกุล':`${m.firstName} ${m.lastName}`,'หมู่ที่':m.moo||'','หมู่บ้าน':m.village||'','เบอร์โทร':m.phone||'',
+    'จัดทั้งหมด(ครั้ง)':r.total,'เข้าร่วม':r.attended,'มาสาย':r.late,'ลา':r.leave,'ผู้แทน':r.rep,'ขาด':r.absent,
+    'ร้อยละการเข้าร่วม':r.pct,'สถานะติดตาม':schRiskLevel(r).t};});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sum.length?sum:[{'หมายเหตุ':'ยังไม่มีข้อมูล'}]),'สรุปรายบุคคล');
+
+  const mx=mem.map((m,i)=>{const o={'ลำดับ':i+1,'ชื่อ-นามสกุล':`${m.firstName} ${m.lastName}`,'หมู่ที่':m.moo||''};
+    ss.forEach(s=>{o[THAI_MONTHS_SHORT[new Date(s.date).getMonth()]]=schRec(s.id,m.id)?.status||'-';});
+    const r=schYearOf(m.id,schYear); o['เข้าร่วม']=r.attended; o['ขาด']=r.absent; o['ร้อยละ']=r.pct; return o;});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mx.length?mx:[{'หมายเหตุ':'ยังไม่มีข้อมูล'}]),'ตารางรายเดือน');
+
+  const per=ss.map((s,i)=>{const st=schStats(s.id);return {
+    'ครั้งที่':i+1,'วันที่':formatThaiDate(s.date),'ชื่อรอบเรียน':s.title,'หัวข้อ':s.topic||'','สถานที่':s.location||'',
+    'วิทยากร':s.speaker||'','ชั่วโมง':s.hours||'','อสม.ทั้งหมด':st.total,'มา':st['มา'],'สาย':st['สาย'],'ลา':st['ลา'],
+    'ผู้แทน':st['ผู้แทน'],'ขาด':st['ขาด'],'ร้อยละเข้าร่วม':st.pct,'สถานะ':s.closedAt?'ปิดรอบแล้ว':'ยังเปิดอยู่'};});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(per.length?per:[{'หมายเหตุ':'ยังไม่มีข้อมูล'}]),'สรุปรายครั้ง');
+
+  const det=[]; ss.forEach(s=>mem.forEach(m=>{const r=schRec(s.id,m.id);det.push({
+    'วันที่':formatThaiDate(s.date),'รอบเรียน':s.title,'ชื่อ อสม.':`${m.firstName} ${m.lastName}`,'หมู่ที่':m.moo||'',
+    'สถานะ':r?.status||'ยังไม่เช็ก','เวลาเช็กชื่อ':r?.checkinAt?new Date(r.checkinAt).toLocaleString('th-TH'):'',
+    'วิธีเช็กชื่อ':r?.source||'','ลงลายมือชื่อ':r?.sign?'มี':'ไม่มี','หมายเหตุ':r?.note||''});}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(det.length?det:[{'หมายเหตุ':'ยังไม่มีข้อมูล'}]),'รายละเอียดรายครั้ง');
+
+  const moos=schMoos().map(mo=>{const ms=mem.filter(m=>String(m.moo||'')===mo);
+    const t=ms.reduce((a,m)=>a+schYearOf(m.id,schYear).total,0), a=ms.reduce((x,m)=>x+schYearOf(m.id,schYear).attended,0);
+    return {'หมู่ที่':mo,'จำนวน อสม.':ms.length,'เข้าร่วม(ครั้ง)':a,'ทั้งหมด(ครั้ง)':t,'ร้อยละ':t?Math.round(a/t*1000)/10:0};});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(moos.length?moos:[{'หมายเหตุ':'ยังไม่มีข้อมูล'}]),'สรุปรายหมู่บ้าน');
+
+  downloadWorkbook(wb,`รายงานโรงเรียน_อสม_บ้านโคกสง่า_${beYear(schYear)}.xlsx`);
+  schLog('ส่งออก Excel',`ปี ${beYear(schYear)}`); schSave();
+}
+
+/* ================================================================================
+   VIEW 4 : ศูนย์เอกสารราชการ
+   ================================================================================ */
+function renderSchoolDocsView(){
+  schInit();
+  const el=document.getElementById('view-school-docs');
+  const ss=schSessions();
+  const cur=getActiveSchoolSession();
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>ศูนย์เอกสารโรงเรียน อสม.</h2>
+      <p>ออกเอกสารราชการรูปแบบ A4 พร้อมพิมพ์หรือบันทึกเป็น PDF — เลิกใช้แบบฟอร์มกระดาษได้ทั้งกระบวนการ</p></div>
+  </div>
+  <div class="schp-bar">
+    <div class="fg grow"><label>เลือกรอบเรียนสำหรับเอกสารรายครั้ง</label>
+      <select class="input" id="doc-sess" onchange="sessionStorage.setItem('school_active_session',this.value)">
+        ${ss.length?ss.map(s=>`<option value="${s.id}" ${cur&&s.id===cur.id?'selected':''}>${formatThaiDateShort(s.date)} — ${escapeHtml(s.title)}</option>`).join('')
+          :'<option value="">ยังไม่มีรอบเรียน</option>'}
+      </select></div>
+    <div class="fg"><label>ปีสำหรับเอกสารรายปี</label>
+      <select class="input" onchange="schYear=+this.value;renderSchoolDocsView()">
+        ${schYears().map(v=>`<option value="${v}" ${v===schYear?'selected':''}>พ.ศ. ${beYear(v)}</option>`).join('')}
+      </select></div>
+  </div>
+  <div class="schp-docs">
+    ${schDocCard('fa-file-signature','ใบลงชื่อผู้เข้าร่วม','แบบฟอร์มลงลายมือชื่อ พร้อมช่องเซ็นและลายมือชื่อดิจิทัลที่บันทึกไว้แล้ว ใช้เป็นหลักฐานประกอบการเบิกจ่าย',"schPrintSignSheet(document.getElementById('doc-sess').value)")}
+    ${schDocCard('fa-file-lines','รายงานผลการจัดกิจกรรม','สรุปผลรายครั้ง จำนวนผู้เข้าร่วม ผู้ขาด พร้อมช่องลงนามผู้รายงานและผู้อนุมัติ สำหรับส่ง สสอ.',"schPrintSessionReport(document.getElementById('doc-sess').value)")}
+    ${schDocCard('fa-qrcode','ป้าย QR ติดหน้างาน','ป้าย A4 แสดง QR และรหัส PIN ขนาดใหญ่ สำหรับติดหน้าห้องประชุมให้ อสม. สแกนเอง',"schPrintQrPoster(document.getElementById('doc-sess').value)")}
+    ${schDocCard('fa-chart-column',`รายงานประจำปี ${beYear(schYear)}`,'สรุปภาพรวมทั้งปี ตารางการมาเรียนรายเดือน และรายชื่อผู้ที่ต้องติดตาม สำหรับรายงานอำเภอ','schPrintYearReport()')}
+    ${schDocCard('fa-envelope-open-text','หนังสือแจ้งเตือนผู้ขาดเรียน','หนังสือราชการรายบุคคลถึง อสม. ที่ขาดเกินเกณฑ์ ระบุวันที่ขาดครบถ้วน พิมพ์ครั้งเดียวได้ทุกฉบับ','schPrintAbsenceLetters()')}
+    ${schDocCard('fa-award','เกียรติบัตรผู้เข้าเรียนครบ','เกียรติบัตร A4 แนวนอน สำหรับ อสม. ที่เข้าร่วมครบทุกครั้งในปี พร้อมช่องลงนาม','schPrintCertificates()')}
+    ${schDocCard('fa-id-card','บัตรประจำตัว อสม. พร้อม QR','บัตรขนาดพกพา 8 ใบ/แผ่น มี QR ประจำตัวสำหรับสแกนเช็กชื่อหน้างาน','schPrintIdCards()')}
+    ${schDocCard('fa-list-check','ทะเบียนคุมการอบรมรายบุคคล','ตารางไขว้รายคน × รายเดือน แบบเดียวกับสมุดทะเบียนคุมกระดาษ ใช้แนบท้ายรายงาน','schPrintMatrixSheet()')}
+  </div>`;
+}
+function schDocCard(ic,t,d,fn){
+  return `<div class="schp-doc"><div class="schp-doc-ic"><i class="fa-solid ${ic}"></i></div>
+    <h4>${t}</h4><p>${d}</p>
+    <button class="btn btn-outline btn-sm" onclick="${fn}"><i class="fa-solid fa-print"></i> พิมพ์ / บันทึก PDF</button></div>`;
+}
+
+/* ================================================================================
+   PRINT ENGINE — เอกสารราชการ A4
+   ================================================================================ */
+const SCH_PRINT_CSS=`
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+*{box-sizing:border-box}
+body{font-family:'Sarabun','TH Sarabun New',sans-serif;font-size:15px;color:#000;margin:0;background:#EEE;line-height:1.55}
+.pg{background:#fff;width:210mm;min-height:297mm;padding:18mm 16mm 14mm;margin:8mm auto;box-shadow:0 2px 12px rgba(0,0,0,.18);position:relative}
+.pg.land{width:297mm;min-height:210mm}
+.gov-head{text-align:center;margin-bottom:14px}
+.gov-head .krut{font-size:34px;line-height:1}
+.gov-head h1{font-size:19px;margin:6px 0 2px;font-weight:700}
+.gov-head h2{font-size:16px;margin:0;font-weight:600}
+.gov-head p{font-size:14px;margin:3px 0 0}
+.rule{border:0;border-top:1.5px solid #000;margin:10px 0 14px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 26px;font-size:14px;margin-bottom:12px}
+.meta b{font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{border:1px solid #000;padding:5px 6px;vertical-align:middle}
+th{background:#E8E8E8;font-weight:700;text-align:center;font-size:13px}
+td.c{text-align:center}td.l{text-align:left}
+.sig-cell{height:34px}
+.sig-cell img{height:30px;max-width:110px;object-fit:contain}
+.sum{margin-top:14px;font-size:14px;border:1px solid #000;padding:9px 12px}
+.sum span{display:inline-block;margin-right:22px}
+.signrow{display:flex;justify-content:space-around;margin-top:40px;text-align:center;font-size:14px;gap:20px}
+.signrow div{flex:1}
+.dots{display:block;margin:34px auto 5px;width:74%;border-bottom:1px dotted #000}
+.note{font-size:12.5px;color:#333;margin-top:10px}
+.pnum{position:absolute;bottom:8mm;left:0;right:0;text-align:center;font-size:12px;color:#555}
+h3.sec{font-size:16px;margin:18px 0 8px;font-weight:700;border-right:4px solid #171354;padding-right:8px}
+.kbox{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
+.kbox div{flex:1;min-width:110px;border:1px solid #000;padding:8px;text-align:center}
+.kbox b{display:block;font-size:22px}
+.kbox small{font-size:12px}
+.cert{border:9px double #171354;padding:16mm;text-align:center;min-height:170mm;display:flex;flex-direction:column;justify-content:center}
+.cert h1{font-size:38px;margin:0 0 4px;color:#171354;font-weight:700}
+.cert h2{font-size:22px;margin:0 0 24px;font-weight:600}
+.cert .nm{font-size:34px;font-weight:700;margin:16px 0;border-bottom:1px solid #999;display:inline-block;padding:0 40px 6px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:6mm}
+.idc{border:1.5px solid #171354;border-radius:4mm;padding:5mm;display:flex;gap:4mm;align-items:center;height:52mm}
+.idc .qr{width:32mm;height:32mm;flex:none}
+.idc .qr img{width:100%;height:100%}
+.idc .info{flex:1;min-width:0;font-size:13px}
+.idc .info h4{margin:0 0 3px;font-size:15px;font-weight:700}
+.idc .org{font-size:11px;color:#333;border-top:1px solid #CCC;margin-top:5px;padding-top:4px}
+.idc .code{font-size:19px;font-weight:700;letter-spacing:3px;color:#171354}
+.qrposter{text-align:center;padding-top:14mm}
+.qrposter h1{font-size:34px;margin:0 0 6px}
+.qrposter .big{font-size:64px;font-weight:700;letter-spacing:14px;color:#171354;margin:14px 0}
+.qrposter img{width:96mm;height:96mm;border:1px solid #ccc;padding:5mm;background:#fff}
+.toolbar{position:fixed;top:0;left:0;right:0;background:#171354;color:#fff;padding:9px 16px;display:flex;
+  justify-content:space-between;align-items:center;z-index:99;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.toolbar button{background:#fff;color:#171354;border:0;padding:8px 18px;border-radius:6px;font-weight:700;
+  cursor:pointer;font-family:inherit;font-size:14px;margin-right:8px}
+body{padding-top:52px}
+@media print{
+  body{background:#fff;padding:0}
+  .toolbar{display:none}
+  .pg{box-shadow:none;margin:0;width:auto;min-height:auto;page-break-after:always;padding:14mm 13mm}
+  .pg:last-child{page-break-after:auto}
+  @page{size:A4 portrait;margin:0}
+  .pg.land{page-break-after:always}
+}
+@media print{ .land-doc @page{size:A4 landscape} }
+`;
+function schPrintWindow(title,html,landscape){
+  const w=window.open('','_blank','width=1100,height=800');
+  if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาต Pop-up สำหรับเว็บนี้','error'); return; }
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
+    <title>${title}</title>
+    <style>${SCH_PRINT_CSS}${landscape?'@media print{@page{size:A4 landscape;margin:0}}':''}</style></head>
+    <body><div class="toolbar"><b>${title}</b>
+      <div><button onclick="window.print()">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+      <button onclick="window.close()" style="background:transparent;color:#fff;border:1px solid #fff">ปิด</button></div></div>
+    ${html}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{ try{w.focus();}catch(e){} },300);
+}
+function schGovHead(sub){
+  return `<div class="gov-head">
+    <div class="krut">🏛️</div>
+    <h1>โรงเรียน อสม. ${SCH_ORG.name}</h1>
+    <h2>${sub||''}</h2>
+    <p>ตำบล${SCH_ORG.tambon} อำเภอ${SCH_ORG.amphoe} จังหวัด${SCH_ORG.province}</p>
+  </div><hr class="rule">`;
+}
+function schSignBlock(){
+  const c=state.schoolCfg||{};
+  return `<div class="signrow">
+    <div><span class="dots"></span>( ${escapeHtml(c.reporter||currentUserFullName()||'............................')} )<br>${escapeHtml(c.reporterPos||'ผู้รายงาน')}<br>ผู้รายงาน</div>
+    <div><span class="dots"></span>( ${escapeHtml(c.principal||'............................')} )<br>${escapeHtml(c.principalPos||'')}<br>ผู้อนุมัติ</div>
+  </div>`;
+}
+function schThaiToday(){ return formatThaiDate(new Date()); }
+
+/* ---------------------------------------------------------------- 1. ใบลงชื่อ */
+function schPrintSignSheet(sid){
+  const s=schSessionById(sid); if(!s){ toast('กรุณาเลือกรอบเรียนก่อน','error'); return; }
+  const mem=schMembers(), st=schStats(sid);
+  const PER=22; const pages=[];
+  for(let i=0;i<mem.length;i+=PER) pages.push(mem.slice(i,i+PER));
+  if(!pages.length) pages.push([]);
+  const html=pages.map((chunk,pi)=>`
+  <div class="pg">
+    ${schGovHead('แบบลงลายมือชื่อผู้เข้าร่วมกิจกรรม')}
+    <div class="meta">
+      <span><b>กิจกรรม:</b> ${escapeHtml(s.title)}</span>
+      <span><b>วันที่:</b> ${formatThaiDate(s.date)}</span>
+      <span><b>เวลา:</b> ${escapeHtml(s.startTime||'')}–${escapeHtml(s.endTime||'')} น.</span>
+      <span><b>สถานที่:</b> ${escapeHtml(s.location||SCH_ORG.name)}</span>
+      ${s.topic?`<span><b>หัวข้อ:</b> ${escapeHtml(s.topic)}</span>`:''}
+      ${s.speaker?`<span><b>วิทยากร:</b> ${escapeHtml(s.speaker)}</span>`:''}
+    </div>
+    <table>
+      <thead><tr><th style="width:8%">ลำดับ</th><th style="width:30%">ชื่อ – นามสกุล</th><th style="width:8%">หมู่ที่</th>
+        <th style="width:12%">สถานะ</th><th style="width:12%">เวลา</th><th style="width:30%">ลายมือชื่อ</th></tr></thead>
+      <tbody>${chunk.map((m,i)=>{const r=schRec(sid,m.id)||{};return `<tr>
+        <td class="c">${pi*PER+i+1}</td>
+        <td class="l">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</td>
+        <td class="c">${escapeHtml(m.moo||'-')}</td>
+        <td class="c">${escapeHtml(r.status||'')}</td>
+        <td class="c">${r.checkinAt?new Date(r.checkinAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''}</td>
+        <td class="c sig-cell">${r.sign?`<img src="${r.sign}" alt="">`:''}</td></tr>`}).join('')}
+      </tbody></table>
+    ${pi===pages.length-1?`
+    <div class="sum"><b>สรุป:</b>
+      <span>อสม. ทั้งหมด ${st.total} คน</span><span>มา ${st['มา']}</span><span>สาย ${st['สาย']}</span>
+      <span>ลา ${st['ลา']}</span><span>ผู้แทน ${st['ผู้แทน']}</span><span>ขาด ${st['ขาด']}</span>
+      <span><b>คิดเป็นร้อยละ ${st.pct}</b></span></div>
+    ${schSignBlock()}`:''}
+    <div class="pnum">หน้า ${pi+1}/${pages.length} • พิมพ์เมื่อ ${schThaiToday()}</div>
+  </div>`).join('');
+  schPrintWindow(`ใบลงชื่อ — ${s.title}`,html);
+}
+
+/* ---------------------------------------------------------------- 2. รายงานผลรายครั้ง */
+function schPrintSessionReport(sid){
+  const s=schSessionById(sid); if(!s){ toast('กรุณาเลือกรอบเรียนก่อน','error'); return; }
+  const st=schStats(sid), mem=schMembers();
+  const absent=mem.filter(m=>schRec(sid,m.id)?.status==='ขาด');
+  const leave =mem.filter(m=>schRec(sid,m.id)?.status==='ลา');
+  const byMoo=schMoos().map(mo=>{
+    const ms=mem.filter(m=>String(m.moo||'')===mo);
+    const a=ms.filter(m=>SCH_PRESENT.includes(schRec(sid,m.id)?.status)).length;
+    return {mo,n:ms.length,a,pct:ms.length?Math.round(a/ms.length*1000)/10:0};});
+  const html=`
+  <div class="pg">
+    ${schGovHead('รายงานผลการดำเนินงานกิจกรรมโรงเรียน อสม.')}
+    <div class="meta">
+      <span><b>ชื่อกิจกรรม:</b> ${escapeHtml(s.title)}</span>
+      <span><b>วัน/เวลา:</b> ${formatThaiDate(s.date)} เวลา ${escapeHtml(s.startTime||'')}–${escapeHtml(s.endTime||'')} น. (${s.hours||0} ชั่วโมง)</span>
+      <span><b>สถานที่:</b> ${escapeHtml(s.location||SCH_ORG.name)}</span>
+      <span><b>ผู้รับผิดชอบ:</b> ${escapeHtml(s.owner||'')}</span>
+      ${s.speaker?`<span><b>วิทยากร:</b> ${escapeHtml(s.speaker)}</span>`:''}
+    </div>
+    <h3 class="sec">๑. หัวข้อ/สาระสำคัญของการอบรม</h3>
+    <p style="margin:0 0 6px">${escapeHtml(s.topic||'กิจกรรมพัฒนาศักยภาพอาสาสมัครสาธารณสุขประจำหมู่บ้าน')}</p>
+
+    <h3 class="sec">๒. ผลการเข้าร่วมกิจกรรม</h3>
+    <div class="kbox">
+      <div><b>${st.total}</b><small>อสม. ทั้งหมด (คน)</small></div>
+      <div><b>${st.attended}</b><small>เข้าร่วม (คน)</small></div>
+      <div><b>${st['ลา']}</b><small>ลา (คน)</small></div>
+      <div><b>${st['ขาด']}</b><small>ขาด (คน)</small></div>
+      <div><b>${st.pct}%</b><small>ร้อยละการเข้าร่วม</small></div>
+    </div>
+    <table><thead><tr><th>สถานะการเข้าร่วม</th><th style="width:22%">จำนวน (คน)</th><th style="width:22%">ร้อยละ</th></tr></thead>
+      <tbody>${SCH_ST.map(k=>`<tr><td class="l">${k}</td><td class="c">${st[k]}</td>
+        <td class="c">${st.total?Math.round(st[k]/st.total*1000)/10:0}</td></tr>`).join('')}
+        <tr><th class="l">รวม</th><th>${st.total}</th><th>100</th></tr></tbody></table>
+
+    <h3 class="sec">๓. ผลการเข้าร่วมจำแนกรายหมู่บ้าน</h3>
+    <table><thead><tr><th>หมู่ที่</th><th>จำนวน อสม. (คน)</th><th>เข้าร่วม (คน)</th><th>ร้อยละ</th></tr></thead>
+      <tbody>${byMoo.length?byMoo.map(x=>`<tr><td class="c">${escapeHtml(x.mo)}</td><td class="c">${x.n}</td>
+        <td class="c">${x.a}</td><td class="c">${x.pct}</td></tr>`).join('')
+        :'<tr><td colspan="4" class="c">ไม่มีข้อมูล</td></tr>'}</tbody></table>
+
+    <h3 class="sec">๔. รายชื่อผู้ไม่เข้าร่วมกิจกรรม</h3>
+    <p style="margin:0 0 6px"><b>ลากิจ/ลาป่วย (${leave.length} คน):</b>
+      ${leave.length?leave.map(m=>`${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} (ม.${escapeHtml(m.moo||'-')})`).join(', '):'– ไม่มี –'}</p>
+    <p style="margin:0"><b>ขาดการอบรม (${absent.length} คน):</b>
+      ${absent.length?absent.map(m=>`${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} (ม.${escapeHtml(m.moo||'-')})`).join(', '):'– ไม่มี –'}</p>
+
+    <h3 class="sec">๕. ปัญหา อุปสรรค และข้อเสนอแนะ</h3>
+    <p style="border-bottom:1px dotted #666;height:20px;margin:6px 0"></p>
+    <p style="border-bottom:1px dotted #666;height:20px;margin:6px 0"></p>
+    ${schSignBlock()}
+    <div class="pnum">พิมพ์จากระบบโรงเรียน อสม. ออนไลน์ ${SCH_ORG.name} เมื่อ ${schThaiToday()}</div>
+  </div>`;
+  schPrintWindow(`รายงานผล — ${s.title}`,html);
+}
+
+/* ---------------------------------------------------------------- 3. ป้าย QR */
+async function schPrintQrPoster(sid){
+  const s=schSessionById(sid); if(!s){ toast('กรุณาเลือกรอบเรียนก่อน','error'); return; }
+  toast('กำลังสร้างป้าย QR...','info');
+  const url=sessionCheckinUrl(sid);
+  const img=await schQrDataUrl(url,420);
+  const html=`<div class="pg"><div class="qrposter">
+    <h1>เช็กชื่อเข้าเรียน</h1>
+    <h2 style="font-size:20px;margin:0 0 4px;font-weight:600">${escapeHtml(s.title)}</h2>
+    <p style="font-size:16px;margin:0 0 14px">${formatThaiDate(s.date)} • ${escapeHtml(s.location||SCH_ORG.name)}</p>
+    ${img?`<img src="${img}" alt="QR">`:'<p>ไม่สามารถสร้าง QR ได้</p>'}
+    <p style="font-size:18px;margin:16px 0 2px;font-weight:600">รหัส PIN ประจำรอบ</p>
+    <div class="big">${escapeHtml(s.pin||'------')}</div>
+    <p style="font-size:15px;margin-top:16px">สแกน QR ด้วยกล้องมือถือ → กรอกเลขบัตรประชาชน ๔ ตัวท้าย → กรอก PIN → กดลงชื่อ</p>
+  </div></div>`;
+  schPrintWindow('ป้าย QR เช็กชื่อ',html);
+}
+
+/* ---------------------------------------------------------------- 4. รายงานประจำปี */
+function schPrintYearReport(){
+  schInit();
+  const y=schYear;
+  const ss=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===y)
+           .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const mem=schMembers();
+  const rows=mem.map(m=>({m,r:schYearOf(m.id,y)}));
+  const avg=rows.length?Math.round(rows.reduce((a,x)=>a+x.r.pct,0)/rows.length*10)/10:0;
+  const risky=rows.filter(x=>schRiskLevel(x.r).c!=='good').sort((a,b)=>b.r.absent-a.r.absent);
+  const perfect=rows.filter(x=>x.r.total&&x.r.attended===x.r.total);
+  const html=`
+  <div class="pg">
+    ${schGovHead(`รายงานสรุปผลการดำเนินงานโรงเรียน อสม. ประจำปี พ.ศ. ${beYear(y)}`)}
+    <h3 class="sec">๑. ข้อมูลทั่วไป</h3>
+    <div class="kbox">
+      <div><b>${ss.length}</b><small>จัดกิจกรรม (ครั้ง)</small></div>
+      <div><b>${mem.length}</b><small>อสม. ในทะเบียน (คน)</small></div>
+      <div><b>${avg}%</b><small>เข้าร่วมเฉลี่ยทั้งปี</small></div>
+      <div><b>${perfect.length}</b><small>เข้าครบทุกครั้ง (คน)</small></div>
+      <div><b>${risky.length}</b><small>ต้องติดตาม (คน)</small></div>
+    </div>
+    <h3 class="sec">๒. ผลการจัดกิจกรรมรายครั้ง</h3>
+    <table><thead><tr><th style="width:7%">ครั้งที่</th><th style="width:15%">วันที่</th><th>หัวข้อ</th>
+      <th style="width:9%">มา</th><th style="width:9%">สาย</th><th style="width:9%">ลา</th><th style="width:9%">ขาด</th><th style="width:11%">ร้อยละ</th></tr></thead>
+      <tbody>${ss.length?ss.map((s,i)=>{const st=schStats(s.id);return `<tr><td class="c">${i+1}</td>
+        <td class="c">${formatThaiDateShort(s.date)}</td><td class="l">${escapeHtml(s.topic||s.title)}</td>
+        <td class="c">${st['มา']}</td><td class="c">${st['สาย']}</td><td class="c">${st['ลา']}</td>
+        <td class="c">${st['ขาด']}</td><td class="c">${st.pct}</td></tr>`}).join('')
+        :'<tr><td colspan="8" class="c">ยังไม่มีการจัดกิจกรรมในปีนี้</td></tr>'}</tbody></table>
+
+    <h3 class="sec">๓. รายชื่อ อสม. ที่ต้องติดตาม</h3>
+    <table><thead><tr><th style="width:7%">ลำดับ</th><th>ชื่อ – นามสกุล</th><th style="width:9%">หมู่</th>
+      <th style="width:11%">เข้าร่วม</th><th style="width:9%">ขาด</th><th style="width:11%">ร้อยละ</th><th style="width:17%">ระดับ</th></tr></thead>
+      <tbody>${risky.length?risky.map((x,i)=>`<tr><td class="c">${i+1}</td>
+        <td class="l">${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}</td>
+        <td class="c">${escapeHtml(x.m.moo||'-')}</td><td class="c">${x.r.attended}/${x.r.total}</td>
+        <td class="c">${x.r.absent}</td><td class="c">${x.r.pct}</td>
+        <td class="c">${schRiskLevel(x.r).t}</td></tr>`).join('')
+        :'<tr><td colspan="7" class="c">ไม่มี อสม. ที่ต้องติดตาม</td></tr>'}</tbody></table>
+    ${schSignBlock()}
+    <div class="pnum">พิมพ์เมื่อ ${schThaiToday()}</div>
+  </div>`;
+  schPrintWindow(`รายงานประจำปี ${beYear(y)}`,html);
+}
+
+/* ---------------------------------------------------------------- 5. ทะเบียนคุม (ตารางไขว้) */
+function schPrintMatrixSheet(){
+  schInit();
+  const y=schYear;
+  const ss=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===y)
+           .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const mem=schMembers();
+  if(!ss.length){ toast('ยังไม่มีรอบเรียนในปีนี้','error'); return; }
+  const PER=30, pages=[];
+  for(let i=0;i<mem.length;i+=PER) pages.push(mem.slice(i,i+PER));
+  const html=pages.map((chunk,pi)=>`
+  <div class="pg land">
+    ${schGovHead(`ทะเบียนคุมการเข้าร่วมโรงเรียน อสม. ประจำปี พ.ศ. ${beYear(y)}`)}
+    <table style="font-size:12px">
+      <thead><tr><th style="width:5%">ที่</th><th style="width:22%">ชื่อ – นามสกุล</th><th style="width:5%">หมู่</th>
+        ${ss.map(s=>`<th>${THAI_MONTHS_SHORT[new Date(s.date).getMonth()]}</th>`).join('')}
+        <th style="width:8%">เข้าร่วม</th><th style="width:6%">ขาด</th><th style="width:7%">ร้อยละ</th></tr></thead>
+      <tbody>${chunk.map((m,i)=>{const r=schYearOf(m.id,y);return `<tr>
+        <td class="c">${pi*PER+i+1}</td><td class="l">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</td>
+        <td class="c">${escapeHtml(m.moo||'-')}</td>
+        ${ss.map(s=>{const st=schRec(s.id,m.id)?.status;
+          return `<td class="c">${({'มา':'✓','สาย':'ส','ลา':'ล','ผู้แทน':'ท','ขาด':'✗'})[st]||'–'}</td>`}).join('')}
+        <td class="c">${r.attended}/${r.total}</td><td class="c">${r.absent}</td><td class="c">${r.pct}</td></tr>`}).join('')}
+      </tbody></table>
+    <p class="note">หมายเหตุ: ✓ = มา, ส = มาสาย, ล = ลา, ท = ส่งผู้แทน, ✗ = ขาด, – = ยังไม่บันทึก</p>
+    ${pi===pages.length-1?schSignBlock():''}
+    <div class="pnum">หน้า ${pi+1}/${pages.length} • พิมพ์เมื่อ ${schThaiToday()}</div>
+  </div>`).join('');
+  schPrintWindow(`ทะเบียนคุม ${beYear(y)}`,html,true);
+}
+
+/* ---------------------------------------------------------------- 6. หนังสือแจ้งเตือน */
+function schPrintAbsenceLetters(onlyId){
+  schInit();
+  const y=schYear;
+  const ss=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===y)
+           .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let list=schMembers().map(m=>({m,r:schYearOf(m.id,y)}));
+  list = onlyId ? list.filter(x=>x.m.id===onlyId)
+                : list.filter(x=>schRiskLevel(x.r).c!=='good').sort((a,b)=>b.r.absent-a.r.absent);
+  if(!list.length){ toast('ไม่มี อสม. ที่เข้าเกณฑ์ต้องออกหนังสือแจ้งเตือน','info'); return; }
+  const c=state.schoolCfg||{};
+  const html=list.map(x=>{
+    const dates=ss.filter(s=>schRec(s.id,x.m.id)?.status==='ขาด').map(s=>formatThaiDate(s.date));
+    return `
+    <div class="pg">
+      ${schGovHead('หนังสือแจ้งการเข้าร่วมกิจกรรมโรงเรียน อสม.')}
+      <p style="text-align:left;margin:0 0 4px"><b>ที่</b> สน ๐๐๓๒/&nbsp;.........</p>
+      <p style="text-align:left;margin:0 0 16px"><b>วันที่</b> ${schThaiToday()}</p>
+      <p style="margin:0 0 4px"><b>เรื่อง</b> แจ้งผลการเข้าร่วมกิจกรรมโรงเรียน อสม. และขอความร่วมมือเข้าร่วมกิจกรรมอย่างต่อเนื่อง</p>
+      <p style="margin:0 0 16px"><b>เรียน</b> นาย/นาง/นางสาว ${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}
+        อาสาสมัครสาธารณสุขประจำหมู่บ้าน หมู่ที่ ${escapeHtml(x.m.moo||'-')} บ้าน${escapeHtml(x.m.village||'')}</p>
+      <p style="text-indent:2.5em;margin:0 0 12px">
+        ตามที่ ${SCH_ORG.name} ได้จัดกิจกรรมโรงเรียน อสม. เพื่อพัฒนาศักยภาพอาสาสมัครสาธารณสุขประจำหมู่บ้าน
+        เป็นประจำทุกเดือน รวมทั้งสิ้น ${x.r.total} ครั้ง ในปี พ.ศ. ${beYear(y)} นั้น</p>
+      <p style="text-indent:2.5em;margin:0 0 12px">
+        จากการตรวจสอบข้อมูลการเข้าร่วมกิจกรรม พบว่าท่านเข้าร่วมกิจกรรมจำนวน <b>${x.r.attended} ครั้ง</b>
+        คิดเป็นร้อยละ <b>${x.r.pct}</b> ลากิจ/ลาป่วย ${x.r.leave} ครั้ง และ<b>ขาดการเข้าร่วมจำนวน ${x.r.absent} ครั้ง</b>
+        ${dates.length?`ได้แก่วันที่ ${dates.join(', ')}`:''}</p>
+      <p style="text-indent:2.5em;margin:0 0 12px">
+        เนื่องจากการเข้าร่วมกิจกรรมโรงเรียน อสม. เป็นส่วนหนึ่งของการประเมินผลการปฏิบัติงานและการพิจารณาค่าป่วยการ อสม.
+        จึงขอความร่วมมือให้ท่านเข้าร่วมกิจกรรมอย่างสม่ำเสมอในครั้งต่อไป หากมีเหตุจำเป็นไม่สามารถเข้าร่วมได้
+        ขอให้แจ้งเจ้าหน้าที่ผู้รับผิดชอบล่วงหน้าเพื่อบันทึกการลาให้ถูกต้อง</p>
+      <p style="text-indent:2.5em;margin:0 0 12px">จึงเรียนมาเพื่อทราบและขอความร่วมมือ</p>
+      <div class="signrow" style="margin-top:46px">
+        <div style="flex:0 0 55%"></div>
+        <div><span class="dots"></span>( ${escapeHtml(c.principal||'............................')} )<br>
+          ${escapeHtml(c.principalPos||'ผู้อำนวยการโรงพยาบาลส่งเสริมสุขภาพตำบลบ้านโคกสง่า')}</div>
+      </div>
+      <p class="note" style="margin-top:26px">ผู้ประสานงาน: ${escapeHtml(c.reporter||currentUserFullName()||'-')}
+        ${escapeHtml(c.reporterPos||'')} • ${SCH_ORG.name}</p>
+      <div class="pnum">พิมพ์จากระบบโรงเรียน อสม. ออนไลน์ เมื่อ ${schThaiToday()}</div>
+    </div>`;}).join('');
+  schPrintWindow(`หนังสือแจ้งเตือน (${list.length} ฉบับ)`,html);
+  schLog('ออกหนังสือแจ้งเตือน',`${list.length} ฉบับ ปี ${beYear(y)}`); schSave();
+}
+
+/* ---------------------------------------------------------------- 7. เกียรติบัตร */
+function schPrintCertificates(){
+  schInit();
+  const y=schYear;
+  const list=schMembers().map(m=>({m,r:schYearOf(m.id,y)}))
+    .filter(x=>x.r.total>0 && x.r.attended===x.r.total);
+  if(!list.length){ toast('ยังไม่มี อสม. ที่เข้าร่วมครบทุกครั้งในปีนี้','info'); return; }
+  const c=state.schoolCfg||{};
+  const hours=(state.schoolSessions||[]).filter(s=>new Date(s.date).getFullYear()===y)
+    .reduce((a,s)=>a+(parseFloat(s.hours)||0),0);
+  const html=list.map(x=>`
+  <div class="pg land"><div class="cert">
+    <div style="font-size:40px">🏛️</div>
+    <h1>เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า</h1>
+    <div class="nm">${escapeHtml(x.m.firstName)} ${escapeHtml(x.m.lastName)}</div>
+    <h2 style="margin-top:14px">อาสาสมัครสาธารณสุขประจำหมู่บ้าน หมู่ที่ ${escapeHtml(x.m.moo||'-')} บ้าน${escapeHtml(x.m.village||'')}</h2>
+    <p style="font-size:19px;line-height:1.8;margin:0 0 8px">
+      ได้เข้าร่วมกิจกรรม <b>โรงเรียน อสม. ${SCH_ORG.name}</b><br>
+      ครบทุกครั้ง จำนวน ${x.r.total} ครั้ง รวม ${hours} ชั่วโมง<br>
+      ประจำปีพุทธศักราช ${beYear(y)}</p>
+    <p style="font-size:17px;margin:14px 0 0">ให้ไว้ ณ วันที่ ${schThaiToday()}</p>
+    <div class="signrow" style="margin-top:26px">
+      <div style="flex:0 0 25%"></div>
+      <div><span class="dots" style="margin-top:26px"></span>( ${escapeHtml(c.principal||'............................')} )<br>
+        <span style="font-size:14px">${escapeHtml(c.principalPos||'')}</span></div>
+      <div style="flex:0 0 25%"></div>
+    </div>
+  </div></div>`).join('');
+  schPrintWindow(`เกียรติบัตร ${beYear(y)} (${list.length} ใบ)`,html,true);
+}
+
+/* ---------------------------------------------------------------- 8. บัตรประจำตัว + QR */
+async function schPrintIdCards(){
+  schInit();
+  const mem=schMembers();
+  if(!mem.length){ toast('ยังไม่มีทะเบียน อสม. ในระบบ','error'); return; }
+  toast(`กำลังสร้างบัตร ${mem.length} ใบ กรุณารอสักครู่...`,'info');
+  const qrs=[];
+  for(const m of mem) qrs.push(await schQrDataUrl('OSM:'+m.id,180));
+  const PER=8, pages=[];
+  for(let i=0;i<mem.length;i+=PER) pages.push(i);
+  const html=pages.map(start=>`
+  <div class="pg"><div class="cards">
+    ${mem.slice(start,start+PER).map((m,j)=>`
+    <div class="idc">
+      <div class="qr">${qrs[start+j]?`<img src="${qrs[start+j]}" alt="">`:''}</div>
+      <div class="info">
+        <div style="font-size:11px;color:#171354;font-weight:700">บัตรประจำตัว อสม.</div>
+        <h4>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</h4>
+        <div>หมู่ที่ ${escapeHtml(m.moo||'-')} บ้าน${escapeHtml(m.village||'')}</div>
+        <div>รหัสเช็กชื่อ <span class="code">${schCode(m)}</span></div>
+        <div class="org">${SCH_ORG.name}<br>ต.${SCH_ORG.tambon} อ.${SCH_ORG.amphoe} จ.${SCH_ORG.province}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+  <p class="note" style="margin-top:8mm;text-align:center">ยื่นบัตรให้เจ้าหน้าที่สแกน QR เพื่อเช็กชื่อเข้าเรียน • พิมพ์เมื่อ ${schThaiToday()}</p>
+  </div>`).join('');
+  schPrintWindow(`บัตรประจำตัว อสม. (${mem.length} ใบ)`,html);
+}
+
+/* ================================================================================
+   WIRING — เพิ่มเมนู / มุมมองใหม่ และ override การนำทาง
+   ================================================================================ */
+VIEW_TITLES['school-sessions']=['โรงเรียน อสม. ออนไลน์','จัดการรอบเรียนประจำเดือน'];
+VIEW_TITLES['school-roster']  =['โรงเรียน อสม. ออนไลน์','เช็กชื่อ — รายชื่อ / สแกน QR / รหัส 4 หลัก'];
+VIEW_TITLES['school-report']  =['โรงเรียน อสม. ออนไลน์','รายงานและสถิติการมาเรียน'];
+VIEW_TITLES['school-docs']    =['โรงเรียน อสม. ออนไลน์','ศูนย์เอกสารราชการ (พิมพ์ / PDF)'];
+
+const SCHOOL_VIEWS=['school-sessions','school-roster','school-report','school-docs'];
+
+function switchView(viewName){
+  if(viewName!=='dashboard' && !isAdmin()){ requestAdminLogin(viewName); return; }
+  if(state.currentView==='school-roster' && viewName!=='school-roster') schStopScan();
+  state.currentView=viewName;
+  document.querySelectorAll('.view-section').forEach(s=>s.classList.add('hidden'));
+  const t=document.getElementById('view-'+viewName); if(t) t.classList.remove('hidden');
+  document.querySelectorAll('.nav-link[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===viewName));
+  const ti=VIEW_TITLES[viewName]||['',''];
+  document.getElementById('topbar-title').innerHTML=ti[0]+`<small id="topbar-sub">${ti[1]}</small>`;
+  if(['osm-list','osm-households'].includes(viewName)){
+    document.getElementById('grp-osm-sub').classList.remove('closed');
+    document.getElementById('grp-osm').classList.add('open');
+  }
+  if(['activity-checkin','activity-report'].includes(viewName)){
+    document.getElementById('grp-activity-sub').classList.remove('closed');
+    document.getElementById('grp-activity').classList.add('open');
+  }
+  if(SCHOOL_VIEWS.includes(viewName)){
+    document.getElementById('grp-school-sub').classList.remove('closed');
+    document.getElementById('grp-school').classList.add('open');
+  }
+  closeSidebar(); renderCurrentView(); window.scrollTo(0,0);
+}
+
+function renderCurrentView(){
+  switch(state.currentView){
+    case 'dashboard': renderDashboard(); break;
+    case 'osm-list': renderOsmListView(); break;
+    case 'osm-households': renderHouseholdsView(); break;
+    case 'activity-checkin': renderCheckinView(); break;
+    case 'activity-report': renderActivityReportView(); break;
+    case 'school-sessions': renderSchoolSessionsView(); break;
+    case 'school-roster': renderSchoolRosterView(); break;
+    case 'school-report': renderSchoolReportView(); break;
+    case 'school-docs': renderSchoolDocsView(); break;
+    case 'meetings': renderMeetingsView(); break;
+    case 'export': renderExportView(); break;
+    case 'admin': renderAdminView(); break;
+  }
+}
+
+function printSchoolSession(id){ schPrintSignSheet(id); }
+
+/* ---------------------------------------------------------------- boot */
+(function schBoot(){
+  const go=()=>{
+    schInit();
+    // 1) เพิ่ม section ของมุมมองใหม่
+    const host=document.querySelector('.content')||document.body;
+    if(!document.getElementById('view-school-docs')){
+      const sec=document.createElement('section');
+      sec.className='view-section hidden'; sec.id='view-school-docs';
+      const ref=document.getElementById('view-school-report');
+      if(ref&&ref.parentNode) ref.parentNode.insertBefore(sec,ref.nextSibling); else host.appendChild(sec);
+    }
+    // 2) เพิ่มเมนู "ศูนย์เอกสาร"
+    const sub=document.getElementById('grp-school-sub');
+    if(sub && !sub.querySelector('[data-view="school-docs"]')){
+      const b=document.createElement('button');
+      b.className='nav-link'; b.dataset.view='school-docs'; b.textContent='ศูนย์เอกสาร / พิมพ์';
+      b.addEventListener('click',()=>switchView('school-docs'));
+      sub.appendChild(b);
+    }
+    // 3) เมนูเดิมถูกผูก event ไว้แล้วในส่วน INIT จึงไม่ผูกซ้ำ
+    // 4) หยุดกล้องเมื่อออกจากหน้า
+    window.addEventListener('beforeunload',schStopScan);
+    document.addEventListener('visibilitychange',()=>{ if(document.hidden) schStopScan(); });
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,120));
+  else setTimeout(go,120);
+})();
+
+
+/* ============================================================================================
+   FIRESTORE SYNC LAYER  v1.0
+   ซิงก์ state ↔ Firestore แบบเรียลไทม์ พร้อมโหมดออฟไลน์และการอัปโหลดครั้งแรก
+   ============================================================================================ */
+const FB_MAP = {
+  osmMembers:       'osm_members',
+  households:       'households',
+  schoolSessions:   'school_sessions',
+  schoolAttendance: 'school_attendance',
+  meetings:         'meetings',
+  attendance:       'activity_attendance'
+};
+const FB_CFG_KEY = 'khoksanga_fb_cfg';
+
+let fbLast      = {};      // สแนปช็อตล่าสุดที่ตรงกับ cloud (ใช้ทำ diff)
+let fbApplying  = false;   // กันลูป: กำลังเขียนค่าจาก cloud ลง state
+let fbUnsub     = [];
+let fbTimer     = null;
+let fbFirst     = {};      // เคยได้ snapshot แรกของ collection นี้แล้วหรือยัง
+let fbNeedUp    = false;   // cloud ว่าง แต่ในเครื่องมีข้อมูล → ต้องอัปโหลด
+let fbStatusMsg = '';
+let fbLastSync  = null;
+let fbBusy      = false;
+
+/* ---------------------------------------------------------------- config */
+function fbCfg(){
+  try{ return Object.assign({email:'',autoSync:true,publicCheckin:false}, JSON.parse(localStorage.getItem(FB_CFG_KEY)||'{}')); }
+  catch(e){ return {email:'',autoSync:true,publicCheckin:false}; }
+}
+function fbSetCfg(o){ localStorage.setItem(FB_CFG_KEY, JSON.stringify(Object.assign(fbCfg(),o))); }
+function fbOK(){ const F=window.FBX; return !!(F && F.ready && F.db && !F.fatal); }
+function fbStaff(){ const F=window.FBX; return !!(F && F.ready && !F.anon); }
+
+/* ---------------------------------------------------------------- normalize */
+function fbNorm(v){
+  if(Array.isArray(v)) return v.map(fbNorm);
+  if(v && typeof v==='object'){
+    const o={}; Object.keys(v).sort().forEach(k=>{ if(v[k]!==undefined) o[k]=fbNorm(v[k]); }); return o;
+  }
+  return v===undefined ? null : v;
+}
+function fbSer(o){ try{ return JSON.stringify(fbNorm(o)); }catch(e){ return ''; } }
+function fbSafeId(x){ return String(x||'').replace(/[\/\\#?\[\]]/g,'_').slice(0,300) || uid('doc'); }
+
+/* ---------------------------------------------------------------- listeners */
+function fbAttach(){
+  if(!fbOK()) return;
+  fbDetach();
+  const F=window.FBX;
+  Object.entries(FB_MAP).forEach(([key,col])=>{
+    try{
+      fbUnsub.push(F.onSnapshot(F.collection(F.db,col), snap=>{
+        const arr=[], map={};
+        snap.forEach(d=>{ const o=d.data()||{}; o.id=d.id; arr.push(o); map[d.id]=fbSer(o); });
+
+        // ครั้งแรก: ถ้า cloud ว่างแต่ในเครื่องมีข้อมูล ห้ามล้างข้อมูลในเครื่อง
+        if(!fbFirst[key]){
+          fbFirst[key]=true;
+          const localN=(Array.isArray(state[key])?state[key]:[]).length;
+          if(!arr.length && localN){ fbNeedUp=true; fbLast[key]={}; fbPaint(); return; }
+        }
+        fbLast[key]=map;
+        fbApplying=true;
+        state[key]=arr;
+        try{ persistState(); }catch(e){}
+        fbApplying=false;
+        fbLastSync=new Date();
+        fbPaint();
+        fbRepaintView();
+      }, err=>{ fbErr(err); }));
+    }catch(e){ fbErr(e); }
+  });
+
+  // เอกสารตั้งค่า
+  try{
+    fbUnsub.push(F.onSnapshot(F.doc(F.db,'app_config','school'), d=>{
+      if(!d.exists()) return;
+      const c=d.data()||{};
+      fbApplying=true; state.schoolCfg=Object.assign(state.schoolCfg||{},c);
+      fbLast.__cfg=fbSer(state.schoolCfg);
+      try{ persistState(); }catch(e){} fbApplying=false;
+    }, ()=>{}));
+  }catch(e){}
+}
+function fbDetach(){ fbUnsub.forEach(u=>{ try{u();}catch(e){} }); fbUnsub=[]; fbFirst={}; }
+
+function fbErr(e){
+  const m=String(e && (e.code||e.message) || e);
+  fbStatusMsg = /permission|insufficient/i.test(m)
+    ? 'สิทธิ์เข้าถึงไม่พอ — ยังไม่ได้ตั้ง Security Rules หรือยังไม่ได้เข้าสู่ระบบ Firebase'
+    : 'เชื่อมต่อผิดพลาด: '+m;
+  console.warn('[FBX]',e);
+  fbPaint();
+}
+
+/* ---------------------------------------------------------------- push (diff) */
+function fbSchedulePush(){
+  if(!fbCfg().autoSync || !fbStaff() || fbApplying) return;
+  clearTimeout(fbTimer);
+  fbTimer=setTimeout(()=>{ fbPush().catch(fbErr); }, 1200);
+}
+async function fbPush(){
+  if(!fbStaff() || fbBusy) return;
+  const F=window.FBX;
+  fbBusy=true;
+  try{
+    let batch=F.writeBatch(F.db), ops=0;
+    const flush=async()=>{ if(ops){ await batch.commit(); batch=F.writeBatch(F.db); ops=0; } };
+
+    for(const [key,col] of Object.entries(FB_MAP)){
+      const arr=Array.isArray(state[key])?state[key]:[];
+      const cur={};
+      arr.forEach(o=>{ if(o&&o.id!=null){ const id=fbSafeId(o.id); cur[id]=fbSer(o); } });
+      const prev=fbLast[key]||{};
+      for(const id in cur){
+        if(prev[id]!==cur[id]){ batch.set(F.doc(F.db,col,id), JSON.parse(cur[id])); ops++; }
+        if(ops>=380) await flush();
+      }
+      for(const id in prev){
+        if(!(id in cur)){ batch.delete(F.doc(F.db,col,id)); ops++; }
+        if(ops>=380) await flush();
+      }
+      fbLast[key]=cur;
+    }
+
+    const cfg=fbSer(state.schoolCfg||{});
+    if(fbLast.__cfg!==cfg){ batch.set(F.doc(F.db,'app_config','school'), JSON.parse(cfg)); fbLast.__cfg=cfg; ops++; }
+
+    await flush();
+    if(fbCfg().publicCheckin) await fbPublishRoster();
+    fbNeedUp=false; fbLastSync=new Date(); fbStatusMsg='';
+  } finally { fbBusy=false; fbPaint(); }
+}
+
+/* เผยแพร่ทะเบียนย่อสำหรับหน้าเช็กชื่อสาธารณะ (ไม่มีเลขบัตรเต็ม / ไม่มีที่อยู่) */
+async function fbPublishRoster(){
+  if(!fbStaff()) return;
+  const F=window.FBX;
+  let batch=F.writeBatch(F.db), ops=0;
+  const cur={};
+  schMembers().forEach(m=>{
+    const id=fbSafeId(m.id);
+    cur[id]={ n:`${m.firstName||''} ${m.lastName||''}`.trim(), m:String(m.moo||''), c:schCode(m) };
+  });
+  const prev=fbLast.__roster||{};
+  for(const id in cur){
+    const s=JSON.stringify(cur[id]);
+    if(prev[id]!==s){ batch.set(F.doc(F.db,'public_roster',id), cur[id]); ops++; }
+    if(ops>=380){ await batch.commit(); batch=F.writeBatch(F.db); ops=0; }
+  }
+  for(const id in prev) if(!(id in cur)){ batch.delete(F.doc(F.db,'public_roster',id)); ops++; }
+  if(ops) await batch.commit();
+  fbLast.__roster={}; for(const id in cur) fbLast.__roster[id]=JSON.stringify(cur[id]);
+}
+async function fbClearRoster(){
+  if(!fbStaff()) return;
+  const F=window.FBX;
+  const snap=await F.getDocs(F.collection(F.db,'public_roster'));
+  let batch=F.writeBatch(F.db), ops=0;
+  snap.forEach(d=>{ batch.delete(d.ref); ops++; });
+  if(ops) await batch.commit();
+  fbLast.__roster={};
+}
+
+/* อัปโหลดทุกอย่างใหม่ทั้งหมด (ครั้งแรก / กู้คืน) */
+async function fbUploadAll(){
+  if(!fbStaff()){ toast('กรุณาเข้าสู่ระบบ Firebase ด้วยบัญชีเจ้าหน้าที่ก่อน','error'); return; }
+  toast('กำลังอัปโหลดข้อมูลขึ้น Firebase...','info');
+  fbLast={};
+  try{ await fbPush(); toast('อัปโหลดข้อมูลขึ้น Firebase เรียบร้อยแล้ว','success'); }
+  catch(e){ fbErr(e); toast('อัปโหลดไม่สำเร็จ: '+(e.message||e),'error'); }
+  fbPaint();
+}
+async function fbDownloadAll(){
+  if(!fbOK()){ toast('ยังไม่ได้เชื่อมต่อ Firebase','error'); return; }
+  confirmDialog('ดึงข้อมูลทั้งหมดจาก Firebase มาทับข้อมูลในเครื่องนี้ใช่หรือไม่ ข้อมูลในเครื่องที่ยังไม่ถูกอัปโหลดจะหายไป',async()=>{
+    closeModal();
+    const F=window.FBX;
+    try{
+      toast('กำลังดึงข้อมูล...','info');
+      for(const [key,col] of Object.entries(FB_MAP)){
+        const snap=await F.getDocs(F.collection(F.db,col));
+        const arr=[],map={};
+        snap.forEach(d=>{ const o=d.data()||{}; o.id=d.id; arr.push(o); map[d.id]=fbSer(o); });
+        state[key]=arr; fbLast[key]=map;
+      }
+      fbApplying=true; persistState(); fbApplying=false;
+      fbNeedUp=false; fbLastSync=new Date();
+      renderCurrentView(); fbPaint();
+      toast(`ดึงข้อมูลสำเร็จ — อสม. ${state.osmMembers.length} คน • รอบเรียน ${(state.schoolSessions||[]).length} รอบ`,'success');
+    }catch(e){ fbErr(e); toast('ดึงข้อมูลไม่สำเร็จ: '+(e.message||e),'error'); }
+  },{confirmLabel:'ดึงข้อมูลมาทับ'});
+}
+
+/* ---------------------------------------------------------------- auth */
+async function fbSignInStaff(email,pw){
+  const F=window.FBX;
+  if(!F||F.fatal) throw new Error('Firebase ยังโหลดไม่สำเร็จ');
+  await F.signInWithEmailAndPassword(F.auth,email,pw);
+  fbSetCfg({email});
+  sessionStorage.setItem('fb_pw',pw);
+}
+async function fbSignOut(){
+  const F=window.FBX; if(!F) return;
+  fbDetach(); sessionStorage.removeItem('fb_pw');
+  try{ await F.signOut(F.auth); }catch(e){}
+  fbLast={}; fbPaint(); toast('ออกจากระบบ Firebase แล้ว','info');
+}
+async function fbAutoSignIn(){
+  const F=window.FBX; if(!F||F.fatal) return;
+  if(F.ready) return;
+  const c=fbCfg(), pw=sessionStorage.getItem('fb_pw');
+  if(c.email && pw){ try{ await F.signInWithEmailAndPassword(F.auth,c.email,pw); return; }catch(e){ console.warn(e); } }
+}
+
+/* ---------------------------------------------------------------- status UI */
+function fbPaint(){
+  const chip=document.getElementById('fb-chip'); if(!chip) return;
+  const F=window.FBX;
+  let ic='fa-cloud-slash', txt='ออฟไลน์', col='var(--text-faint)';
+  if(!F || F.fatal){ ic='fa-triangle-exclamation'; txt='Firebase ผิดพลาด'; col='var(--danger)'; }
+  else if(fbBusy){ ic='fa-spinner fa-spin'; txt='กำลังซิงก์'; col='var(--info)'; }
+  else if(fbStatusMsg){ ic='fa-triangle-exclamation'; txt='ต้องตั้งค่า'; col='var(--warning)'; }
+  else if(fbNeedUp){ ic='fa-cloud-arrow-up'; txt='รออัปโหลด'; col='var(--warning)'; }
+  else if(fbStaff()){ ic='fa-cloud-check'; txt='ซิงก์แล้ว'; col='var(--success)'; }
+  else if(fbOK()){ ic='fa-cloud'; txt='อ่านอย่างเดียว'; col='var(--info)'; }
+  else { ic='fa-cloud-slash'; txt='ยังไม่เชื่อมต่อ'; col='var(--text-faint)'; }
+  chip.innerHTML=`<i class="fa-solid ${ic}"></i><span class="fb-chip-t">${txt}</span>`;
+  chip.style.color=col;
+  chip.title=fbStatusMsg||`Firebase: ${txt}`+(fbLastSync?` • ล่าสุด ${fbLastSync.toLocaleTimeString('th-TH')}`:'');
+}
+function fbRepaintView(){
+  const v=state.currentView;
+  if(['dashboard','osm-list','osm-households','school-sessions','school-roster','school-report','activity-report','meetings','admin'].includes(v)){
+    clearTimeout(fbRepaintView._t);
+    fbRepaintView._t=setTimeout(()=>{ try{ renderCurrentView(); }catch(e){} },250);
+  }
+}
+
+/* ---------------------------------------------------------------- panel */
+function fbOpenPanel(){
+  const F=window.FBX, c=fbCfg();
+  const counts=Object.keys(FB_MAP).map(k=>`${({osmMembers:'อสม.',households:'หลังคาเรือน',schoolSessions:'รอบเรียน',schoolAttendance:'บันทึกเช็กชื่อ',meetings:'การประชุม',attendance:'กิจกรรมอื่น'})[k]} ${(state[k]||[]).length}`).join(' • ');
+  const signed=fbStaff(), anon=!!(F&&F.anon);
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-cloud"></i> Firebase — ฐานข้อมูลกลาง</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.75">
+      <div><b>โปรเจกต์:</b> osm-khoksanga</div>
+      <div><b>สถานะ:</b> ${!F||F.fatal?'<span style="color:var(--danger)">โหลด SDK ไม่สำเร็จ</span>'
+        :signed?`<span style="color:var(--success)">เชื่อมต่อแล้ว (${escapeHtml(F.user?.email||'')})</span>`
+        :anon?'<span style="color:var(--info)">ผู้เยี่ยมชม (อ่านอย่างเดียว)</span>'
+        :'<span style="color:var(--text-faint)">ยังไม่ได้เข้าสู่ระบบ</span>'}</div>
+      <div><b>ข้อมูลในเครื่อง:</b> ${counts}</div>
+      ${fbLastSync?`<div><b>ซิงก์ล่าสุด:</b> ${fbLastSync.toLocaleString('th-TH')}</div>`:''}
+      ${fbStatusMsg?`<div style="color:var(--warning);margin-top:6px"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(fbStatusMsg)}</div>`:''}
+      ${fbNeedUp?`<div style="color:var(--warning);margin-top:6px"><i class="fa-solid fa-cloud-arrow-up"></i> ฐานข้อมูลบน Firebase ยังว่าง — กด “อัปโหลดข้อมูลทั้งหมด” เพื่อเริ่มใช้งาน</div>`:''}
+    </div>
+
+    ${signed?`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+      <button class="btn btn-primary" onclick="fbUploadAll()"><i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดข้อมูลทั้งหมด</button>
+      <button class="btn btn-outline" onclick="fbDownloadAll()"><i class="fa-solid fa-cloud-arrow-down"></i> ดึงข้อมูลจาก Firebase</button>
+    </div>
+    <label style="display:flex;gap:9px;align-items:center;font-size:13.5px;margin:16px 0 8px;cursor:pointer">
+      <input type="checkbox" id="fb-auto" ${c.autoSync?'checked':''} style="width:17px;height:17px"
+        onchange="fbSetCfg({autoSync:this.checked});toast(this.checked?'เปิดซิงก์อัตโนมัติ':'ปิดซิงก์อัตโนมัติ','info')">
+      ซิงก์อัตโนมัติทุกครั้งที่มีการแก้ไขข้อมูล</label>
+    <label style="display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:6px;cursor:pointer">
+      <input type="checkbox" id="fb-pub" ${c.publicCheckin?'checked':''} style="width:17px;height:17px;margin-top:2px"
+        onchange="fbTogglePublic(this.checked)">
+      <span>เปิดให้ อสม. เช็กชื่อเองผ่าน QR ด้วยมือถือตัวเอง
+        <small style="display:block;color:var(--warning);font-size:11.5px;margin-top:3px">
+          <i class="fa-solid fa-triangle-exclamation"></i> ต้องใช้ Security Rules แบบเปิด (ดูคู่มือ) และจะเผยแพร่ ชื่อ–สกุล / หมู่ / รหัส 4 หลัก ของ อสม. ให้ผู้ที่มีลิงก์อ่านได้</small></span></label>
+    <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
+    <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="fbSignOut();closeModal()">
+      <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ Firebase</button>
+    `:`
+    <form id="fb-login">
+      <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;margin:0 0 14px">
+        เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่ที่สร้างไว้ใน Firebase Console → Authentication → Users
+        (วิธีสร้างอยู่ในคู่มือติดตั้ง)</p>
+      <div class="form-group"><label>อีเมลเจ้าหน้าที่</label>
+        <input id="fb-email" class="input" type="email" autocomplete="username" value="${escapeHtml(c.email||'')}" placeholder="staff@khoksanga.local"></div>
+      <div class="form-group"><label>รหัสผ่าน</label>
+        <input id="fb-pw" class="input" type="password" autocomplete="current-password" placeholder="รหัสผ่าน"></div>
+      <div class="field-error" id="fb-err" style="display:none;margin-bottom:10px"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">
+        <i class="fa-solid fa-plug-circle-check"></i> เชื่อมต่อ Firebase</button>
+    </form>`}
+  </div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">ปิด</button></div>`,{size:'sm'});
+
+  const f=document.getElementById('fb-login');
+  if(f) f.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const b=f.querySelector('button[type=submit]'), er=document.getElementById('fb-err');
+    er.style.display='none'; b.disabled=true; b.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังเชื่อมต่อ';
+    try{
+      await fbSignInStaff(document.getElementById('fb-email').value.trim(), document.getElementById('fb-pw').value);
+      closeModal(); toast('เชื่อมต่อ Firebase สำเร็จ','success');
+    }catch(err){
+      const m=String(err.code||err.message||err);
+      er.textContent = /invalid-credential|wrong-password|user-not-found/.test(m) ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+        : /operation-not-allowed/.test(m) ? 'ยังไม่ได้เปิด Email/Password ใน Firebase Console → Authentication → Sign-in method'
+        : /network/.test(m) ? 'เชื่อมต่ออินเทอร์เน็ตไม่ได้' : m;
+      er.style.display='block'; b.disabled=false; b.innerHTML='<i class="fa-solid fa-plug-circle-check"></i> เชื่อมต่อ Firebase';
+    }
+  });
+}
+async function fbTogglePublic(on){
+  fbSetCfg({publicCheckin:on});
+  try{
+    if(on){ await fbPublishRoster(); toast('เปิดการเช็กชื่อผ่าน QR แล้ว — อย่าลืมตั้ง Security Rules แบบเปิด','success'); }
+    else  { await fbClearRoster();   toast('ปิดการเช็กชื่อผ่าน QR และลบทะเบียนสาธารณะแล้ว','success'); }
+  }catch(e){ fbErr(e); }
+}
+
+/* ---------------------------------------------------------------- persist hooks */
+function persistState(){
+  try{
+    const payload={ theme:state.theme, users:state.users, osmMembers:state.osmMembers, households:state.households,
+      attendance:state.attendance, meetings:state.meetings, schoolSessions:state.schoolSessions||[],
+      schoolAttendance:state.schoolAttendance||[], schoolCfg:state.schoolCfg||{}, schoolLog:state.schoolLog||[] };
+    localStorage.setItem(APP_STORAGE_KEY,JSON.stringify(payload));
+  }catch(e){ console.warn('persistState failed',e); }
+  if(!fbApplying) fbSchedulePush();
+}
+function hydrateState(){
+  try{
+    const raw=localStorage.getItem(APP_STORAGE_KEY); if(!raw) return;
+    const saved=JSON.parse(raw);
+    ['theme','users','osmMembers','households','attendance','meetings','schoolSessions','schoolAttendance','schoolCfg','schoolLog']
+      .forEach(k=>{ if(saved[k]!==undefined) state[k]=saved[k]; });
+    state.schoolSessions   = Array.isArray(state.schoolSessions)?state.schoolSessions:[];
+    state.schoolAttendance = Array.isArray(state.schoolAttendance)?state.schoolAttendance:[];
+  }catch(e){ console.warn('hydrateState failed',e); }
+}
+
+/* ---------------------------------------------------------------- public check-in ผ่าน Firebase */
+async function fbLoadPublic(sid){
+  const F=window.FBX;
+  if(!F||F.fatal) throw new Error('เชื่อมต่อฐานข้อมูลไม่ได้');
+  if(!F.ready) await F.signInAnonymously(F.auth);
+  const sd=await F.getDoc(F.doc(F.db,'school_sessions',fbSafeId(sid)));
+  if(!sd.exists()) throw new Error('ไม่พบรอบเรียนนี้');
+  const s=sd.data(); s.id=sd.id;
+  state.schoolSessions=[s];
+  const rs=await F.getDocs(F.collection(F.db,'public_roster'));
+  const mem=[];
+  rs.forEach(d=>{ const o=d.data()||{}; const nm=String(o.n||'').split(' ');
+    mem.push({ id:d.id, firstName:nm[0]||'', lastName:nm.slice(1).join(' '), moo:o.m||'',
+               idCard:'000000000'+String(o.c||'0000'), phone:'', statusType:'อสม.ตัวจริง' }); });
+  state.osmMembers=mem;
+  state.schoolAttendance=[];
+  return s;
+}
+async function fbWritePublicAttendance(r){
+  const F=window.FBX; if(!F||!F.ready) return;
+  await F.setDoc(F.doc(F.db,'school_attendance',fbSafeId(r.id)), JSON.parse(fbSer(r)));
+}
+function handleCheckinHash(){
+  const m=location.hash.match(/^#checkin=(.+)$/); if(!m) return false;
+  const sid=decodeURIComponent(m[1]);
+  document.body.innerHTML=`<main class="checkin-shell"><div class="checkin-card">
+    <div class="checkin-brand"><div class="logo-orb"><i class="fa-solid fa-school-flag"></i></div>
+      <h2 style="margin-top:12px">โรงเรียน อสม. บ้านโคกสง่า</h2>
+      <p id="pcl">กำลังเชื่อมต่อฐานข้อมูล...</p></div>
+    <div style="text-align:center;padding:26px"><i class="fa-solid fa-spinner fa-spin" style="font-size:30px;opacity:.5"></i></div>
+  </div></main>`;
+  const go=async()=>{
+    schInit();
+    try{ await fbLoadPublic(sid); }
+    catch(e){
+      const el=document.getElementById('pcl');
+      if(el) el.textContent='ใช้ข้อมูลที่บันทึกไว้ในเครื่อง';
+      console.warn(e);
+    }
+    renderPublicCheckin(sid);
+  };
+  if(window.FBX) setTimeout(go,80);
+  else { window.addEventListener('fbx-loaded',()=>setTimeout(go,80),{once:true}); setTimeout(go,4000); }
+  return true;
+}
+
+/* ---------------------------------------------------------------- boot */
+(function fbBoot(){
+  const start=()=>{
+    // ปุ่มสถานะบน topbar
+    if(!document.getElementById('fb-chip')){
+      const tb=document.getElementById('theme-toggle-btn');
+      if(tb&&tb.parentNode){
+        const b=document.createElement('button');
+        b.id='fb-chip'; b.className='icon-btn fb-chip'; b.type='button';
+        b.onclick=fbOpenPanel;
+        tb.parentNode.insertBefore(b,tb);
+      }
+    }
+    fbPaint();
+    window.addEventListener('fbx-state',()=>{
+      fbPaint();
+      if(fbOK()) fbAttach();
+      if(fbStaff()) fbSchedulePush();
+    });
+    if(window.FBX) fbAutoSignIn();
+    else window.addEventListener('fbx-loaded',fbAutoSignIn,{once:true});
+    window.addEventListener('online', ()=>{ fbPaint(); if(fbStaff()) fbSchedulePush(); });
+    window.addEventListener('offline',fbPaint);
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(start,200));
+  else setTimeout(start,200);
+})();
+
 </script>
+<script type="module">
+/* ============================================================================================
+   FIREBASE BOOTSTRAP  —  osm-khoksanga
+   โหลด SDK แบบ ES module แล้วเปิด API ให้สคริปต์หลักเรียกใช้ผ่าน window.FBX
+   ============================================================================================ */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+         collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch }
+  from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCQNLpbolXEhWU_NteueYRX4wVcyDzxXjE",
+  authDomain: "osm-khoksanga.firebaseapp.com",
+  projectId: "osm-khoksanga",
+  storageBucket: "osm-khoksanga.firebasestorage.app",
+  messagingSenderId: "938376041849",
+  appId: "1:938376041849:web:6f66b398e971c2ed098ba8",
+  measurementId: "G-84H5ENX4BP"
+};
+
+let app, db, auth;
+try{
+  app = initializeApp(firebaseConfig);
+  // แคชถาวรในเครื่อง → ใช้งานต่อได้แม้เน็ตหลุดกลางกิจกรรม
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+  auth = getAuth(app);
+}catch(e){
+  console.error('Firebase init failed', e);
+  window.FBX = { fatal: String(e && e.message || e) };
+  window.dispatchEvent(new CustomEvent('fbx-state'));
+}
+
+if(app){
+  window.FBX = {
+    app, db, auth,
+    collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch,
+    signInAnonymously, signInWithEmailAndPassword, signOut,
+    user: null, ready: false, error: '', anon: false
+  };
+
+  onAuthStateChanged(auth, u=>{
+    window.FBX.user  = u || null;
+    window.FBX.ready = !!u;
+    window.FBX.anon  = !!(u && u.isAnonymous);
+    window.dispatchEvent(new CustomEvent('fbx-state'));
+  });
+
+  // Analytics (ไม่บังคับ — ล้มเหลวได้โดยไม่กระทบระบบ)
+  import('https://www.gstatic.com/firebasejs/12.18.0/firebase-analytics.js')
+    .then(m=>{ try{ m.getAnalytics(app); }catch(e){} }).catch(()=>{});
+
+  window.dispatchEvent(new CustomEvent('fbx-loaded'));
+}
+</script>
+
 </body>
 </html>
