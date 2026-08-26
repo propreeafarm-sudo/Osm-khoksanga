@@ -719,6 +719,17 @@ body.sidebar-collapsed .sidebar-user .icon-btn{width:36px;height:36px;}
   background:var(--bg-surface);border:1px dashed var(--border-strong);border-radius:var(--radius-md)}
 .mp-empty i.big{font-size:34px;color:var(--brand-blue-400);display:block;margin-bottom:12px}
 
+/* ===== FIREBASE HELP WIZARD ===== */
+.fbh-ol{font-size:13.5px;line-height:2.05;margin:0;padding-right:20px}
+.fbh-ol li{margin-bottom:5px}
+.fbh-ol code,.fbh-note code,.fbh-warn code{background:var(--bg-surface-2);border:1px solid var(--border);
+  border-radius:5px;padding:1px 6px;font-size:12px;font-family:ui-monospace,monospace;direction:ltr;display:inline-block}
+.fbh-note{background:var(--brand-blue-100);color:var(--brand-navy-700);border-radius:10px;
+  padding:11px 14px;font-size:12.5px;line-height:1.8;margin-top:14px}
+[data-theme="dark"] .fbh-note{background:#232156;color:var(--text-primary)}
+.fbh-warn{background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;
+  padding:12px 15px;font-size:13px;line-height:1.8;margin-bottom:16px}
+
 /* ===== FIREBASE STATUS CHIP ===== */
 .fb-chip{width:auto!important;padding:0 12px;gap:7px;display:inline-flex;align-items:center;
   font-size:12.5px;font-weight:700;white-space:nowrap;border-radius:var(--radius-full)}
@@ -4720,7 +4731,9 @@ function fbRepaintView(){
 /* ---------------------------------------------------------------- panel */
 function fbOpenPanel(){
   const F=window.FBX, c=fbCfg();
-  const counts=Object.keys(FB_MAP).map(k=>`${({osmMembers:'อสม.',households:'หลังคาเรือน',schoolSessions:'รอบเรียน',schoolAttendance:'บันทึกเช็กชื่อ',meetings:'การประชุม',attendance:'กิจกรรมอื่น'})[k]} ${(state[k]||[]).length}`).join(' • ');
+  const FB_LAB={osmMembers:'อสม.',households:'หลังคาเรือน',schoolSessions:'รอบเรียน',schoolAttendance:'บันทึกเช็กชื่อ',
+    meetings:'การประชุม',attendance:'กิจกรรมอื่น',osmAccounts:'บัญชี อสม.',osmLeaves:'ใบลา'};
+  const counts=Object.keys(FB_MAP).map(k=>`${FB_LAB[k]||k} ${(state[k]||[]).length}`).join(' • ');
   const signed=fbStaff(), anon=!!(F&&F.anon);
   openModal(`
   <div class="modal-header"><h3><i class="fa-solid fa-cloud"></i> Firebase — ฐานข้อมูลกลาง</h3>
@@ -4768,6 +4781,9 @@ function fbOpenPanel(){
       <div class="field-error" id="fb-err" style="display:none;margin-bottom:10px"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">
         <i class="fa-solid fa-plug-circle-check"></i> เชื่อมต่อ Firebase</button>
+      <p style="text-align:center;font-size:12.5px;margin:14px 0 0">
+        <a href="javascript:void(0)" onclick="fbHelpAuth()" style="color:var(--brand-navy-600);font-weight:700">
+          <i class="fa-solid fa-circle-question"></i> ยังไม่มีบัญชี / ไม่รู้ว่าใช้รหัสอะไร?</a></p>
     </form>`}
   </div>
   <div class="modal-footer">
@@ -4784,9 +4800,27 @@ function fbOpenPanel(){
       closeModal(); toast('เชื่อมต่อ Firebase สำเร็จ','success');
     }catch(err){
       const m=String(err.code||err.message||err);
-      er.textContent = /invalid-credential|wrong-password|user-not-found/.test(m) ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-        : /operation-not-allowed/.test(m) ? 'ยังไม่ได้เปิด Email/Password ใน Firebase Console → Authentication → Sign-in method'
-        : /network/.test(m) ? 'เชื่อมต่ออินเทอร์เน็ตไม่ได้' : m;
+      let msg, help='';
+      if(/configuration-not-found/.test(m)){
+        msg='ยังไม่ได้เปิดใช้งาน Authentication ในโปรเจกต์นี้';
+        help='auth';
+      } else if(/operation-not-allowed/.test(m)){
+        msg='ยังไม่ได้เปิดวิธีเข้าสู่ระบบแบบ Email/Password';
+        help='auth';
+      } else if(/user-not-found/.test(m)){
+        msg='ยังไม่มีบัญชีนี้ใน Firebase — ต้องสร้างผู้ใช้ก่อน';
+        help='auth';
+      } else if(/invalid-credential|wrong-password/.test(m)){
+        msg='อีเมลหรือรหัสผ่านไม่ถูกต้อง (รหัสผ่านคือตัวที่ตั้งไว้ตอนสร้างผู้ใช้ใน Firebase ไม่ใช่รหัส Gmail)';
+        help='auth';
+      } else if(/invalid-email/.test(m)){
+        msg='รูปแบบอีเมลไม่ถูกต้อง';
+      } else if(/too-many-requests/.test(m)){
+        msg='ลองผิดหลายครั้งเกินไป กรุณารอสัก 5 นาทีแล้วลองใหม่';
+      } else if(/network/.test(m)){
+        msg='เชื่อมต่ออินเทอร์เน็ตไม่ได้';
+      } else { msg=m; }
+      er.innerHTML=escapeHtml(msg)+(help?` <a href="javascript:void(0)" onclick="fbHelpAuth()" style="color:var(--brand-navy-600);font-weight:700;text-decoration:underline">ดูวิธีแก้ทีละขั้น</a>`:'');
       er.style.display='block'; b.disabled=false; b.innerHTML='<i class="fa-solid fa-plug-circle-check"></i> เชื่อมต่อ Firebase';
     }
   });
@@ -6573,6 +6607,159 @@ function dgAttachButton(){
   b.innerHTML='<i class="fa-solid fa-stethoscope"></i> ตรวจสอบการเชื่อมต่อ';
   b.onclick=dgOpen;
   f.insertBefore(b,f.firstChild);
+}
+
+
+/* ============================================================================================
+   HELP : สร้างบัญชีเจ้าหน้าที่ใน Firebase Authentication
+   แก้ error auth/configuration-not-found, operation-not-allowed, user-not-found
+   ============================================================================================ */
+const FB_PROJECT_ID = 'osm-khoksanga';
+let fbHelpStep = 0;
+
+function fbHelpAuth(){
+  fbHelpStep = 0;
+  openModal(fbHelpShell(),{size:'md'});
+  fbHelpRender();
+}
+function fbHelpShell(){
+  return `
+  <div class="modal-header"><h3><i class="fa-solid fa-circle-question"></i> สร้างบัญชีเจ้าหน้าที่ใน Firebase</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body" id="fbh-body"></div>
+  <div class="modal-footer" id="fbh-foot"></div>`;
+}
+
+const FB_HELP_STEPS = [
+  {
+    t:'เปิดหน้า Authentication',
+    ic:'fa-arrow-up-right-from-square',
+    body:`
+      <p style="font-size:13.5px;line-height:1.85;margin:0 0 14px">
+        กดปุ่มด้านล่างเพื่อเปิด Firebase Console ของโปรเจกต์ <b>${FB_PROJECT_ID}</b> ในแท็บใหม่
+        (ถ้าถามให้ล็อกอิน ให้ใช้บัญชี Google ที่สร้างโปรเจกต์นี้)</p>
+      <a class="btn btn-primary" style="width:100%;justify-content:center" target="_blank" rel="noopener"
+        href="https://console.firebase.google.com/project/${FB_PROJECT_ID}/authentication/providers">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดหน้า Authentication</a>
+      <div class="fbh-note">
+        ถ้าเปิดแล้วเห็นปุ่มใหญ่เขียนว่า <b>Get started</b> ให้กดปุ่มนั้น 1 ครั้ง
+        <br>นี่คือสาเหตุของ error <code>auth/configuration-not-found</code> ที่คุณเจอ —
+        โปรเจกต์ยังไม่เคยเปิดใช้ Authentication เลย</div>`
+  },
+  {
+    t:'เปิดวิธีเข้าสู่ระบบ Email/Password',
+    ic:'fa-toggle-on',
+    body:`
+      <p style="font-size:13.5px;line-height:1.85;margin:0 0 12px">ในหน้า Authentication:</p>
+      <ol class="fbh-ol">
+        <li>ไปที่แท็บ <b>Sign-in method</b></li>
+        <li>ในรายการ Sign-in providers กดที่ <b>Email/Password</b></li>
+        <li>เปิดสวิตช์ <b>Enable</b> อันแรก ให้เป็นสีน้ำเงิน
+          <div style="color:var(--text-faint);font-size:12px;margin-top:3px">
+            (อันที่สอง “Email link (passwordless sign-in)” <b>ไม่ต้องเปิด</b>)</div></li>
+        <li>กด <b>Save</b></li>
+      </ol>
+      <div class="fbh-note">ถ้าไม่เปิดขั้นนี้ จะขึ้น error <code>auth/operation-not-allowed</code></div>`
+  },
+  {
+    t:'สร้างผู้ใช้ + ตั้งรหัสผ่าน',
+    ic:'fa-user-plus',
+    body:`
+      <div class="fbh-warn">
+        <b><i class="fa-solid fa-lightbulb"></i> ตรงนี้คือจุดที่คุณสงสัย</b><br>
+        รหัสผ่านที่ระบบถาม <b>ไม่ใช่รหัส Gmail ของคุณ</b> แต่เป็นรหัสที่<b>คุณตั้งขึ้นเองใหม่</b>
+        ในขั้นตอนนี้ จำให้ได้แล้วเอาไปกรอกในแอป</div>
+      <ol class="fbh-ol">
+        <li>ไปที่แท็บ <b>Users</b> แล้วกด <b>Add user</b></li>
+        <li>ช่อง <b>Email</b> ใส่ <code>propreeafarm@gmail.com</code>
+          <div style="color:var(--text-faint);font-size:12px;margin-top:3px">
+            ใช้อีเมลอะไรก็ได้ ไม่ต้องยืนยันตัวตน แต่ต้องตรงกับที่กรอกในแอป</div></li>
+        <li>ช่อง <b>Password</b> ตั้งรหัสใหม่ <b>อย่างน้อย 6 ตัวอักษร</b>
+          <div style="color:var(--text-faint);font-size:12px;margin-top:3px">
+            เช่น <code>Khoksanga2569</code> — จดไว้ก่อน เดี๋ยวต้องใช้</div></li>
+        <li>กด <b>Add user</b></li>
+      </ol>
+      <a class="btn btn-outline" style="width:100%;justify-content:center;margin-top:6px" target="_blank" rel="noopener"
+        href="https://console.firebase.google.com/project/${FB_PROJECT_ID}/authentication/users">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดหน้า Users</a>`
+  },
+  {
+    t:'คัดลอก UID ของผู้ใช้',
+    ic:'fa-copy',
+    body:`
+      <p style="font-size:13.5px;line-height:1.85;margin:0 0 12px">
+        หลังกด Add user จะเห็นแถวผู้ใช้ใหม่ในตาราง คอลัมน์ขวาสุดคือ <b>User UID</b>
+        (ข้อความยาว ๆ เช่น <code style="font-size:11px">kJ3xQ9mPa2...</code>)</p>
+      <ol class="fbh-ol">
+        <li>เอาเมาส์ชี้ที่ UID แล้วกดไอคอนคัดลอก หรือลากคลุมแล้ว Ctrl+C</li>
+        <li>เก็บไว้ก่อน — จะใช้ในขั้นถัดไป</li>
+      </ol>
+      <div class="fbh-note">ถ้าคุณใช้ Rules <b>แบบเข้ม</b> (ชุดแรกที่ผมให้) ข้ามขั้นนี้และขั้นถัดไปได้เลย
+        ไปที่ขั้นสุดท้ายได้ทันที</div>`
+  },
+  {
+    t:'เพิ่ม UID ลง collection staff',
+    ic:'fa-shield-halved',
+    body:`
+      <p style="font-size:13.5px;line-height:1.85;margin:0 0 12px">
+        ขั้นนี้ทำเฉพาะกรณีใช้ <b>Rules ชุด v2</b> เพื่อบอกระบบว่าบัญชีนี้คือเจ้าหน้าที่</p>
+      <ol class="fbh-ol">
+        <li>เปิด <b>Firestore Database</b> → แท็บ <b>Data</b></li>
+        <li>กด <b>Start collection</b> (หรือ + Start collection)</li>
+        <li>Collection ID พิมพ์ว่า <b>staff</b> → Next</li>
+        <li>Document ID <b>วาง UID</b> ที่คัดลอกมา</li>
+        <li>Field name พิมพ์ <b>name</b> / Type เลือก <b>string</b> / Value ใส่ชื่อคุณ</li>
+        <li>กด <b>Save</b></li>
+      </ol>
+      <a class="btn btn-outline" style="width:100%;justify-content:center;margin-top:6px" target="_blank" rel="noopener"
+        href="https://console.firebase.google.com/project/${FB_PROJECT_ID}/firestore/data">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดหน้า Firestore Data</a>`
+  },
+  {
+    t:'กลับมาเข้าสู่ระบบในแอป',
+    ic:'fa-plug-circle-check',
+    body:`
+      <p style="font-size:13.5px;line-height:1.85;margin:0 0 14px">
+        กลับมาที่แท็บนี้ แล้วกรอก:</p>
+      <div style="background:var(--bg-surface-2);border-radius:10px;padding:14px 16px;font-size:13.5px;line-height:2">
+        <b>อีเมล:</b> อีเมลที่ใส่ในขั้นที่ ๓<br>
+        <b>รหัสผ่าน:</b> รหัสที่<b>คุณตั้งเองใหม่</b>ในขั้นที่ ๓ (ไม่ใช่รหัส Gmail)
+      </div>
+      <div class="fbh-note">เข้าสำเร็จแล้วปุ่มเมฆบนแถบบนจะเปลี่ยนเป็น <b style="color:var(--success)">สีเขียว “ซิงก์แล้ว”</b><br>
+        จากนั้นกด <b>ตรวจสอบการเชื่อมต่อ</b> อีกครั้งเพื่อยืนยันว่าผ่านครบทุกขั้น</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px"
+        onclick="closeModal();fbOpenPanel()"><i class="fa-solid fa-right-to-bracket"></i> ไปหน้าเข้าสู่ระบบ</button>`
+  }
+];
+
+function fbHelpRender(){
+  const b=document.getElementById('fbh-body'); if(!b) return;
+  const st=FB_HELP_STEPS[fbHelpStep];
+  b.innerHTML=`
+  <div style="display:flex;gap:5px;margin-bottom:18px">
+    ${FB_HELP_STEPS.map((_,i)=>`<i style="flex:1;height:5px;border-radius:99px;
+      background:${i<=fbHelpStep?'var(--brand-navy-600)':'var(--border)'};display:block"></i>`).join('')}
+  </div>
+  <div style="display:flex;gap:13px;align-items:center;margin-bottom:16px">
+    <div style="width:44px;height:44px;flex:none;border-radius:13px;display:grid;place-items:center;
+      background:var(--sch-violet-bg);color:var(--brand-navy-700);font-size:19px">
+      <i class="fa-solid ${st.ic}"></i></div>
+    <div><div style="font-size:11.5px;color:var(--text-faint);font-weight:700">
+      ขั้นที่ ${['๑','๒','๓','๔','๕','๖'][fbHelpStep]} จาก ๖</div>
+      <b style="font-size:16.5px">${st.t}</b></div>
+  </div>
+  ${st.body}`;
+
+  document.getElementById('fbh-foot').innerHTML=`
+    <button class="btn btn-outline" ${fbHelpStep===0?'disabled':''} onclick="fbHelpGo(-1)">
+      <i class="fa-solid fa-chevron-right"></i> ย้อนกลับ</button>
+    ${fbHelpStep<FB_HELP_STEPS.length-1
+      ? `<button class="btn btn-primary" onclick="fbHelpGo(1)">ถัดไป <i class="fa-solid fa-chevron-left"></i></button>`
+      : `<button class="btn btn-outline" onclick="closeModal()">ปิด</button>`}`;
+}
+function fbHelpGo(d){
+  fbHelpStep=Math.max(0,Math.min(FB_HELP_STEPS.length-1,fbHelpStep+d));
+  fbHelpRender();
 }
 
 </script>
