@@ -4520,7 +4520,13 @@ function fbCfg(){
 }
 function fbSetCfg(o){ localStorage.setItem(FB_CFG_KEY, JSON.stringify(Object.assign(fbCfg(),o))); }
 function fbOK(){ const F=window.FBX; return !!(F && F.ready && F.db && !F.fatal); }
-function fbStaff(){ const F=window.FBX; return !!(F && F.ready && !F.anon); }
+function fbStaff(){
+  const F=window.FBX;
+  if(!(F && F.ready && !F.anon)) return false;
+  // ผู้ใช้ที่เป็น อสม. ไม่นับเป็นเจ้าหน้าที่ แม้จะล็อกอิน Firebase แล้วก็ตาม
+  if(typeof isMember==='function' && isMember()) return false;
+  return true;
+}
 
 /* ---------------------------------------------------------------- normalize */
 function fbNorm(v){
@@ -4536,6 +4542,7 @@ function fbSafeId(x){ return String(x||'').replace(/[\/\\#?\[\]]/g,'_').slice(0,
 /* ---------------------------------------------------------------- listeners */
 function fbAttach(){
   if(!fbOK()) return;
+  if(!fbStaff()){ if(typeof isMember==='function' && isMember()) fbAttachMine(); return; }
   fbDetach();
   const F=window.FBX;
   Object.entries(FB_MAP).forEach(([key,col])=>{
@@ -4586,9 +4593,93 @@ function fbErr(e){
 
 /* ---------------------------------------------------------------- push (diff) */
 function fbSchedulePush(){
-  if(!fbCfg().autoSync || !fbStaff() || fbApplying) return;
+  if(fbApplying) return;
+  if(!fbStaff()){
+    if(typeof isMember==='function' && isMember() && fbOK()){
+      clearTimeout(fbTimer);
+      fbTimer=setTimeout(()=>{ fbPushMine().catch(e=>console.warn('[FBX mine]',e)); }, 1200);
+    }
+    return;
+  }
+  if(!fbCfg().autoSync) return;
   clearTimeout(fbTimer);
   fbTimer=setTimeout(()=>{ fbPush().catch(fbErr); }, 1200);
+}
+
+/* ---------------------------------------------------------------- โหมด อสม. (เขียนเฉพาะของตัวเอง) */
+function fbMyOsmId(){ return (state.currentUser && state.currentUser.osmId) || ''; }
+
+async function fbPushMine(){
+  const F=window.FBX; if(!F||!F.ready||fbBusy) return;
+  const oid=fbMyOsmId(); if(!oid) return;
+  fbBusy=true;
+  try{
+    const put=async(col,obj)=>{
+      if(!obj||obj.id==null) return;
+      const id=fbSafeId(obj.id), key=col+'/'+id, ser=fbSer(obj);
+      if(fbLast.__mine && fbLast.__mine[key]===ser) return;
+      await F.setDoc(F.doc(F.db,col,id), JSON.parse(ser));
+      fbLast.__mine=fbLast.__mine||{}; fbLast.__mine[key]=ser;
+    };
+    const me=(state.osmMembers||[]).find(m=>m.id===oid);
+    if(me) await put('osm_members', me);
+    const acc=(state.osmAccounts||[]).find(a=>a.id===(state.currentUser&&state.currentUser.accountId));
+    if(acc) await put('osm_accounts', acc);
+    for(const h of (state.households||[]).filter(x=>x.osmId===oid)) await put('households', h);
+    for(const r of (state.schoolAttendance||[]).filter(x=>x.osmId===oid)) await put('school_attendance', r);
+    for(const l of (state.osmLeaves||[]).filter(x=>x.osmId===oid)) await put('osm_leaves', l);
+    // ลบหลังคาเรือนที่ถูกลบในเครื่อง
+    const keep=new Set((state.households||[]).filter(x=>x.osmId===oid).map(x=>'households/'+fbSafeId(x.id)));
+    for(const k of Object.keys(fbLast.__mine||{})){
+      if(k.startsWith('households/') && !keep.has(k)){
+        try{ await F.deleteDoc(F.doc(F.db,'households',k.split('/')[1])); }catch(e){}
+        delete fbLast.__mine[k];
+      }
+    }
+    fbLastSync=new Date(); fbStatusMsg='';
+  } finally { fbBusy=false; fbPaint(); }
+}
+
+function fbAttachMine(){
+  const F=window.FBX; if(!F||!F.ready||!F.query) return;
+  const oid=fbMyOsmId(); if(!oid) return;
+  fbDetach();
+  const apply=(key,arr,replaceScope)=>{
+    fbApplying=true;
+    if(replaceScope) state[key]=(state[key]||[]).filter(x=>x.osmId!==oid).concat(arr);
+    else state[key]=arr;
+    try{ persistState(); }catch(e){}
+    fbApplying=false; fbLastSync=new Date(); fbPaint(); fbRepaintView();
+  };
+  const sub=(col,scoped)=>{
+    try{
+      const q=F.query(F.collection(F.db,col), F.where('osmId','==',oid));
+      fbUnsub.push(F.onSnapshot(q, snap=>{
+        const arr=[]; snap.forEach(d=>{ const o=d.data()||{}; o.id=d.id; arr.push(o); });
+        apply(scoped,arr,true);
+      }, e=>console.warn('[FBX mine]',col,e)));
+    }catch(e){ console.warn(e); }
+  };
+  sub('households','households');
+  sub('school_attendance','schoolAttendance');
+  sub('osm_leaves','osmLeaves');
+  try{
+    fbUnsub.push(F.onSnapshot(F.collection(F.db,'school_sessions'), snap=>{
+      const arr=[]; snap.forEach(d=>{ const o=d.data()||{}; o.id=d.id; arr.push(o); });
+      apply('schoolSessions',arr,false);
+    }, e=>console.warn('[FBX mine] sessions',e)));
+  }catch(e){}
+  try{
+    fbUnsub.push(F.onSnapshot(F.doc(F.db,'osm_members',oid), d=>{
+      if(!d.exists()) return;
+      const o=d.data()||{}; o.id=d.id;
+      fbApplying=true;
+      const i=(state.osmMembers||[]).findIndex(x=>x.id===oid);
+      if(i>=0) state.osmMembers[i]=o; else state.osmMembers.push(o);
+      try{ persistState(); }catch(e){}
+      fbApplying=false; fbRepaintView();
+    }, e=>console.warn('[FBX mine] member',e)));
+  }catch(e){}
 }
 async function fbPush(){
   if(!fbStaff() || fbBusy) return;
@@ -4722,7 +4813,7 @@ function fbPaint(){
 }
 function fbRepaintView(){
   const v=state.currentView;
-  if(['dashboard','osm-list','osm-households','school-sessions','school-roster','school-report','activity-report','meetings','admin'].includes(v)){
+  if(['dashboard','osm-list','osm-households','school-sessions','school-roster','school-report','activity-report','meetings','admin','member-home','member-history','member-leave','member-profile','member-households'].includes(v)){
     clearTimeout(fbRepaintView._t);
     fbRepaintView._t=setTimeout(()=>{ try{ renderCurrentView(); }catch(e){} },250);
   }
@@ -4977,7 +5068,7 @@ function mpPwScore(pw){
 }
 function mpMaskCid(cid){
   const c=String(cid||'').replace(/\D/g,'');
-  return c.length===13 ? c.slice(0,1)+'-XXXX-XXXXX-'+c.slice(-2)+'-'+c.slice(-1) : c;
+  return c.length===13 ? c[0]+'-XXXX-XXXXX-'+c.slice(9,11)+'-'+c[12] : c;
 }
 
 /* ---------------------------------------------------------------- Firebase auth (อสม.) */
@@ -5198,6 +5289,7 @@ async function mpDoLogin(e){
   if(!acc.osmId)               return fail('บัญชียังไม่ได้เชื่อมกับทะเบียน อสม. กรุณาติดต่อเจ้าหน้าที่');
 
   acc.lastLogin=new Date().toISOString();
+  try{ if(!(window.FBX&&window.FBX.ready&&!window.FBX.anon)) await mpFbSignIn(cid,pw); }catch(e){ console.warn('member cloud sign-in skipped'); }
   const m=osmById(acc.osmId)||{};
   state.currentUser={ id:acc.id, accountId:acc.id, role:'osm', osmId:acc.osmId,
     firstName:acc.firstName||m.firstName||'', lastName:acc.lastName||m.lastName||'', username:cid };
@@ -5300,6 +5392,8 @@ function renderMemberHome(){
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn btn-outline" onclick="switchView('member-profile')"><i class="fa-solid fa-address-card"></i> ข้อมูลของฉัน</button>
+    <button class="btn btn-outline" onclick="switchView('member-households')"><i class="fa-solid fa-house-chimney"></i> หลังคาเรือนของฉัน</button>
     <button class="btn btn-outline" onclick="switchView('member-history')"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการมาเรียน</button>
     <button class="btn btn-outline" onclick="switchView('member-leave')"><i class="fa-solid fa-file-pen"></i> ใบลาของฉัน ${myLeaves.filter(x=>x.status==='pending').length?`<span class="badge mp-badge-pend">${myLeaves.filter(x=>x.status==='pending').length}</span>`:''}</button>
     <button class="btn btn-outline" onclick="mpChangePw()"><i class="fa-solid fa-key"></i> เปลี่ยนรหัสผ่าน</button>
@@ -6762,6 +6856,376 @@ function fbHelpGo(d){
   fbHelpRender();
 }
 
+
+/* ============================================================================================
+   MEMBER SELF-SERVICE  v1.0
+   ให้ อสม. แก้ไขข้อมูลของตัวเอง และบันทึกหลังคาเรือนที่รับผิดชอบได้เอง
+   ============================================================================================ */
+
+/* ฟิลด์ที่ อสม. แก้เองได้ — เลขบัตร / สถานะการเป็น อสม. สงวนไว้ให้เจ้าหน้าที่ */
+const MP_EDITABLE = ['phone','houseNo','moo','village','gender','birthDate','startYear',
+                     'chongkosoSelf','chongkosoSpouse','position','tambon','amphoe','province'];
+
+function mpMyHouseholds(){
+  const m=mpMyMember(); if(!m) return [];
+  return (state.households||[]).filter(h=>h.osmId===m.id);
+}
+function mpTouch(){
+  // บันทึกเวลาที่ อสม. แก้ไขล่าสุด เพื่อให้เจ้าหน้าที่ตรวจย้อนได้
+  const m=mpMyMember(); if(!m) return;
+  m.selfUpdatedAt=new Date().toISOString();
+  m.selfUpdatedBy=currentUserFullName();
+}
+
+/* ============================================================================================
+   VIEW : ข้อมูลของฉัน
+   ============================================================================================ */
+function renderMemberProfile(){
+  mpInit();
+  const el=document.getElementById('view-member-profile');
+  const m=mpMyMember(), acc=mpMyAccount();
+  if(!m){ el.innerHTML='<div class="mp-empty"><i class="fa-solid fa-user-slash big"></i><h3>ไม่พบข้อมูลของท่าน</h3><p>กรุณาติดต่อเจ้าหน้าที่</p></div>'; return; }
+
+  const row=(lab,val,hint)=>`
+    <div style="display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="min-width:0"><b style="font-size:13px;color:var(--text-secondary);font-weight:600">${lab}</b>
+        ${hint?`<div style="font-size:11.5px;color:var(--text-faint);margin-top:2px">${hint}</div>`:''}</div>
+      <div style="text-align:left;font-size:14px;font-weight:600">${val||'<span style="color:var(--text-faint);font-weight:400">ยังไม่ระบุ</span>'}</div>
+    </div>`;
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>ข้อมูลของฉัน</h2><p>ตรวจสอบและแก้ไขข้อมูลส่วนตัวให้เป็นปัจจุบัน</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-primary" onclick="mpEditProfile()"><i class="fa-solid fa-pen"></i> แก้ไขข้อมูล</button>
+    </div>
+  </div>
+
+  <div style="background:var(--brand-blue-100);color:var(--brand-navy-700);border-radius:var(--radius-md);
+    padding:13px 16px;font-size:12.5px;line-height:1.75;margin-bottom:18px">
+    <i class="fa-solid fa-circle-info"></i>
+    ท่านแก้ไขได้เฉพาะข้อมูลติดต่อและที่อยู่ — <b>เลขบัตรประชาชน ชื่อ–สกุล และสถานะการเป็น อสม.</b>
+    ต้องให้เจ้าหน้าที่ รพ.สต. แก้ให้ เพื่อความถูกต้องของทะเบียน</div>
+
+  <div class="card" style="margin-bottom:16px"><div class="card-pad">
+    <h3 style="margin:0 0 6px;font-size:16px;font-weight:800">ข้อมูลประจำตัว</h3>
+    <p style="margin:0 0 8px;font-size:12px;color:var(--text-faint)">
+      <i class="fa-solid fa-lock"></i> แก้ไขได้โดยเจ้าหน้าที่เท่านั้น</p>
+    ${row('ชื่อ – นามสกุล', escapeHtml(m.firstName+' '+m.lastName))}
+    ${row('เลขบัตรประชาชน', mpMaskCid(m.idCard), 'แสดงบางส่วนเพื่อความปลอดภัย')}
+    ${row('สถานะการเป็น อสม.', escapeHtml(m.statusType||'อสม.ตัวจริง'))}
+    ${row('รหัสเช็กชื่อ', `<span style="letter-spacing:3px">${schCode(m)}</span>`,'ใช้บอกเจ้าหน้าที่ตอนเช็กชื่อ')}
+  </div></div>
+
+  <div class="card" style="margin-bottom:16px"><div class="card-pad">
+    <h3 style="margin:0 0 12px;font-size:16px;font-weight:800">ข้อมูลติดต่อและที่อยู่</h3>
+    ${row('เบอร์โทรศัพท์', escapeHtml(m.phone||''))}
+    ${row('บ้านเลขที่', escapeHtml(m.houseNo||''))}
+    ${row('หมู่ที่', escapeHtml(m.moo||''))}
+    ${row('ชื่อหมู่บ้าน', escapeHtml(m.village||''))}
+    ${row('ตำบล / อำเภอ / จังหวัด', escapeHtml([m.tambon||TAMBON_DEFAULT,m.amphoe||AMPHOE_DEFAULT,m.province||PROVINCE_DEFAULT].join(' • ')))}
+  </div></div>
+
+  <div class="card" style="margin-bottom:16px"><div class="card-pad">
+    <h3 style="margin:0 0 12px;font-size:16px;font-weight:800">ข้อมูลการปฏิบัติงาน</h3>
+    ${row('ตำแหน่ง', escapeHtml(m.position||'อสม.'))}
+    ${row('ปีที่เริ่มเป็น อสม.', escapeHtml(m.startYear||''))}
+    ${row('เพศ', escapeHtml(m.gender||''))}
+    ${row('วันเกิด', m.birthDate?formatThaiDate(m.birthDate):'')}
+    ${row('ฌกส. (ตัวท่าน)', escapeHtml(m.chongkosoSelf||'ไม่ได้เป็นสมาชิก'))}
+    ${row('ฌกส. (คู่สมรส)', escapeHtml(m.chongkosoSpouse||'ไม่ได้เป็นสมาชิก'))}
+  </div></div>
+
+  ${m.selfUpdatedAt?`<p style="text-align:center;font-size:11.5px;color:var(--text-faint)">
+    แก้ไขล่าสุดโดยท่านเอง เมื่อ ${new Date(m.selfUpdatedAt).toLocaleString('th-TH')}</p>`:''}
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+    <button class="btn btn-outline" onclick="switchView('member-households')">
+      <i class="fa-solid fa-house-chimney"></i> หลังคาเรือนของฉัน (${mpMyHouseholds().length})</button>
+    <button class="btn btn-outline" onclick="mpChangePw()"><i class="fa-solid fa-key"></i> เปลี่ยนรหัสผ่าน</button>
+  </div>`;
+}
+
+function mpEditProfile(){
+  const m=mpMyMember(); if(!m) return;
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-pen"></i> แก้ไขข้อมูลของฉัน</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-pf"><div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:16px">
+      <b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</b> — ${mpMaskCid(m.idCard)}
+      <div style="color:var(--text-faint);font-size:11.5px;margin-top:3px">
+        ชื่อ–สกุล และเลขบัตร แก้ไขได้โดยเจ้าหน้าที่เท่านั้น</div></div>
+
+    <div class="form-group"><label>เบอร์โทรศัพท์ <span class="req">*</span></label>
+      <input id="pf-phone" class="input" inputmode="numeric" maxlength="10" value="${escapeHtml(m.phone||'')}" placeholder="0XXXXXXXXX"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>บ้านเลขที่</label><input id="pf-houseno" class="input" value="${escapeHtml(m.houseNo||'')}" placeholder="เช่น 25/1"></div>
+      <div class="form-group"><label>หมู่ที่ <span class="req">*</span></label><input id="pf-moo" class="input" inputmode="numeric" value="${escapeHtml(m.moo||'')}"></div>
+    </div>
+    <div class="form-group"><label>ชื่อหมู่บ้าน <span class="req">*</span></label>
+      <input id="pf-village" class="input" list="pf-vil" value="${escapeHtml(m.village||'')}">
+      <datalist id="pf-vil">${[...new Set(state.osmMembers.map(x=>x.village).filter(Boolean))].map(v=>`<option value="${escapeHtml(v)}">`).join('')}</datalist></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>เพศ</label>
+        <select id="pf-gender" class="input">${['','ชาย','หญิง'].map(g=>`<option value="${g}" ${(m.gender||'')===g?'selected':''}>${g||'— ไม่ระบุ —'}</option>`).join('')}</select></div>
+      <div class="form-group"><label>วันเกิด</label><input id="pf-birth" type="date" class="input" value="${escapeHtml(m.birthDate||'')}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>ตำแหน่ง</label><input id="pf-position" class="input" value="${escapeHtml(m.position||'อสม.')}"></div>
+      <div class="form-group"><label>ปีที่เริ่มเป็น อสม. (พ.ศ.)</label>
+        <input id="pf-startyear" class="input" inputmode="numeric" maxlength="4" value="${escapeHtml(m.startYear||'')}" placeholder="เช่น 2560"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>ฌกส. (ตัวท่าน)</label>
+        <select id="pf-cself" class="input">${['ไม่ได้เป็นสมาชิก',...CHONGKOSO_STATUSES].map(x=>`<option ${(m.chongkosoSelf||'ไม่ได้เป็นสมาชิก')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="form-group"><label>ฌกส. (คู่สมรส)</label>
+        <select id="pf-cspouse" class="input">${['ไม่ได้เป็นสมาชิก',...CHONGKOSO_STATUSES].map(x=>`<option ${(m.chongkosoSpouse||'ไม่ได้เป็นสมาชิก')===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-error" id="pf-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button></div>
+  </form>`,{size:'md'});
+
+  document.getElementById('mp-pf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const g=x=>document.getElementById(x).value.trim();
+    const er=document.getElementById('pf-err');
+    const phone=g('pf-phone').replace(/\D/g,''), moo=g('pf-moo'), village=g('pf-village');
+    if(!validatePhone(phone)){ er.textContent='เบอร์โทรศัพท์ไม่ถูกต้อง (9–10 หลัก)'; er.style.display='block'; return; }
+    if(!moo||!village){ er.textContent='กรุณากรอกหมู่ที่และชื่อหมู่บ้าน'; er.style.display='block'; return; }
+    Object.assign(m,{ phone, moo, village, houseNo:g('pf-houseno'),
+      gender:g('pf-gender'), birthDate:g('pf-birth'), position:g('pf-position')||'อสม.',
+      startYear:g('pf-startyear'), chongkosoSelf:g('pf-cself'), chongkosoSpouse:g('pf-cspouse') });
+    mpTouch();
+    // ให้ข้อมูลบัญชีตรงกับทะเบียน
+    const acc=mpMyAccount(); if(acc){ acc.phone=phone; acc.moo=moo; }
+    schLog('อสม. แก้ไขข้อมูลตนเอง',`${m.firstName} ${m.lastName}`);
+    persistState(); closeModal(); renderCurrentView();
+    toast('บันทึกข้อมูลเรียบร้อยแล้ว','success');
+  });
+}
+
+/* ============================================================================================
+   VIEW : หลังคาเรือนของฉัน
+   ============================================================================================ */
+function renderMemberHouseholds(){
+  mpInit();
+  const el=document.getElementById('view-member-households');
+  const m=mpMyMember();
+  if(!m){ el.innerHTML='<div class="mp-empty">ไม่พบข้อมูล</div>'; return; }
+  const list=mpMyHouseholds().slice().sort((a,b)=>String(a.houseNo||'').localeCompare(String(b.houseNo||''),'th',{numeric:true}));
+  const people=list.reduce((a,h)=>a+((h.members||[]).length),0);
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>หลังคาเรือนที่ฉันรับผิดชอบ</h2>
+      <p>บันทึกบ้านและรายชื่อสมาชิกในความรับผิดชอบของท่าน หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-primary" onclick="mpHhForm()"><i class="fa-solid fa-house-circle-plus"></i> เพิ่มหลังคาเรือน</button>
+    </div>
+  </div>
+
+  <div class="mp-grid" style="margin-top:0">
+    <div class="mp-tile" style="--k:var(--brand-navy-700)"><div class="l">หลังคาเรือน</div>
+      <div class="v">${list.length}</div><div class="s">หลัง</div></div>
+    <div class="mp-tile" style="--k:var(--sch-emerald)"><div class="l">ประชากรที่ดูแล</div>
+      <div class="v">${people}</div><div class="s">คน</div></div>
+    <div class="mp-tile" style="--k:${list.filter(h=>!(h.members||[]).length).length?'var(--sch-amber)':'var(--sch-emerald)'}">
+      <div class="l">ยังไม่ลงรายชื่อสมาชิก</div>
+      <div class="v">${list.filter(h=>!(h.members||[]).length).length}</div><div class="s">หลัง</div></div>
+  </div>
+
+  ${list.length? list.map(h=>`
+    <div class="mp-leave" style="align-items:flex-start">
+      <div style="min-width:0;flex:1">
+        <b style="font-size:15px"><i class="fa-solid fa-house-chimney" style="color:var(--brand-navy-600)"></i>
+          บ้านเลขที่ ${escapeHtml(h.houseNo||'-')}</b>
+        <div style="font-size:12.5px;color:var(--text-secondary);margin-top:5px">
+          สมาชิก ${(h.members||[]).length} คน${h.recordedDate?` • บันทึกเมื่อ ${formatThaiDateShort(h.recordedDate)}`:''}</div>
+        ${(h.members||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">
+          ${h.members.map(n=>`<span class="badge badge-neutral" style="font-size:12px">${escapeHtml(n)}</span>`).join('')}</div>`
+          :`<div style="font-size:12px;color:var(--warning);margin-top:8px">
+            <i class="fa-solid fa-triangle-exclamation"></i> ยังไม่ได้ลงรายชื่อสมาชิกในบ้านหลังนี้</div>`}
+        ${h.note?`<div style="font-size:12px;color:var(--text-faint);margin-top:7px"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(h.note)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-outline btn-sm" onclick="mpHhForm('${h.id}')"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+        <button class="btn btn-ghost btn-sm" onclick="mpHhDelete('${h.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+      </div>
+    </div>`).join('')
+  : `<div class="mp-empty"><i class="fa-solid fa-house-chimney big"></i>
+      <h3>ยังไม่ได้บันทึกหลังคาเรือน</h3>
+      <p>บันทึกบ้านที่ท่านรับผิดชอบ พร้อมรายชื่อสมาชิกในบ้าน<br>ข้อมูลนี้ใช้ประกอบการรายงานผลการปฏิบัติงาน อสม.</p>
+      <button class="btn btn-primary" onclick="mpHhForm()"><i class="fa-solid fa-house-circle-plus"></i> เพิ่มหลังคาเรือนแรก</button></div>`}`;
+}
+
+function mpHhForm(hhId){
+  const m=mpMyMember(); if(!m) return;
+  const editing=!!hhId;
+  const h=editing ? (state.households||[]).find(x=>x.id===hhId) : {members:[]};
+  if(editing && (!h || h.osmId!==m.id)){ toast('ไม่พบข้อมูล หรือไม่ใช่หลังคาเรือนของท่าน','error'); return; }
+  let names=(h.members||[]).slice();
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid ${editing?'fa-pen':'fa-house-circle-plus'}"></i>
+    ${editing?'แก้ไข':'เพิ่ม'}หลังคาเรือน</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-hh"><div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:16px">
+      <b>ผู้รับผิดชอบ:</b> ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}
+      — หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</div>
+    <div class="form-group"><label>บ้านเลขที่ <span class="req">*</span></label>
+      <input id="hh-no" class="input" value="${escapeHtml(h.houseNo||'')}" placeholder="เช่น 25/1"></div>
+    <div class="form-group"><label>รายชื่อสมาชิกในหลังคาเรือน</label>
+      <div id="hh-names"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="hh-add" style="margin-top:7px">
+        <i class="fa-solid fa-plus"></i> เพิ่มรายชื่อ</button></div>
+    <div class="form-group"><label>หมายเหตุ</label>
+      <textarea id="hh-note" class="input" rows="2" placeholder="เช่น มีผู้สูงอายุติดเตียง 1 คน">${escapeHtml(h.note||'')}</textarea></div>
+    <div class="field-error" id="hh-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button></div>
+  </form>`,{size:'sm'});
+
+  const draw=()=>{
+    const w=document.getElementById('hh-names');
+    w.innerHTML = names.length ? names.map((n,i)=>`
+      <div style="display:flex;gap:6px;margin-bottom:7px">
+        <input class="input hh-n" data-i="${i}" value="${escapeHtml(n)}" placeholder="ชื่อ – นามสกุล">
+        <button type="button" class="btn btn-ghost hh-x" data-i="${i}" style="flex:none;width:40px">
+          <i class="fa-solid fa-xmark"></i></button></div>`).join('')
+      : '<p style="font-size:12.5px;color:var(--text-faint);margin:0">ยังไม่มีรายชื่อ กดปุ่ม “เพิ่มรายชื่อ” ด้านล่าง</p>';
+    w.querySelectorAll('.hh-n').forEach(i=>i.addEventListener('input',()=>{ names[+i.dataset.i]=i.value; }));
+    w.querySelectorAll('.hh-x').forEach(b=>b.addEventListener('click',()=>{ names.splice(+b.dataset.i,1); draw(); }));
+  };
+  document.getElementById('hh-add').addEventListener('click',()=>{ names.push(''); draw();
+    setTimeout(()=>{ const a=document.querySelectorAll('.hh-n'); a[a.length-1]?.focus(); },30); });
+  draw();
+
+  document.getElementById('mp-hh').addEventListener('submit',e=>{
+    e.preventDefault();
+    const no=document.getElementById('hh-no').value.trim();
+    const note=document.getElementById('hh-note').value.trim();
+    const er=document.getElementById('hh-err');
+    if(!no){ er.textContent='กรุณากรอกบ้านเลขที่'; er.style.display='block'; return; }
+    const dup=(state.households||[]).some(x=>x.osmId===m.id && x.id!==hhId &&
+      String(x.houseNo||'').trim()===no);
+    if(dup){ er.textContent='ท่านบันทึกบ้านเลขที่นี้ไว้แล้ว'; er.style.display='block'; return; }
+    const clean=names.map(x=>String(x||'').trim()).filter(Boolean);
+    if(editing){
+      Object.assign(h,{houseNo:no,members:clean,note,updatedAt:new Date().toISOString()});
+    }else{
+      state.households.push({ id:uid('hh'), osmId:m.id, houseNo:no, members:clean, note,
+        sourceType:'อสม. บันทึกเอง', recordedDate:toISODate(new Date()), createdAt:new Date().toISOString() });
+    }
+    schLog(editing?'อสม. แก้ไขหลังคาเรือน':'อสม. เพิ่มหลังคาเรือน',`${m.firstName} ${m.lastName} — บ้านเลขที่ ${no}`);
+    persistState(); closeModal(); renderCurrentView();
+    toast(editing?'แก้ไขข้อมูลเรียบร้อยแล้ว':'เพิ่มหลังคาเรือนเรียบร้อยแล้ว','success');
+  });
+}
+
+function mpHhDelete(hhId){
+  const m=mpMyMember();
+  const h=(state.households||[]).find(x=>x.id===hhId);
+  if(!h || !m || h.osmId!==m.id){ toast('ไม่ใช่หลังคาเรือนของท่าน','error'); return; }
+  confirmDialog(`ลบบ้านเลขที่ ${h.houseNo} ออกจากรายการของท่านใช่หรือไม่`,()=>{
+    state.households=state.households.filter(x=>x.id!==hhId);
+    schLog('อสม. ลบหลังคาเรือน',`${m.firstName} ${m.lastName} — บ้านเลขที่ ${h.houseNo}`);
+    persistState(); closeModal(); renderCurrentView();
+    toast('ลบข้อมูลเรียบร้อยแล้ว','success');
+  },{confirmLabel:'ลบข้อมูล'});
+}
+
+/* ============================================================================================
+   WIRING
+   ============================================================================================ */
+VIEW_TITLES['member-profile']    = ['พื้นที่ของฉัน','ข้อมูลส่วนตัวและการแก้ไข'];
+VIEW_TITLES['member-households'] = ['พื้นที่ของฉัน','หลังคาเรือนที่รับผิดชอบ'];
+
+const MEMBER_VIEWS2 = ['member-home','member-history','member-leave','member-profile','member-households'];
+
+function switchView(viewName){
+  const member = isMember();
+  if(member && !MEMBER_VIEWS2.includes(viewName) && viewName!=='dashboard'){
+    toast('หน้านี้สำหรับเจ้าหน้าที่เท่านั้น','info'); viewName='member-home';
+  }
+  if(!member && viewName!=='dashboard' && !isAdmin()){ requestAdminLogin(viewName); return; }
+  if(state.currentView==='school-roster' && viewName!=='school-roster') schStopScan();
+
+  state.currentView=viewName;
+  document.querySelectorAll('.view-section').forEach(s=>s.classList.add('hidden'));
+  const t=document.getElementById('view-'+viewName); if(t) t.classList.remove('hidden');
+  document.querySelectorAll('.nav-link[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===viewName));
+  const ti=VIEW_TITLES[viewName]||['',''];
+  document.getElementById('topbar-title').innerHTML=ti[0]+`<small id="topbar-sub">${ti[1]}</small>`;
+
+  if(['osm-list','osm-households'].includes(viewName)){
+    document.getElementById('grp-osm-sub').classList.remove('closed');
+    document.getElementById('grp-osm').classList.add('open');
+  }
+  if(['activity-checkin','activity-report'].includes(viewName)){
+    document.getElementById('grp-activity-sub').classList.remove('closed');
+    document.getElementById('grp-activity').classList.add('open');
+  }
+  if(SCHOOL_VIEWS2.includes(viewName)){
+    document.getElementById('grp-school-sub').classList.remove('closed');
+    document.getElementById('grp-school').classList.add('open');
+  }
+  closeSidebar(); renderCurrentView(); window.scrollTo(0,0);
+}
+
+function renderCurrentView(){
+  switch(state.currentView){
+    case 'dashboard': renderDashboard(); dashRegistryCard(); dgChecklist(); break;
+    case 'osm-list': renderOsmListView(); impInjectButton(); break;
+    case 'osm-households': renderHouseholdsView(); break;
+    case 'activity-checkin': renderCheckinView(); break;
+    case 'activity-report': renderActivityReportView(); break;
+    case 'school-sessions': renderSchoolSessionsView(); break;
+    case 'school-roster': renderSchoolRosterView(); break;
+    case 'school-report': renderSchoolReportView(); break;
+    case 'school-docs': renderSchoolDocsView(); break;
+    case 'school-members': renderOsmAccountsView(); break;
+    case 'member-home': renderMemberHome(); break;
+    case 'member-history': renderMemberHistory(); break;
+    case 'member-leave': renderMemberLeave(); break;
+    case 'member-profile': renderMemberProfile(); break;
+    case 'member-households': renderMemberHouseholds(); break;
+    case 'meetings': renderMeetingsView(); break;
+    case 'export': renderExportView(); break;
+    case 'admin': renderAdminView(); break;
+  }
+}
+
+/* เพิ่ม view + เมนู */
+(function mpSelfBoot(){
+  const go=()=>{
+    const ref=document.getElementById('view-member-leave')||document.getElementById('view-school-report');
+    ['view-member-profile','view-member-households'].forEach(id=>{
+      if(document.getElementById(id)) return;
+      const sec=document.createElement('section'); sec.className='view-section hidden'; sec.id=id;
+      (ref&&ref.parentNode)?ref.parentNode.appendChild(sec):document.body.appendChild(sec);
+    });
+    const g=document.getElementById('mp-nav-group');
+    if(g && !g.querySelector('[data-view="member-profile"]')){
+      const add=(view,ic,txt)=>{
+        const b=document.createElement('button');
+        b.className='nav-link'; b.dataset.view=view;
+        b.innerHTML=`<i class="fa-solid ${ic} nav-ic"></i><span>${txt}</span>`;
+        b.addEventListener('click',()=>switchView(view));
+        g.appendChild(b);
+      };
+      add('member-profile','fa-address-card','ข้อมูลของฉัน');
+      add('member-households','fa-house-chimney','หลังคาเรือนของฉัน');
+    }
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,320));
+  else setTimeout(go,320);
+})();
+
 </script>
 <script type="module">
 /* ============================================================================================
@@ -6773,7 +7237,8 @@ import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithE
          signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-         collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch }
+         collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch, query, where,
+         query, where }
   from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const firebaseConfig = {
