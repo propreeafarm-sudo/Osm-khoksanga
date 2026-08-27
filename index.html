@@ -5476,13 +5476,13 @@ async function mpDoLogin(e){
   let acc=mpAccountByCid(cid);
   // ถ้ายังไม่มีในเครื่อง ลองเข้าสู่ระบบผ่าน Firebase แล้วดึงข้อมูลลงมา
   if(!acc){
-    try{ await mpFbSignIn(cid,pw); await new Promise(r=>setTimeout(r,900)); acc=mpAccountByCid(cid); }catch(err){}
+    try{ await mpFbSignIn(cid,pw); await new Promise(r=>setTimeout(r,900)); acc=mpAccountByCid(cid); }catch(err){ console.warn(err&&err.code); }
     if(!acc) return fail('ไม่พบบัญชีนี้ กรุณาลงทะเบียนใหม่ หรือติดต่อเจ้าหน้าที่');
   }
   let ok = acc.pwHash ? (await mpHash(pw,acc.salt))===acc.pwHash : false;
   if(!ok){
     // เผื่อกรณีบัญชีถูกสร้างจากเครื่องอื่นและมีแต่บัญชี Firebase
-    try{ ok = !!(await mpFbSignIn(cid,pw)); }catch(err){ ok=false; }
+    try{ ok = !!(await mpFbSignIn(cid,pw,acc.fbEmail)); }catch(err){ ok=false; }
     if(!ok) return fail('รหัสผ่านไม่ถูกต้อง');
   }
   if(acc.status==='pending')   return fail('บัญชีของท่านอยู่ระหว่างรอเจ้าหน้าที่อนุมัติ');
@@ -5490,7 +5490,7 @@ async function mpDoLogin(e){
   if(!acc.osmId)               return fail('บัญชียังไม่ได้เชื่อมกับทะเบียน อสม. กรุณาติดต่อเจ้าหน้าที่');
 
   acc.lastLogin=new Date().toISOString();
-  try{ if(!(window.FBX&&window.FBX.ready&&!window.FBX.anon)) await mpFbSignIn(cid,pw); }catch(e){ console.warn('member cloud sign-in skipped'); }
+  try{ if(!(window.FBX&&window.FBX.ready&&!window.FBX.anon)) await mpFbSignIn(cid,pw,acc.fbEmail); }catch(e){ console.warn('member cloud sign-in skipped'); }
   const m=osmById(acc.osmId)||{};
   state.currentUser={ id:acc.id, accountId:acc.id, role:'osm', osmId:acc.osmId,
     firstName:acc.firstName||m.firstName||'', lastName:acc.lastName||m.lastName||'', username:cid };
@@ -5592,7 +5592,15 @@ function renderMemberHome(){
       <div class="v">${r.pct}%</div><div class="s"><span class="schp-chip ${lv.c}">${lv.t}</span></div></div>
   </div>
 
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
+  ${(mpMyAccount()&&mpMyAccount().tempPw)?`
+  <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:var(--radius-md);
+    padding:13px 16px;font-size:13px;line-height:1.75;margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:200px"><b><i class="fa-solid fa-triangle-exclamation"></i> ท่านยังใช้รหัสผ่านชั่วคราวอยู่</b><br>
+      เพื่อความปลอดภัย กรุณาตั้งรหัสผ่านของท่านเอง</span>
+    <button class="btn btn-primary btn-sm" onclick="mpChangePw()"><i class="fa-solid fa-key"></i> เปลี่ยนรหัสผ่าน</button>
+  </div>`:''}
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
     <button class="btn btn-primary" onclick="switchView('member-activity')"><i class="fa-solid fa-clipboard-check"></i> บันทึกกิจกรรมของฉัน</button>
     <button class="btn btn-outline" onclick="switchView('member-profile')"><i class="fa-solid fa-address-card"></i> ข้อมูลของฉัน</button>
     <button class="btn btn-outline" onclick="switchView('member-households')"><i class="fa-solid fa-house-chimney"></i> หลังคาเรือนของฉัน</button>
@@ -5772,6 +5780,7 @@ function mpChangePw(){
     if(n.length<6) return bad('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
     if(n!==n2) return bad('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน');
     acc.salt=mpSalt(); acc.pwHash=await mpHash(n,acc.salt); acc.pwChangedAt=new Date().toISOString();
+    delete acc.tempPw; delete acc.tempPwAt; delete acc.tempPwBy;
     persistState(); closeModal(); toast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว','success');
   });
 }
@@ -8173,6 +8182,674 @@ function renderCurrentView(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,380));
   else setTimeout(go,380);
 })();
+
+
+/* ============================================================================================
+   ACCOUNT SEARCH + CREDENTIALS  v1.0
+   • แก้ช่องค้นหาให้พิมพ์ต่อเนื่องได้ ไม่เสียโฟกัส และค้นชื่อในทะเบียน อสม. ได้ด้วย
+   • หน้าข้อมูลเข้าสู่ระบบ: ดูชื่อผู้ใช้ได้เต็ม + จัดการรหัสผ่านชั่วคราว + พิมพ์ใบแจ้งรหัส
+   ============================================================================================ */
+
+let acFilter='all';   // all | pending | approved | suspended
+
+function mpAccMatch(a, term){
+  if(!term) return true;
+  const m=mpLinkedMember(a);
+  const hay=[
+    a.firstName, a.lastName, a.citizenId, a.phone, a.moo,
+    m?m.firstName:'', m?m.lastName:'', m?m.village:'', m?m.moo:'',
+    m?String(m.idCard||''):''
+  ].join(' ').toLowerCase();
+  // ค้นได้ทั้งแบบทั้งคำและแยกคำ (พิมพ์ "สมชาย ใจดี" หรือ "ใจดี สมชาย" ก็เจอ)
+  return term.split(/\s+/).filter(Boolean).every(w=>hay.includes(w));
+}
+function mpFilteredAccounts(){
+  const t=String(acSearch||'').toLowerCase().trim();
+  return (state.osmAccounts||[]).slice()
+    .sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)
+      || String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
+    .filter(a=>acFilter==='all'||a.status===acFilter)
+    .filter(a=>mpAccMatch(a,t));
+}
+/* อัปเดตเฉพาะรายการ ไม่ render ทั้งหน้า → ช่องค้นหาไม่เสียโฟกัส */
+function mpRefreshAccounts(){
+  const box=document.getElementById('ac-list'); if(!box) return;
+  const list=mpFilteredAccounts();
+  box.innerHTML=mpAccountsHtml(list);
+  const c=document.getElementById('ac-count'); if(c) c.textContent=list.length;
+}
+
+function mpAccountsHtml(accs){
+  const list = accs || mpFilteredAccounts();
+  if(!list.length) return `<div class="mp-empty"><i class="fa-solid fa-magnifying-glass big"></i>
+    <h3>ไม่พบบัญชีตามเงื่อนไข</h3><p>ลองพิมพ์ชื่อ นามสกุล หมู่บ้าน หรือเลขบัตรประชาชน</p></div>`;
+  return list.map(a=>{
+    const m=mpLinkedMember(a);
+    const b=a.status==='approved'?'mp-badge-ok':a.status==='suspended'?'mp-badge-no':'mp-badge-pend';
+    const t2=a.status==='approved'?'ใช้งานได้':a.status==='suspended'?'ระงับการใช้งาน':'รออนุมัติ';
+    const hasTemp = !!a.tempPw;
+    return `<div class="ac-row ${a.status==='pending'?'ac-pend':''}">
+      <div class="who">
+        <b>${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)} <span class="schp-chip ${b}">${t2}</span>
+          ${hasTemp?'<span class="schp-chip watch" title="ยังใช้รหัสชั่วคราวอยู่"><i class="fa-solid fa-key"></i> รหัสชั่วคราว</span>':''}</b>
+        <small>${mpMaskCid(a.citizenId)} • ${escapeHtml(a.phone||'-')} • หมู่ ${escapeHtml(a.moo||'-')}
+          • ยื่นเมื่อ ${formatThaiDateShort(a.createdAt)}
+          ${a.lastLogin?` • เข้าล่าสุด ${formatThaiDateShort(a.lastLogin)}`:' • <span style="color:var(--warning)">ยังไม่เคยเข้าระบบ</span>'}</small>
+        <small style="color:${m?'var(--success)':'var(--danger)'}">
+          <i class="fa-solid ${m?'fa-link':'fa-link-slash'}"></i>
+          ${m?`เชื่อมกับทะเบียน: ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} (หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')})`
+             :'ยังไม่ได้เชื่อมกับทะเบียน อสม.'}</small>
+      </div>
+      <div class="ac-acts">
+        <button class="btn btn-outline btn-sm" onclick="mpCredentials('${a.id}')"><i class="fa-solid fa-id-card-clip"></i> ข้อมูลเข้าระบบ</button>
+        <button class="btn btn-outline btn-sm" onclick="mpLinkForm('${a.id}')"><i class="fa-solid fa-link"></i> เชื่อมทะเบียน</button>
+        ${a.status==='pending'?`<button class="btn btn-primary btn-sm" onclick="mpApprove('${a.id}')"><i class="fa-solid fa-check"></i> อนุมัติ</button>`:''}
+        ${a.status==='approved'?`<button class="btn btn-outline btn-sm" onclick="mpSuspend('${a.id}',true)"><i class="fa-solid fa-ban"></i> ระงับ</button>`:''}
+        ${a.status==='suspended'?`<button class="btn btn-outline btn-sm" onclick="mpSuspend('${a.id}',false)"><i class="fa-solid fa-rotate-left"></i> คืนสิทธิ์</button>`:''}
+        <button class="btn btn-ghost btn-sm" title="ลบบัญชี" onclick="mpDeleteAcc('${a.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+      </div></div>`;
+  }).join('');
+}
+
+/* ---------------------------------------------------------------- หน้าเจ้าหน้าที่ (เขียนใหม่) */
+function renderOsmAccountsView(){
+  mpInit();
+  const el=document.getElementById('view-school-members');
+  const all=(state.osmAccounts||[]);
+  const pend=all.filter(a=>a.status==='pending').length;
+  const temp=all.filter(a=>a.tempPw).length;
+  const never=all.filter(a=>a.status==='approved' && !a.lastLogin).length;
+  const lvs=(state.osmLeaves||[]).slice().sort((a,b)=>
+    (a.status==='pending'?0:1)-(b.status==='pending'?0:1) || String(b.createdAt).localeCompare(String(a.createdAt)));
+  const lvPend=lvs.filter(x=>x.status==='pending').length;
+  const list=mpFilteredAccounts();
+  const issues=mpAccountIssues();
+
+  el.innerHTML=`
+  <div class="page-head"><div><h2>บัญชีผู้ใช้งาน อสม.</h2>
+    <p>อนุมัติคำขอ เชื่อมบัญชีกับทะเบียน ดูข้อมูลเข้าระบบ และพิจารณาใบลา</p></div>
+    <div class="page-head-actions">
+      ${temp?`<button class="btn btn-outline" onclick="mpPrintAllSlips()"><i class="fa-solid fa-print"></i> พิมพ์ใบแจ้งรหัส (${temp})</button>`:''}
+      <button class="btn btn-outline" onclick="mpCreateAccountForm()"><i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้ อสม.</button>
+      <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบบัญชี${issues.count?` <span class="badge mp-badge-pend">${issues.count}</span>`:''}</button>
+      <button class="btn btn-outline" onclick="mpPrintRegPoster()"><i class="fa-solid fa-qrcode"></i> ป้าย QR ลงทะเบียน</button>
+    </div></div>
+
+  <div class="schp-kpis">
+    <div class="schp-kpi" style="--k:var(--brand-navy-700)"><div class="k-lab">บัญชีทั้งหมด</div><div class="k-val">${all.length}</div><div class="k-sub">คน</div></div>
+    <div class="schp-kpi" style="--k:var(--sch-amber)"><div class="k-lab">รออนุมัติ</div><div class="k-val">${pend}</div><div class="k-sub">คำขอ</div></div>
+    <div class="schp-kpi" style="--k:var(--sch-emerald)"><div class="k-lab">ใช้งานได้</div><div class="k-val">${all.filter(a=>a.status==='approved').length}</div><div class="k-sub">บัญชี</div></div>
+    <div class="schp-kpi" style="--k:${never?'var(--sch-rose)':'var(--sch-emerald)'}"><div class="k-lab">ยังไม่เคยเข้าระบบ</div><div class="k-val">${never}</div><div class="k-sub">คน ที่ควรติดตาม</div></div>
+    <div class="schp-kpi" style="--k:var(--info)"><div class="k-lab">ใบลารอพิจารณา</div><div class="k-val">${lvPend}</div><div class="k-sub">ฉบับ</div></div>
+  </div>
+
+  <div class="schp-bar">
+    <div class="fg grow"><label>มุมมอง</label>
+      <div class="schp-tabs">
+        <button class="schp-tab ${acTab==='accounts'?'on':''}" onclick="acTab='accounts';renderOsmAccountsView()">
+          <i class="fa-solid fa-users-gear"></i> บัญชีผู้ใช้ ${pend?`<span class="badge mp-badge-pend">${pend}</span>`:''}</button>
+        <button class="schp-tab ${acTab==='leaves'?'on':''}" onclick="acTab='leaves';renderOsmAccountsView()">
+          <i class="fa-solid fa-file-pen"></i> ใบลา ${lvPend?`<span class="badge mp-badge-pend">${lvPend}</span>`:''}</button>
+      </div></div>
+  </div>
+
+  ${acTab==='accounts'?`
+  <div class="schp-bar">
+    <div class="fg grow"><label>ค้นหา</label>
+      <input class="input" id="ac-q" autocomplete="off" value="${escapeHtml(acSearch||'')}"
+        placeholder="พิมพ์ชื่อ นามสกุล หมู่บ้าน เบอร์โทร หรือเลขบัตร"
+        oninput="acSearch=this.value;mpRefreshAccounts()"></div>
+    <div class="fg"><label>สถานะ</label>
+      <select class="input" onchange="acFilter=this.value;mpRefreshAccounts()">
+        <option value="all" ${acFilter==='all'?'selected':''}>ทั้งหมด</option>
+        <option value="pending" ${acFilter==='pending'?'selected':''}>รออนุมัติ</option>
+        <option value="approved" ${acFilter==='approved'?'selected':''}>ใช้งานได้</option>
+        <option value="suspended" ${acFilter==='suspended'?'selected':''}>ระงับการใช้งาน</option>
+      </select></div>
+  </div>
+  <div class="schp-roster">
+    <div class="schp-roster-head">
+      <b><i class="fa-solid fa-users-gear"></i> พบ <span id="ac-count">${list.length}</span> บัญชี</b>
+      <span style="color:var(--text-secondary);font-size:12px">
+        <i class="fa-solid fa-circle-info"></i> กด “ข้อมูลเข้าระบบ” เพื่อดูชื่อผู้ใช้และจัดการรหัสผ่าน</span>
+    </div>
+    <div id="ac-list">${mpAccountsHtml(list)}</div>
+  </div>`
+  : `<div class="schp-roster">${mpLeavesHtml(lvs)}</div>`}`;
+
+  // คืนตำแหน่งเคอร์เซอร์ให้ช่องค้นหา
+  const q=document.getElementById('ac-q');
+  if(q && acSearch){ q.focus(); try{ q.setSelectionRange(q.value.length,q.value.length); }catch(e){} }
+}
+
+/* ============================================================================================
+   ข้อมูลเข้าสู่ระบบของ อสม.
+   ============================================================================================ */
+function mpCredentials(id){
+  const a=mpAccountById(id); if(!a) return;
+  const m=mpLinkedMember(a);
+  const cid=String(a.citizenId||'').replace(/\D/g,'');
+  const hasTemp=!!a.tempPw;
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-id-card-clip"></i> ข้อมูลเข้าสู่ระบบ</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.85;margin-bottom:16px">
+      <b>${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}</b>
+      ${m?`<span style="color:var(--text-secondary)">— หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</span>`:''}
+      <div style="color:var(--text-faint);font-size:11.5px">
+        สถานะ: ${a.status==='approved'?'ใช้งานได้':a.status==='suspended'?'ระงับการใช้งาน':'รออนุมัติ'}
+        ${a.lastLogin?` • เข้าระบบล่าสุด ${new Date(a.lastLogin).toLocaleString('th-TH')}`:' • ยังไม่เคยเข้าระบบ'}</div>
+    </div>
+
+    <h4 style="margin:0 0 8px;font-size:14px"><i class="fa-solid fa-user"></i> ชื่อผู้ใช้ (Username)</h4>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <input class="input" id="cr-user" readonly value="${escapeHtml(cid)}"
+        style="font-size:19px;letter-spacing:3px;font-weight:800;text-align:center">
+      <button class="btn btn-outline" onclick="mpCopy('cr-user','คัดลอกชื่อผู้ใช้แล้ว')"><i class="fa-solid fa-copy"></i></button>
+    </div>
+    <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 18px">
+      ชื่อผู้ใช้คือ <b>เลขบัตรประชาชน 13 หลัก</b> ของ อสม. เอง เปลี่ยนไม่ได้</p>
+
+    <h4 style="margin:0 0 8px;font-size:14px"><i class="fa-solid fa-key"></i> รหัสผ่าน</h4>
+    ${hasTemp ? `
+      <div style="background:var(--sch-amber-bg);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:12.5px;color:var(--sch-amber);margin-bottom:8px">
+          <i class="fa-solid fa-triangle-exclamation"></i> รหัสชั่วคราวที่เจ้าหน้าที่ตั้งให้
+          เมื่อ ${formatThaiDateShort(a.tempPwAt)} — อสม. ยังไม่ได้เปลี่ยนเป็นรหัสของตัวเอง</div>
+        <div style="display:flex;gap:8px">
+          <input class="input" id="cr-pw" readonly value="${escapeHtml(a.tempPw)}"
+            style="font-size:24px;letter-spacing:7px;font-weight:800;text-align:center;background:#fff;color:#111">
+          <button class="btn btn-outline" onclick="mpCopy('cr-pw','คัดลอกรหัสผ่านแล้ว')"><i class="fa-solid fa-copy"></i></button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
+        <button class="btn btn-outline" onclick="mpPrintSlip('${a.id}')"><i class="fa-solid fa-print"></i> พิมพ์ใบแจ้งรหัส</button>
+        <button class="btn btn-outline" onclick="mpResetPw('${a.id}')"><i class="fa-solid fa-rotate"></i> สุ่มรหัสใหม่</button>
+      </div>`
+    : `
+      <div style="background:var(--sch-emerald-bg);border-radius:10px;padding:13px 16px;font-size:12.5px;
+        color:var(--sch-emerald);line-height:1.8;margin-bottom:12px">
+        <b><i class="fa-solid fa-shield-halved"></i> อสม. ตั้งรหัสผ่านเองไว้แล้ว — ระบบดูรหัสไม่ได้</b><br>
+        <span style="color:var(--text-secondary)">รหัสผ่านถูกเข้ารหัสแบบทางเดียว (SHA-256) เพื่อความปลอดภัย
+        แม้แต่ผู้ดูแลระบบก็อ่านไม่ได้ ถ้า อสม. ลืมรหัส ให้กด “ตั้งรหัสชั่วคราว” แล้วแจ้งเจ้าตัวไปเปลี่ยนเอง</span>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:14px"
+        onclick="mpResetPw('${a.id}')"><i class="fa-solid fa-key"></i> ตั้งรหัสชั่วคราวให้ใหม่</button>`}
+
+    <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
+    <div style="font-size:12px;color:var(--text-faint);line-height:1.8">
+      <b>วิธีแนะนำ อสม. เข้าระบบ</b><br>
+      ๑. เปิดหน้าเว็บระบบ → กดปุ่ม “สำหรับ อสม.” มุมขวาบน<br>
+      ๒. กรอกเลขบัตรประชาชน 13 หลัก และรหัสผ่าน<br>
+      ๓. เข้าได้แล้วให้เปลี่ยนรหัสเองที่เมนู “ข้อมูลของฉัน → เปลี่ยนรหัสผ่าน”
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">ปิด</button></div>`,{size:'sm'});
+}
+
+function mpCopy(id,msg){
+  const el=document.getElementById(id); if(!el) return;
+  try{ el.select(); }catch(e){}
+  const done=()=>toast(msg||'คัดลอกแล้ว','success');
+  if(navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(el.value).then(done).catch(()=>{ try{document.execCommand('copy');done();}catch(e){} });
+  else { try{ document.execCommand('copy'); done(); }catch(e){} }
+}
+
+/* ตั้งรหัสชั่วคราว — เก็บไว้ให้เจ้าหน้าที่ดูได้จนกว่า อสม. จะเปลี่ยนเอง */
+async function mpResetPw(id){
+  const a=mpAccountById(id); if(!a) return;
+  const tmp=String(Math.floor(100000+Math.random()*900000));
+  a.salt=mpSalt(); a.pwHash=await mpHash(tmp,a.salt);
+  a.tempPw=tmp; a.tempPwAt=new Date().toISOString(); a.tempPwBy=currentUserFullName();
+  schLog('ตั้งรหัสชั่วคราว',`${a.firstName} ${a.lastName}`);
+  persistState();
+  closeModal();
+  mpCredentials(id);
+  toast('ตั้งรหัสชั่วคราวเรียบร้อย — แจ้งให้ อสม. เปลี่ยนรหัสหลังเข้าระบบ','success');
+  if(state.currentView==='school-members') setTimeout(()=>{ const b=document.getElementById('ac-list'); if(b) mpRefreshAccounts(); },50);
+}
+
+/* ---------------------------------------------------------------- ใบแจ้งรหัส */
+function mpSlipHtml(a){
+  const m=mpLinkedMember(a);
+  const url=(()=>{ try{ const u=new URL(location.href); u.hash=''; return u.toString(); }catch(e){ return ''; } })();
+  return `
+  <div class="pg" style="min-height:auto;padding:14mm 16mm">
+    ${schGovHead('ใบแจ้งข้อมูลเข้าใช้งานระบบ อสม. ออนไลน์')}
+    <div class="meta" style="display:block;line-height:2">
+      <div><b>ชื่อ – นามสกุล:</b> ${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}
+        ${m?` &nbsp; <b>หมู่ที่:</b> ${escapeHtml(m.moo||'-')} บ้าน${escapeHtml(m.village||'')}`:''}</div>
+    </div>
+    <table style="margin-top:10px">
+      <tbody>
+        <tr><th style="width:38%;text-align:right">เว็บไซต์ระบบ</th>
+            <td class="l" style="font-size:12.5px;word-break:break-all">${escapeHtml(url)}</td></tr>
+        <tr><th style="text-align:right">ชื่อผู้ใช้ (เลขบัตรประชาชน)</th>
+            <td class="c" style="font-size:19px;font-weight:700;letter-spacing:2px">${escapeHtml(String(a.citizenId||''))}</td></tr>
+        <tr><th style="text-align:right">รหัสผ่านชั่วคราว</th>
+            <td class="c" style="font-size:24px;font-weight:700;letter-spacing:6px">${escapeHtml(a.tempPw||'—')}</td></tr>
+      </tbody>
+    </table>
+    <div class="sum" style="margin-top:12px">
+      <b>ขั้นตอนการเข้าใช้งาน</b><br>
+      ๑. เปิดเว็บไซต์ข้างต้น แล้วกดปุ่ม “สำหรับ อสม.” ที่มุมขวาบน<br>
+      ๒. กรอกชื่อผู้ใช้และรหัสผ่านชั่วคราวตามตาราง<br>
+      ๓. เมื่อเข้าได้แล้ว ไปที่เมนู “ข้อมูลของฉัน → เปลี่ยนรหัสผ่าน”
+          เพื่อตั้งรหัสของท่านเอง (อย่างน้อย ๖ ตัวอักษร)
+    </div>
+    <p class="note" style="margin-top:10px">
+      <b>ข้อควรระวัง:</b> กรุณาเก็บเอกสารนี้เป็นความลับ และเปลี่ยนรหัสผ่านทันทีหลังเข้าระบบครั้งแรก
+      • ออกให้เมื่อ ${schThaiToday()} โดย ${escapeHtml(a.tempPwBy||currentUserFullName()||'-')}
+    </p>
+  </div>`;
+}
+function mpPrintSlip(id){
+  const a=mpAccountById(id); if(!a) return;
+  if(!a.tempPw){ toast('ยังไม่มีรหัสชั่วคราว กรุณากด “ตั้งรหัสชั่วคราว” ก่อน','error'); return; }
+  schPrintWindow(`ใบแจ้งรหัส — ${a.firstName} ${a.lastName}`, mpSlipHtml(a));
+}
+function mpPrintAllSlips(){
+  const list=(state.osmAccounts||[]).filter(a=>a.tempPw);
+  if(!list.length){ toast('ยังไม่มีบัญชีที่ใช้รหัสชั่วคราว','info'); return; }
+  schPrintWindow(`ใบแจ้งรหัสเข้าใช้งาน (${list.length} ฉบับ)`, list.map(mpSlipHtml).join(''));
+  schLog('พิมพ์ใบแจ้งรหัส',`${list.length} ฉบับ`); persistState();
+}
+
+
+/* ============================================================================================
+   ACCOUNT REPAIR  v1.0
+   แก้ปัญหา "สมัครไม่ได้ เลขบัตรซ้ำ / เคยสมัครแล้ว"
+   • ใช้อีเมลภายในแบบเลี่ยงการชนกัน จึงไม่ติด email-already-in-use อีก
+   • กู้บัญชีเดิมอัตโนมัติเมื่อมีบัญชีบน Firebase แต่ในเครื่องไม่มี
+   • เจ้าหน้าที่สร้างบัญชีให้ อสม. ได้โดยตรง (ไม่ต้องรอสมัครเอง)
+   • เครื่องมือตรวจสอบบัญชีซ้ำ / ค้าง / ไม่ได้เชื่อมทะเบียน
+   ============================================================================================ */
+
+const FB_MAIL_DOMAIN = '@khoksanga.local';
+function mpFbEmail(cid, n){
+  const c=String(cid).replace(/\D/g,'');
+  return 'osm'+c+(n?('.'+n):'')+FB_MAIL_DOMAIN;
+}
+/* สร้างบัญชี Firebase โดยเลี่ยงอีเมลที่ชนกัน (คืน {uid,email} หรือ null ถ้าไม่มี Firebase) */
+async function mpFbCreate(cid, pw){
+  const F=window.FBX;
+  if(!F || F.fatal || !F.createUser) return null;
+  let lastErr=null;
+  for(let n=0;n<6;n++){
+    const email=mpFbEmail(cid,n);
+    try{
+      const cred=await F.createUser(F.auth, email, pw);
+      return { uid: cred.user?cred.user.uid:'', email };
+    }catch(e){
+      lastErr=e;
+      const m=String(e && (e.code||e.message) || e);
+      if(!/email-already-in-use/.test(m)) throw e;   // ปัญหาอื่น เช่น รหัสสั้นไป → โยนออกไปเลย
+    }
+  }
+  throw lastErr || new Error('สร้างบัญชีบนคลาวด์ไม่สำเร็จ');
+}
+async function mpFbSignIn(cid, pw, email){
+  const F=window.FBX;
+  if(!F || F.fatal) return null;
+  const tries = email ? [email] : [mpFbEmail(cid,0),mpFbEmail(cid,1),mpFbEmail(cid,2)];
+  let lastErr=null;
+  for(const em of tries){
+    try{
+      const cred=await F.signInWithEmailAndPassword(F.auth, em);
+      return cred.user?cred.user.uid:null;
+    }catch(e){ /* ลองรูปแบบถัดไป */ lastErr=e; }
+  }
+  // ลองอีกรอบแบบส่งรหัสผ่านให้ครบพารามิเตอร์ (บาง SDK ต้องการ 3 อาร์กิวเมนต์)
+  for(const em of tries){
+    try{
+      const cred=await F.signInWithEmailAndPassword(F.auth, em, pw);
+      return cred.user?cred.user.uid:null;
+    }catch(e){ lastErr=e; }
+  }
+  if(lastErr) throw lastErr;
+  return null;
+}
+
+/* ---------------------------------------------------------------- ตรวจสถานะเลขบัตรก่อนสมัคร */
+function mpCheckCid(cid){
+  const c=String(cid||'').replace(/\D/g,'');
+  const acc=mpAccountByCid(c);
+  const mem=(state.osmMembers||[]).find(m=>String(m.idCard||'').replace(/\D/g,'')===c);
+  return { c, acc, mem,
+    inRegistry: !!mem,
+    dupRegistry: (state.osmMembers||[]).filter(m=>String(m.idCard||'').replace(/\D/g,'')===c).length>1 };
+}
+
+/* ============================================================================================
+   เจ้าหน้าที่: สร้างบัญชีให้ อสม. โดยตรง
+   ============================================================================================ */
+function mpCreateAccountForm(){
+  mpInit();
+  const used=new Set((state.osmAccounts||[]).map(a=>a.osmId).filter(Boolean));
+  const free=schMembers().filter(m=>!used.has(m.id));
+  if(!free.length){ toast('อสม. ทุกคนในทะเบียนมีบัญชีแล้ว','info'); return; }
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้ อสม.</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-ca"><div class="modal-body">
+    <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.75;margin:0 0 14px">
+      ใช้เมื่อ อสม. สมัครเองไม่ได้ ระบบจะสร้างบัญชีพร้อม<b>รหัสผ่านชั่วคราว</b>
+      และอนุมัติให้ใช้งานทันที — จากนั้นพิมพ์ใบแจ้งรหัสให้เจ้าตัวได้เลย</p>
+    <div class="form-group"><label>เลือก อสม. จากทะเบียน <span class="req">*</span></label>
+      <input class="input" id="ca-q" placeholder="พิมพ์เพื่อค้นหาชื่อ" autocomplete="off" style="margin-bottom:7px">
+      <select id="ca-osm" class="input" size="7" style="height:auto">
+        ${free.map(m=>`<option value="${m.id}">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} — หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</option>`).join('')}
+      </select>
+      <small style="color:var(--text-faint);font-size:11.5px">แสดงเฉพาะผู้ที่ยังไม่มีบัญชี (${free.length} คน)</small></div>
+    <div class="field-error" id="ca-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-key"></i> สร้างบัญชี + รหัสชั่วคราว</button>
+  </div></form>`,{size:'sm'});
+
+  const q=document.getElementById('ca-q'), sel=document.getElementById('ca-osm');
+  q.addEventListener('input',()=>{
+    const t=q.value.toLowerCase().trim();
+    const list=free.filter(m=>!t||`${m.firstName} ${m.lastName} ${m.village||''} ${m.moo||''}`.toLowerCase().includes(t));
+    sel.innerHTML=list.map(m=>`<option value="${m.id}">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} — หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</option>`).join('');
+  });
+  setTimeout(()=>q.focus(),80);
+
+  document.getElementById('mp-ca').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const err=document.getElementById('ca-err');
+    const osmId=sel.value;
+    if(!osmId){ err.textContent='กรุณาเลือก อสม.'; err.style.display='block'; return; }
+    const acc=await mpCreateAccountFor(osmId,{silent:true});
+    if(!acc){ err.textContent='สร้างบัญชีไม่สำเร็จ'; err.style.display='block'; return; }
+    closeModal(); renderOsmAccountsView();
+    mpCredentials(acc.id);
+    toast('สร้างบัญชีเรียบร้อย — แจ้งรหัสชั่วคราวให้ อสม. ได้เลย','success');
+  });
+}
+
+async function mpCreateAccountFor(osmId, opts){
+  opts=opts||{};
+  mpInit();
+  const m=osmById(osmId); if(!m) return null;
+  const cid=String(m.idCard||'').replace(/\D/g,'');
+  if(!validateIdCard(cid)){ toast('อสม. ท่านนี้ยังไม่มีเลขบัตรประชาชนที่ถูกต้องในทะเบียน','error'); return null; }
+  const exist=mpAccountByCid(cid);
+  if(exist){ if(!opts.silent) toast('เลขบัตรนี้มีบัญชีอยู่แล้ว','info'); return exist; }
+
+  const tmp=String(Math.floor(100000+Math.random()*900000));
+  const salt=mpSalt();
+  let uid='', email='';
+  try{
+    const r=await mpFbCreate(cid,tmp);
+    if(r){ uid=r.uid; email=r.email; }
+  }catch(e){ console.warn('cloud account skipped:',e && (e.code||e.message)); }
+
+  const acc={ id: uid || uid_('acc'), uid, fbEmail:email, citizenId:cid,
+    firstName:m.firstName||'', lastName:m.lastName||'', phone:m.phone||'', moo:m.moo||'',
+    salt, pwHash: await mpHash(tmp,salt), osmId:m.id,
+    status:'approved', createdAt:new Date().toISOString(),
+    approvedAt:new Date().toISOString(), approvedBy:currentUserFullName(),
+    createdByStaff:true, tempPw:tmp, tempPwAt:new Date().toISOString(), tempPwBy:currentUserFullName(),
+    lastLogin:'' };
+  state.osmAccounts.push(acc);
+  schLog('เจ้าหน้าที่สร้างบัญชีให้ อสม.',`${m.firstName} ${m.lastName}`);
+  persistState();
+  return acc;
+}
+
+/* ============================================================================================
+   ตรวจสอบและซ่อมบัญชี
+   ============================================================================================ */
+function mpAccountIssues(){
+  mpInit();
+  const accs=state.osmAccounts||[];
+  const norm=x=>String(x||'').replace(/\D/g,'');
+
+  // เลขบัตรซ้ำในบัญชีผู้ใช้
+  const byCid={};
+  accs.forEach(a=>{ const c=norm(a.citizenId); (byCid[c]=byCid[c]||[]).push(a); });
+  const dupAcc=Object.entries(byCid).filter(([c,l])=>c&&l.length>1).map(([c,l])=>({cid:c,list:l}));
+
+  // เลขบัตรซ้ำในทะเบียน อสม.
+  const byMem={};
+  (state.osmMembers||[]).forEach(m=>{ const c=norm(m.idCard); if(c) (byMem[c]=byMem[c]||[]).push(m); });
+  const dupMem=Object.entries(byMem).filter(([c,l])=>l.length>1).map(([c,l])=>({cid:c,list:l}));
+
+  // บัญชีที่ไม่ได้เชื่อมทะเบียน
+  const orphan=accs.filter(a=>!a.osmId || !osmById(a.osmId));
+
+  // บัญชีที่เชื่อมกับ อสม. คนเดียวกันซ้ำซ้อน
+  const byOsm={};
+  accs.forEach(a=>{ if(a.osmId) (byOsm[a.osmId]=byOsm[a.osmId]||[]).push(a); });
+  const dupLink=Object.entries(byOsm).filter(([k,l])=>l.length>1).map(([k,l])=>({osmId:k,list:l}));
+
+  // ค้างรออนุมัติเกิน 3 วัน
+  const stale=accs.filter(a=>a.status==='pending' &&
+    (Date.now()-new Date(a.createdAt||0).getTime())>3*86400000);
+
+  // อสม. ที่ยังไม่มีบัญชี
+  const used=new Set(accs.map(a=>a.osmId).filter(Boolean));
+  const noAcc=schMembers().filter(m=>!used.has(m.id));
+
+  // เลขบัตรไม่ถูกต้องในทะเบียน (สมัครไม่ได้แน่นอน)
+  const badCid=schMembers().filter(m=>!validateIdCard(norm(m.idCard)));
+
+  return { dupAcc, dupMem, orphan, dupLink, stale, noAcc, badCid,
+    count: dupAcc.length+dupMem.length+orphan.length+dupLink.length+stale.length+badCid.length };
+}
+
+function mpRepairPanel(){
+  const x=mpAccountIssues();
+  const sec=(icon,color,title,desc,body)=>`
+    <div style="border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px">
+      <b style="font-size:14px"><i class="fa-solid ${icon}" style="color:${color}"></i> ${title}</b>
+      <div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.7">${desc}</div>
+      ${body}</div>`;
+  const ok=`<div style="font-size:12.5px;color:var(--success)"><i class="fa-solid fa-circle-check"></i> ไม่พบปัญหา</div>`;
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบและซ่อมบัญชี</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:${x.count?'var(--sch-amber-bg)':'var(--sch-emerald-bg)'};
+      color:${x.count?'var(--sch-amber)':'var(--sch-emerald)'};border-radius:10px;padding:12px 15px;
+      font-size:13px;margin-bottom:16px">
+      <i class="fa-solid fa-${x.count?'triangle-exclamation':'circle-check'}"></i>
+      ${x.count?`พบ <b>${x.count}</b> จุดที่ควรแก้ไข`:'ไม่พบปัญหาในระบบบัญชี'}
+      ${x.noAcc.length?` • มี อสม. อีก <b>${x.noAcc.length}</b> คนที่ยังไม่มีบัญชี`:''}
+    </div>
+
+    ${sec('fa-clone','var(--danger)','บัญชีที่ใช้เลขบัตรซ้ำกัน',
+      'เกิดจากการสมัครซ้ำหลายรอบ ทำให้คนอื่นสมัครด้วยเลขบัตรเดิมไม่ได้ — ให้เก็บบัญชีที่ใช้งานจริงไว้ 1 บัญชี',
+      x.dupAcc.length ? x.dupAcc.map(d=>`
+        <div style="background:var(--bg-surface-2);border-radius:9px;padding:10px 12px;margin-bottom:8px">
+          <b style="font-size:12.5px">${mpMaskCid(d.cid)} — ${d.list.length} บัญชี</b>
+          ${d.list.map(a=>`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;
+            font-size:12px;padding:6px 0;border-top:1px dashed var(--border)">
+            <span>${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}
+              <span style="color:var(--text-faint)">• ${a.status==='approved'?'ใช้งานได้':a.status==='suspended'?'ระงับ':'รออนุมัติ'}
+              • สร้าง ${formatThaiDateShort(a.createdAt)}
+              ${a.lastLogin?'• เคยเข้าระบบ':'• ยังไม่เคยเข้าระบบ'}</span></span>
+            <button class="btn btn-ghost btn-sm" onclick="mpDeleteAccQuick('${a.id}')" title="ลบบัญชีนี้">
+              <i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+          </div>`).join('')}
+          <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="mpKeepBest('${d.cid}')">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> เก็บบัญชีที่ดีที่สุดไว้อัตโนมัติ</button>
+        </div>`).join('') : ok)}
+
+    ${sec('fa-link-slash','var(--warning)','บัญชีที่ยังไม่ได้เชื่อมทะเบียน',
+      'เข้าระบบไม่ได้จนกว่าจะเชื่อมกับ อสม. ในทะเบียน',
+      x.orphan.length ? x.orphan.map(a=>`
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12.5px;padding:6px 0">
+          <span>${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)} <span style="color:var(--text-faint)">• ${mpMaskCid(a.citizenId)}</span></span>
+          <button class="btn btn-outline btn-sm" onclick="closeModal();mpLinkForm('${a.id}')">เชื่อมทะเบียน</button>
+        </div>`).join('') : ok)}
+
+    ${sec('fa-id-card','var(--danger)','เลขบัตรซ้ำในทะเบียน อสม.',
+      'ทำให้ระบบจับคู่ผิดคน ควรแก้เลขบัตรให้ถูกต้องในเมนูทะเบียน อสม.',
+      x.dupMem.length ? x.dupMem.map(d=>`
+        <div style="font-size:12.5px;padding:6px 0">
+          <b>${mpMaskCid(d.cid)}</b> → ${d.list.map(m=>escapeHtml(m.firstName+' '+m.lastName+' (ม.'+(m.moo||'-')+')')).join(' , ')}
+        </div>`).join('') : ok)}
+
+    ${sec('fa-triangle-exclamation','var(--danger)','เลขบัตรในทะเบียนไม่ถูกต้อง',
+      'อสม. เหล่านี้จะสมัครเองไม่ได้ เพราะเลขบัตรไม่ครบ 13 หลัก',
+      x.badCid.length ? x.badCid.slice(0,15).map(m=>`
+        <div style="font-size:12.5px;padding:5px 0">• ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}
+          <span style="color:var(--text-faint)">หมู่ ${escapeHtml(m.moo||'-')} — เลขบัตร “${escapeHtml(m.idCard||'ว่าง')}”</span></div>`).join('')
+        + (x.badCid.length>15?`<div style="font-size:12px;color:var(--text-faint)">…และอีก ${x.badCid.length-15} คน</div>`:'') : ok)}
+
+    ${sec('fa-clock','var(--warning)','คำขอค้างเกิน 3 วัน','ควรอนุมัติหรือแจ้งผลให้ผู้สมัครทราบ',
+      x.stale.length ? x.stale.map(a=>`
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12.5px;padding:6px 0">
+          <span>${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)} <span style="color:var(--text-faint)">• ยื่น ${formatThaiDateShort(a.createdAt)}</span></span>
+          <button class="btn btn-primary btn-sm" onclick="mpApprove('${a.id}')">อนุมัติ</button>
+        </div>`).join('') : ok)}
+
+    ${x.noAcc.length?`
+    <div style="border:1px solid var(--brand-blue-200);background:var(--brand-blue-100);border-radius:var(--radius-md);
+      padding:14px 16px;color:var(--brand-navy-700)">
+      <b style="font-size:14px"><i class="fa-solid fa-user-plus"></i> อสม. ที่ยังไม่มีบัญชี (${x.noAcc.length} คน)</b>
+      <div style="font-size:12px;margin:5px 0 10px;line-height:1.7">
+        ไม่ต้องรอให้สมัครเอง — เจ้าหน้าที่สร้างบัญชีพร้อมรหัสชั่วคราวให้ได้เลย แล้วพิมพ์ใบแจ้งรหัสไปแจก</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <button class="btn btn-outline btn-sm" onclick="closeModal();mpCreateAccountForm()">
+          <i class="fa-solid fa-user-plus"></i> สร้างทีละคน</button>
+        <button class="btn btn-primary btn-sm" onclick="mpCreateAllAccounts()">
+          <i class="fa-solid fa-users-gear"></i> สร้างให้ทุกคน (${x.noAcc.length})</button>
+      </div>
+    </div>`:''}
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-rotate"></i> ตรวจอีกครั้ง</button>
+    <button class="btn btn-primary" onclick="closeModal()">ปิด</button>
+  </div>`,{size:'md'});
+}
+
+function mpDeleteAccQuick(id){
+  const a=mpAccountById(id); if(!a) return;
+  state.osmAccounts=state.osmAccounts.filter(x=>x.id!==id);
+  schLog('ลบบัญชีซ้ำ',`${a.firstName} ${a.lastName} (${mpMaskCid(a.citizenId)})`);
+  persistState(); mpRepairPanel(); toast('ลบบัญชีแล้ว','success');
+}
+/* เก็บบัญชีที่ "ดีที่สุด" ไว้: เคยเข้าระบบ > อนุมัติแล้ว > เชื่อมทะเบียนแล้ว > สร้างก่อน */
+function mpKeepBest(cid){
+  const c=String(cid).replace(/\D/g,'');
+  const list=(state.osmAccounts||[]).filter(a=>String(a.citizenId||'').replace(/\D/g,'')===c);
+  if(list.length<2) return;
+  const score=a=>(a.lastLogin?8:0)+(a.status==='approved'?4:0)+(a.osmId?2:0)+(a.createdByStaff?1:0);
+  const best=list.slice().sort((a,b)=>score(b)-score(a)
+    || String(a.createdAt||'').localeCompare(String(b.createdAt||'')))[0];
+  // ย้ายข้อมูลที่มีประโยชน์จากบัญชีอื่นมารวมไว้
+  list.forEach(a=>{ if(a===best) return;
+    if(!best.osmId && a.osmId) best.osmId=a.osmId;
+    if(!best.phone && a.phone) best.phone=a.phone;
+    if(!best.lastLogin && a.lastLogin) best.lastLogin=a.lastLogin;
+  });
+  const removed=list.length-1;
+  state.osmAccounts=(state.osmAccounts||[]).filter(a=>a===best ||
+    String(a.citizenId||'').replace(/\D/g,'')!==c);
+  schLog('รวมบัญชีซ้ำ',`${best.firstName} ${best.lastName} — ลบ ${removed} บัญชี`);
+  persistState(); mpRepairPanel();
+  toast(`เก็บบัญชีของ ${best.firstName} ${best.lastName} ไว้ และลบบัญชีซ้ำ ${removed} รายการ`,'success');
+}
+
+async function mpCreateAllAccounts(){
+  const x=mpAccountIssues();
+  const list=x.noAcc.filter(m=>validateIdCard(String(m.idCard||'').replace(/\D/g,'')));
+  if(!list.length){ toast('ไม่มี อสม. ที่สร้างบัญชีได้ (ตรวจเลขบัตรในทะเบียน)','info'); return; }
+  confirmDialog(`สร้างบัญชีพร้อมรหัสผ่านชั่วคราวให้ อสม. ${list.length} คน ใช่หรือไม่ ระบบจะอนุมัติให้ใช้งานทันที และพิมพ์ใบแจ้งรหัสได้หลังจากนี้`,async()=>{
+    closeModal();
+    toast('กำลังสร้างบัญชี...','info');
+    let ok=0, dup=0;
+    for(const m of list){
+      const before=(state.osmAccounts||[]).length;
+      const a=await mpCreateAccountFor(m.id,{silent:true});
+      if(a && (state.osmAccounts||[]).length>before) ok++; else if(a) dup++;
+    }
+    persistState(); renderOsmAccountsView();
+    const skipped=x.noAcc.length-list.length;
+    toast(`สร้างบัญชีสำเร็จ ${ok} คน`
+      +(dup?` • ข้าม ${dup} คน เพราะเลขบัตรซ้ำกับบัญชีอื่น`:'')
+      +(skipped?` • ข้าม ${skipped} คน เพราะเลขบัตรในทะเบียนไม่ถูกต้อง`:'')
+      +' — กด “พิมพ์ใบแจ้งรหัส” เพื่อแจกให้ อสม.', ok?'success':'info');
+  },{confirmLabel:'สร้างทั้งหมด'});
+}
+
+/* ============================================================================================
+   ปรับหน้าสมัคร: บอกสาเหตุชัดเจน และกู้บัญชีเดิมให้อัตโนมัติ
+   ============================================================================================ */
+async function mpDoRegister(e){
+  e.preventDefault();
+  mpInit();
+  const g=x=>document.getElementById(x).value.trim();
+  const er=document.getElementById('oa-rerr');
+  const btn=e.target.querySelector('button[type=submit]');
+  const reset=()=>{ btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> ส่งคำขอลงทะเบียน'; };
+  const fail=(m,html)=>{ er.innerHTML = html||escapeHtml(m); er.style.display='block';
+    try{ er.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){}
+    reset(); };
+  er.style.display='none';
+
+  const cid=g('oa-rcid').replace(/\D/g,''), fn=g('oa-fn'), ln=g('oa-ln'),
+        ph=g('oa-ph').replace(/\D/g,''), moo=g('oa-moo'),
+        pw=document.getElementById('oa-pw').value, pw2=document.getElementById('oa-pw2').value;
+
+  if(!validateIdCard(cid)) return fail('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก');
+  if(!fn||!ln)             return fail('กรุณากรอกชื่อและนามสกุล');
+  if(!validatePhone(ph))   return fail('เบอร์โทรศัพท์ไม่ถูกต้อง (9–10 หลัก)');
+  if(!moo)                 return fail('กรุณากรอกหมู่ที่');
+  if(pw.length<6)          return fail('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+  if(pw!==pw2)             return fail('รหัสผ่านทั้งสองช่องไม่ตรงกัน');
+  if(!document.getElementById('oa-consent').checked) return fail('กรุณายอมรับเงื่อนไขการเก็บข้อมูลส่วนบุคคล');
+
+  btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบ';
+
+  /* มีบัญชีอยู่แล้ว → บอกให้ชัดว่าต้องทำอะไรต่อ ไม่ปล่อยให้ตัน */
+  const exist=mpAccountByCid(cid);
+  if(exist){
+    if(exist.status==='approved')
+      return fail('', `ท่านมีบัญชีในระบบอยู่แล้ว <b>ไม่ต้องสมัครใหม่</b><br>
+        กรุณากดแท็บ “เข้าสู่ระบบ” แล้วใช้เลขบัตรประชาชนกับรหัสผ่านเดิม<br>
+        <span style="color:var(--text-secondary)">ถ้าจำรหัสไม่ได้ ให้แจ้งเจ้าหน้าที่ รพ.สต. ตั้งรหัสชั่วคราวให้</span><br>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:9px" onclick="mpSetTab('login')">
+          <i class="fa-solid fa-right-to-bracket"></i> ไปหน้าเข้าสู่ระบบ</button>`);
+    if(exist.status==='pending')
+      return fail('','คำขอของท่าน<b>อยู่ระหว่างรอเจ้าหน้าที่อนุมัติ</b> ไม่ต้องสมัครซ้ำ<br>หากรอเกิน 2 วันทำการ กรุณาติดต่อ '+escapeHtml(SCH_ORG.name));
+    if(exist.status==='suspended')
+      return fail('','บัญชีของท่าน<b>ถูกระงับการใช้งาน</b> กรุณาติดต่อเจ้าหน้าที่ '+escapeHtml(SCH_ORG.name));
+  }
+
+  try{
+    let uid='', email='';
+    try{
+      const r=await mpFbCreate(cid,pw);
+      if(r){ uid=r.uid; email=r.email; }
+    }catch(err){
+      console.warn('cloud signup:',err && (err.code||err.message));
+      // สร้างบนคลาวด์ไม่ได้ก็ยังสมัครในระบบได้ตามปกติ
+    }
+    const salt=mpSalt();
+    const acc={ id: uid || uid_('acc'), uid, fbEmail:email, citizenId:cid,
+      firstName:fn, lastName:ln, phone:ph, moo,
+      salt, pwHash: await mpHash(pw,salt), osmId:'', status:'pending',
+      createdAt:new Date().toISOString(), approvedAt:'', approvedBy:'', lastLogin:'' };
+    const m=(state.osmMembers||[]).find(x=>String(x.idCard||'').replace(/\D/g,'')===cid);
+    if(m){ acc.osmId=m.id; acc.matched=true; }
+    state.osmAccounts.push(acc);
+    schLog('ลงทะเบียน อสม.',`${fn} ${ln} (${mpMaskCid(cid)})`);
+    persistState();
+    mpAuthDone(acc);
+  }catch(err){
+    fail('เกิดข้อผิดพลาด: '+(err.message||err));
+  }
+}
 
 </script>
 <script type="module">
