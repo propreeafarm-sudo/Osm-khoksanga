@@ -8235,10 +8235,15 @@ function mpAccountsHtml(accs){
         <small>${mpMaskCid(a.citizenId)} • ${escapeHtml(a.phone||'-')} • หมู่ ${escapeHtml(a.moo||'-')}
           • ยื่นเมื่อ ${formatThaiDateShort(a.createdAt)}
           ${a.lastLogin?` • เข้าล่าสุด ${formatThaiDateShort(a.lastLogin)}`:' • <span style="color:var(--warning)">ยังไม่เคยเข้าระบบ</span>'}</small>
-        <small style="color:${m?'var(--success)':'var(--danger)'}">
-          <i class="fa-solid ${m?'fa-link':'fa-link-slash'}"></i>
-          ${m?`เชื่อมกับทะเบียน: ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} (หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')})`
-             :'ยังไม่ได้เชื่อมกับทะเบียน อสม.'}</small>
+        ${(()=>{ const st=mpLinkStatus(a);
+          if(st.type==='ok') return `<small style="color:var(--success)"><i class="fa-solid fa-link"></i>
+            เชื่อมกับทะเบียน: ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} (หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')})</small>`;
+          if(st.type==='none') return `<small style="color:var(--danger)"><i class="fa-solid fa-link-slash"></i> ยังไม่ได้เชื่อมกับทะเบียน อสม.</small>`;
+          return `<small style="color:var(--danger)"><i class="fa-solid fa-triangle-exclamation"></i>
+            <b>เชื่อมผิดคน:</b> ${escapeHtml(st.msg||'')}
+            ${st.correct?`<button class="btn btn-primary btn-sm" style="margin-right:7px;padding:2px 9px;font-size:11px"
+              onclick="mpRelinkOne('${a.id}')"><i class="fa-solid fa-wand-magic-sparkles"></i> แก้อัตโนมัติ</button>`:''}</small>`;
+        })()}
       </div>
       <div class="ac-acts">
         <button class="btn btn-outline btn-sm" onclick="mpCredentials('${a.id}')"><i class="fa-solid fa-id-card-clip"></i> ข้อมูลเข้าระบบ</button>
@@ -8274,6 +8279,15 @@ function renderOsmAccountsView(){
       <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบบัญชี${issues.count?` <span class="badge mp-badge-pend">${issues.count}</span>`:''}</button>
       <button class="btn btn-outline" onclick="mpPrintRegPoster()"><i class="fa-solid fa-qrcode"></i> ป้าย QR ลงทะเบียน</button>
     </div></div>
+
+  ${issues.mislink.length?`
+  <div style="background:var(--sch-rose-bg);color:var(--sch-rose);border-radius:var(--radius-md);
+    padding:13px 16px;font-size:13px;line-height:1.75;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:220px"><b><i class="fa-solid fa-arrow-right-arrow-left"></i>
+      พบบัญชีที่เชื่อมผิดคน ${issues.mislink.length} รายการ</b><br>
+      ระบบเทียบเลขบัตรประชาชนแล้วไม่ตรงกับ อสม. ที่เชื่อมอยู่ — ควรแก้ก่อนใช้งานต่อ</span>
+    <button class="btn btn-primary btn-sm" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ดูและแก้ไข</button>
+  </div>`:''}
 
   <div class="schp-kpis">
     <div class="schp-kpi" style="--k:var(--brand-navy-700)"><div class="k-lab">บัญชีทั้งหมด</div><div class="k-val">${all.length}</div><div class="k-sub">คน</div></div>
@@ -8640,8 +8654,11 @@ function mpAccountIssues(){
   // เลขบัตรไม่ถูกต้องในทะเบียน (สมัครไม่ได้แน่นอน)
   const badCid=schMembers().filter(m=>!validateIdCard(norm(m.idCard)));
 
-  return { dupAcc, dupMem, orphan, dupLink, stale, noAcc, badCid,
-    count: dupAcc.length+dupMem.length+orphan.length+dupLink.length+stale.length+badCid.length };
+  const mislink=(state.osmAccounts||[]).filter(a=>{
+    const t=mpLinkStatus(a).type; return t==='mismatch'||t==='suspect'||t==='cid-diff';
+  });
+  return { dupAcc, dupMem, orphan, dupLink, stale, noAcc, badCid, mislink,
+    count: dupAcc.length+dupMem.length+orphan.length+dupLink.length+stale.length+badCid.length+mislink.length };
 }
 
 function mpRepairPanel(){
@@ -8682,6 +8699,25 @@ function mpRepairPanel(){
           <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="mpKeepBest('${d.cid}')">
             <i class="fa-solid fa-wand-magic-sparkles"></i> เก็บบัญชีที่ดีที่สุดไว้อัตโนมัติ</button>
         </div>`).join('') : ok)}
+
+    ${(()=>{ const bad=mpLinkAudit();
+      return sec('fa-arrow-right-arrow-left','var(--danger)','บัญชีที่เชื่อมสลับคน / ผิดคน',
+        'ระบบเทียบเลขบัตรประชาชนของบัญชีกับเลขบัตรของ อสม. ที่เชื่อมอยู่ ถ้าไม่ตรงแสดงว่าเชื่อมผิด',
+        bad.length ? `
+          <button class="btn btn-primary btn-sm" style="margin-bottom:10px" onclick="mpRelinkAll()">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> แก้ให้ถูกต้องทั้งหมด (${bad.filter(o=>o.st.correct).length})</button>
+          ${bad.map(o=>`
+          <div style="background:var(--bg-surface-2);border-radius:9px;padding:10px 12px;margin-bottom:8px;font-size:12.5px;line-height:1.7">
+            <b>${escapeHtml(o.acc.firstName)} ${escapeHtml(o.acc.lastName)}</b>
+            <span style="color:var(--text-faint)">• ${mpMaskCid(o.acc.citizenId)}</span>
+            ${o.swapWith?`<span class="schp-chip risk" style="font-size:11px"><i class="fa-solid fa-arrow-right-arrow-left"></i> สลับกับ ${escapeHtml(o.swapWith.firstName)} ${escapeHtml(o.swapWith.lastName)}</span>`:''}
+            <div style="color:var(--danger)">${escapeHtml(o.st.msg||'')}</div>
+            <div style="display:flex;gap:7px;margin-top:7px;flex-wrap:wrap">
+              ${o.st.correct?`<button class="btn btn-primary btn-sm" onclick="mpRelinkOne('${o.acc.id}')">แก้เป็น ${escapeHtml(o.st.correct.firstName)} ${escapeHtml(o.st.correct.lastName)}</button>`:''}
+              <button class="btn btn-outline btn-sm" onclick="closeModal();mpLinkForm('${o.acc.id}')">เลือกเอง</button>
+            </div>
+          </div>`).join('')}` : ok);
+    })()}
 
     ${sec('fa-link-slash','var(--warning)','บัญชีที่ยังไม่ได้เชื่อมทะเบียน',
       'เข้าระบบไม่ได้จนกว่าจะเชื่อมกับ อสม. ในทะเบียน',
@@ -8849,6 +8885,207 @@ async function mpDoRegister(e){
   }catch(err){
     fail('เกิดข้อผิดพลาด: '+(err.message||err));
   }
+}
+
+
+/* ============================================================================================
+   LINK AUDIT  v1.0
+   ตรวจจับบัญชีที่ "เชื่อมสลับคน" กับทะเบียน อสม. และแก้ให้ถูกต้อง
+   เกณฑ์หลัก: เลขบัตรประชาชนของบัญชี ต้องตรงกับเลขบัตรของ อสม. ที่เชื่อมอยู่
+   ============================================================================================ */
+
+function mpDigits(x){ return String(x||'').replace(/\D/g,''); }
+function mpNameKey(s){
+  return String(s||'').replace(/^(นาย|นาง|นางสาว|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s*/,'').replace(/\s+/g,'').trim();
+}
+function mpSameName(a,b){
+  const x=mpNameKey(a), y=mpNameKey(b);
+  return !!x && !!y && x===y;
+}
+function mpMemberByCid(cid){
+  const c=mpDigits(cid); if(!c) return null;
+  return (state.osmMembers||[]).find(m=>mpDigits(m.idCard)===c) || null;
+}
+
+/* สถานะการเชื่อมของบัญชีหนึ่ง ๆ */
+function mpLinkStatus(a){
+  const c=mpDigits(a.citizenId);
+  const linked = a.osmId ? osmById(a.osmId) : null;
+  const correct = mpMemberByCid(c);
+
+  if(!linked) return { type:'none', correct, msg:'ยังไม่ได้เชื่อมกับทะเบียน' };
+  if(mpDigits(linked.idCard)===c) return { type:'ok', linked, correct:linked };
+
+  // เลขบัตรไม่ตรง — ดูว่าชื่อพอจะยืนยันได้ไหม
+  const nameOk = mpSameName(a.firstName+' '+a.lastName, linked.firstName+' '+linked.lastName);
+  if(correct) return { type:'mismatch', linked, correct,
+    msg:`เชื่อมกับ ${linked.firstName} ${linked.lastName} แต่เลขบัตรตรงกับ ${correct.firstName} ${correct.lastName}` };
+  if(nameOk)  return { type:'cid-diff', linked, correct:null,
+    msg:'ชื่อตรงกัน แต่เลขบัตรในทะเบียนไม่ตรงกับที่สมัคร' };
+  return { type:'suspect', linked, correct:null,
+    msg:`เชื่อมกับ ${linked.firstName} ${linked.lastName} ซึ่งทั้งชื่อและเลขบัตรไม่ตรงกับผู้สมัคร` };
+}
+
+function mpLinkAudit(){
+  mpInit();
+  const out=[];
+  (state.osmAccounts||[]).forEach(a=>{
+    const st=mpLinkStatus(a);
+    if(st.type==='mismatch'||st.type==='suspect'||st.type==='cid-diff') out.push({acc:a, st});
+  });
+  // ตรวจว่ามีคู่ที่สลับกันตรง ๆ หรือไม่ (A→B, B→A)
+  out.forEach(o=>{
+    if(o.st.type!=='mismatch') return;
+    const partner=out.find(p=>p!==o && p.acc.osmId===o.st.correct.id && p.st.correct && p.st.correct.id===o.acc.osmId);
+    if(partner) o.swapWith=partner.acc;
+  });
+  return out;
+}
+
+/* แก้ให้ถูกต้องตามเลขบัตร (ปลอดภัยกับกรณีสลับคู่ เพราะกำหนดใหม่ทั้งชุดพร้อมกัน) */
+function mpRelinkOne(accId){
+  const a=mpAccountById(accId); if(!a) return;
+  const st=mpLinkStatus(a);
+  if(!st.correct){ toast('ไม่พบ อสม. ที่มีเลขบัตรตรงกับบัญชีนี้ในทะเบียน','error'); return; }
+  const before=st.linked?`${st.linked.firstName} ${st.linked.lastName}`:'(ยังไม่เชื่อม)';
+  // ถ้า อสม. คนที่ถูกต้องถูกบัญชีอื่นยึดไว้ ให้ปลดออกก่อน (บัญชีนั้นจะถูกแก้ในรอบถัดไป)
+  (state.osmAccounts||[]).forEach(x=>{
+    if(x!==a && x.osmId===st.correct.id) x.osmId='';
+  });
+  a.osmId=st.correct.id;
+  schLog('แก้การเชื่อมทะเบียน',`${a.firstName} ${a.lastName}: ${before} → ${st.correct.firstName} ${st.correct.lastName}`);
+  persistState();
+  toast(`เชื่อม ${a.firstName} ${a.lastName} กับ ${st.correct.firstName} ${st.correct.lastName} แล้ว`,'success');
+  if(document.getElementById('modal-box') && document.getElementById('modal-box').innerHTML) mpRepairPanel();
+  if(state.currentView==='school-members') renderOsmAccountsView();
+}
+
+function mpRelinkAll(){
+  const list=mpLinkAudit().filter(o=>o.st.correct);
+  if(!list.length){ toast('ไม่พบบัญชีที่ต้องแก้การเชื่อม','info'); return; }
+  const lines=list.slice(0,12).map(o=>
+    `• ${o.acc.firstName} ${o.acc.lastName} → ${o.st.correct.firstName} ${o.st.correct.lastName}`).join('\n');
+  confirmDialog(`ระบบจะเชื่อมบัญชีใหม่ตามเลขบัตรประชาชนให้ถูกต้อง ${list.length} รายการ ดังนี้\n${lines}${list.length>12?`\n…และอีก ${list.length-12} รายการ`:''}\nข้อมูลการเข้าเรียนและกิจกรรมยังอยู่ครบ ไม่ถูกลบ`,()=>{
+    // ขั้นที่ 1: ปลดการเชื่อมของบัญชีที่จะแก้ทั้งหมดก่อน กันการชนกันตอนสลับคู่
+    const targets=new Map();
+    list.forEach(o=>{ targets.set(o.acc.id, o.st.correct.id); o.acc.osmId=''; });
+    // ขั้นที่ 2: ปลดบัญชีอื่นที่ยึด อสม. ปลายทางไว้
+    const wanted=new Set([...targets.values()]);
+    (state.osmAccounts||[]).forEach(x=>{ if(!targets.has(x.id) && wanted.has(x.osmId)) x.osmId=''; });
+    // ขั้นที่ 3: กำหนดใหม่
+    targets.forEach((osmId,accId)=>{ const a=mpAccountById(accId); if(a) a.osmId=osmId; });
+    schLog('แก้การเชื่อมทะเบียนอัตโนมัติ',`${list.length} รายการ`);
+    persistState(); closeModal();
+    if(state.currentView==='school-members') renderOsmAccountsView();
+    toast(`แก้การเชื่อมให้ถูกต้อง ${list.length} รายการแล้ว`,'success');
+  },{confirmLabel:'แก้ไขทั้งหมด'});
+}
+
+/* ---------------------------------------------------------------- ฟอร์มเชื่อมทะเบียน (ปรับปรุง) */
+function mpLinkForm(id){
+  const a=mpAccountById(id); if(!a) return;
+  const cid=mpDigits(a.citizenId);
+  const correct=mpMemberByCid(cid);
+  const st=mpLinkStatus(a);
+  const used=new Map();
+  (state.osmAccounts||[]).forEach(x=>{ if(x.id!==id && x.osmId) used.set(x.osmId,x); });
+
+  const opts=schMembers().slice().sort((x,y)=>{
+    // ผู้ที่เลขบัตรตรงกันขึ้นก่อนเสมอ
+    if(correct){ if(x.id===correct.id) return -1; if(y.id===correct.id) return 1; }
+    return (parseInt(x.moo||'99',10)-parseInt(y.moo||'99',10))
+        || String(x.firstName||'').localeCompare(String(y.firstName||''),'th');
+  });
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-link"></i> เชื่อมบัญชีกับทะเบียน อสม.</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-link"><div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.85;margin-bottom:14px">
+      <b>ผู้สมัคร:</b> ${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}<br>
+      <b>เลขบัตร:</b> ${escapeHtml(cid)} &nbsp; <b>เบอร์:</b> ${escapeHtml(a.phone||'-')} &nbsp; <b>หมู่:</b> ${escapeHtml(a.moo||'-')}
+    </div>
+
+    ${st.type==='mismatch'?`
+      <div style="background:var(--sch-rose-bg);color:var(--sch-rose);border-radius:10px;padding:12px 15px;font-size:12.5px;line-height:1.8;margin-bottom:14px">
+        <b><i class="fa-solid fa-triangle-exclamation"></i> เชื่อมผิดคนอยู่</b><br>
+        ปัจจุบันเชื่อมกับ <b>${escapeHtml(st.linked.firstName)} ${escapeHtml(st.linked.lastName)}</b>
+        (เลขบัตร ${escapeHtml(mpDigits(st.linked.idCard))})<br>
+        แต่เลขบัตรของผู้สมัครตรงกับ <b>${escapeHtml(st.correct.firstName)} ${escapeHtml(st.correct.lastName)}</b>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:9px" onclick="closeModal();mpRelinkOne('${a.id}')">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> แก้ให้ถูกต้องอัตโนมัติ</button>
+      </div>`
+    : correct?`
+      <div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:14px">
+        <i class="fa-solid fa-circle-check"></i> เลขบัตรตรงกับ
+        <b>${escapeHtml(correct.firstName)} ${escapeHtml(correct.lastName)}</b> (หมู่ ${escapeHtml(correct.moo||'-')}) ในทะเบียน</div>`
+    :`
+      <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:11px 14px;font-size:12.5px;line-height:1.75;margin-bottom:14px">
+        <i class="fa-solid fa-triangle-exclamation"></i> <b>ไม่พบเลขบัตรนี้ในทะเบียน อสม.</b><br>
+        อาจกรอกเลขบัตรผิด หรือเลขบัตรในทะเบียนไม่ถูกต้อง — กรุณาตรวจสอบก่อนเชื่อม</div>`}
+
+    <div class="form-group"><label>ค้นหา อสม. ในทะเบียน</label>
+      <input class="input" id="lk-q" placeholder="พิมพ์ชื่อ นามสกุล หรือหมู่บ้าน" autocomplete="off"></div>
+    <div class="form-group"><label>เลือก อสม. ที่ตรงกับผู้สมัคร</label>
+      <select id="lk-id" class="input" size="8" style="height:auto"></select></div>
+    <div id="lk-warn"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-link"></i> บันทึกการเชื่อม</button>
+  </div></form>`,{size:'sm'});
+
+  const sel=document.getElementById('lk-id'), q=document.getElementById('lk-q');
+  const draw=()=>{
+    const t=q.value.toLowerCase().trim();
+    const list=opts.filter(m=>!t||`${m.firstName} ${m.lastName} ${m.village||''} ${m.moo||''}`.toLowerCase().includes(t));
+    sel.innerHTML=`<option value="">— ยังไม่เชื่อม —</option>`+list.map(m=>{
+      const taken=used.get(m.id);
+      const isCorrect=correct&&m.id===correct.id;
+      // ถ้าเชื่อมผิดอยู่ ให้เลือกคนที่เลขบัตรตรงไว้ล่วงหน้า จะได้กดบันทึกแก้ได้เลย
+      const preferred = (st.type==='mismatch' && correct) ? correct.id : (a.osmId || (correct?correct.id:''));
+      const cur = preferred===m.id;
+      return `<option value="${m.id}" ${cur?'selected':''} ${taken?'style="color:var(--text-faint)"':''}>
+        ${isCorrect?'★ ':''}${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)} — หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}${
+        isCorrect?' (เลขบัตรตรงกัน)':''}${taken?` [ถูกใช้โดย ${escapeHtml(taken.firstName)} ${escapeHtml(taken.lastName)}]`:''}</option>`;
+    }).join('');
+    check();
+  };
+  const check=()=>{
+    const w=document.getElementById('lk-warn'); if(!w) return;
+    const m=osmById(sel.value);
+    if(!m){ w.innerHTML=''; return; }
+    if(mpDigits(m.idCard)===cid){
+      w.innerHTML=`<div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:9px;padding:10px 13px;font-size:12.5px">
+        <i class="fa-solid fa-circle-check"></i> เลขบัตรตรงกัน เชื่อมได้เลย</div>`;
+    }else{
+      const taken=used.get(m.id);
+      w.innerHTML=`<div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:9px;padding:10px 13px;font-size:12.5px;line-height:1.75">
+        <i class="fa-solid fa-triangle-exclamation"></i> <b>เลขบัตรไม่ตรงกัน</b><br>
+        ผู้สมัคร ${escapeHtml(cid)} • ทะเบียน ${escapeHtml(mpDigits(m.idCard)||'ว่าง')}
+        ${taken?`<br>อสม. ท่านนี้ถูกเชื่อมกับบัญชีของ ${escapeHtml(taken.firstName)} ${escapeHtml(taken.lastName)} อยู่แล้ว — บันทึกแล้วบัญชีนั้นจะถูกปลด`:''}
+        <br>กรุณาตรวจสอบให้แน่ใจก่อนบันทึก</div>`;
+    }
+  };
+  q.addEventListener('input',draw);
+  sel.addEventListener('change',check);
+  draw();
+
+  document.getElementById('mp-link').addEventListener('submit',e=>{
+    e.preventDefault();
+    const newId=sel.value;
+    if(newId){
+      (state.osmAccounts||[]).forEach(x=>{ if(x.id!==id && x.osmId===newId) x.osmId=''; });
+    }
+    const before=a.osmId?osmById(a.osmId):null;
+    a.osmId=newId;
+    const m=newId?osmById(newId):null;
+    schLog('เชื่อมบัญชีกับทะเบียน',
+      `${a.firstName} ${a.lastName}: ${before?before.firstName+' '+before.lastName:'(ว่าง)'} → ${m?m.firstName+' '+m.lastName:'(ว่าง)'}`);
+    persistState(); closeModal();
+    if(state.currentView==='school-members') renderOsmAccountsView();
+    toast(newId?'เชื่อมบัญชีกับทะเบียน อสม. แล้ว':'ยกเลิกการเชื่อมแล้ว','success');
+  });
 }
 
 </script>
