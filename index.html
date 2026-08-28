@@ -8275,6 +8275,7 @@ function renderOsmAccountsView(){
     <p>อนุมัติคำขอ เชื่อมบัญชีกับทะเบียน ดูข้อมูลเข้าระบบ และพิจารณาใบลา</p></div>
     <div class="page-head-actions">
       ${temp?`<button class="btn btn-outline" onclick="mpPrintAllSlips()"><i class="fa-solid fa-print"></i> พิมพ์ใบแจ้งรหัส (${temp})</button>`:''}
+      <button class="btn btn-primary" onclick="mpWhyCantLogin()"><i class="fa-solid fa-user-magnifying-glass"></i> เข้าระบบไม่ได้?</button>
       <button class="btn btn-outline" onclick="mpCreateAccountForm()"><i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้ อสม.</button>
       <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบบัญชี${issues.count?` <span class="badge mp-badge-pend">${issues.count}</span>`:''}</button>
       <button class="btn btn-outline" onclick="mpPrintRegPoster()"><i class="fa-solid fa-qrcode"></i> ป้าย QR ลงทะเบียน</button>
@@ -9086,6 +9087,631 @@ function mpLinkForm(id){
     if(state.currentView==='school-members') renderOsmAccountsView();
     toast(newId?'เชื่อมบัญชีกับทะเบียน อสม. แล้ว':'ยกเลิกการเชื่อมแล้ว','success');
   });
+}
+
+
+/* ============================================================================================
+   MEMBER LEAVE + MEETING NOTES  v1.0
+   • อสม. ยื่น/แก้ไข/ยกเลิกใบลาได้เอง แม้ยังไม่มีรอบเรียนเปิดอยู่
+   • อสม. บันทึกรายงานการประชุมโรงเรียน อสม. ของตนเองได้
+   ============================================================================================ */
+
+const MP_LEAVE_TYPES = ['ลากิจ','ลาป่วย','ติดภารกิจราชการ','ไปต่างจังหวัด','ดูแลผู้ป่วยในครอบครัว','อื่น ๆ'];
+
+/* รอบเรียนที่ยื่นลาได้ = ยังไม่ปิด หรือ จะถึงในอนาคต (รวมที่ปิดแล้วแต่ยังไม่เกิน 7 วัน) */
+function mpLeavableSessions(){
+  const today=toISODate(new Date());
+  const back=toISODate(new Date(Date.now()-7*86400000));
+  return (state.schoolSessions||[])
+    .filter(s=>!s.closedAt || String(s.date)>=back)
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+}
+function mpLeaveEditable(x){ return x && x.status==='pending'; }
+
+/* ---------------------------------------------------------------- VIEW : ใบลา */
+function renderMemberLeave(){
+  mpInit();
+  const el=document.getElementById('view-member-leave');
+  const m=mpMyMember(); if(!m){ el.innerHTML='<div class="mp-empty">ไม่พบข้อมูล</div>'; return; }
+  const mine=(state.osmLeaves||[]).filter(x=>x.osmId===m.id)
+    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  const sess=mpLeavableSessions();
+  const pend=mine.filter(x=>x.status==='pending').length;
+  const okN=mine.filter(x=>x.status==='approved').length;
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>แจ้งลา / ใบลาของฉัน</h2>
+      <p>แจ้งล่วงหน้าเมื่อไม่สามารถเข้าร่วมกิจกรรมได้ เจ้าหน้าที่จะบันทึกเป็น “ลา” แทน “ขาด”</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-primary" onclick="mpLeaveForm()"><i class="fa-solid fa-file-pen"></i> ยื่นใบลาใหม่</button>
+    </div></div>
+
+  <div class="mp-grid" style="margin-top:0">
+    <div class="mp-tile" style="--k:var(--brand-navy-700)"><div class="l">ใบลาทั้งหมด</div>
+      <div class="v">${mine.length}</div><div class="s">ฉบับ</div></div>
+    <div class="mp-tile" style="--k:var(--sch-amber)"><div class="l">รอพิจารณา</div>
+      <div class="v">${pend}</div><div class="s">ฉบับ</div></div>
+    <div class="mp-tile" style="--k:var(--sch-emerald)"><div class="l">อนุมัติแล้ว</div>
+      <div class="v">${okN}</div><div class="s">ฉบับ</div></div>
+  </div>
+
+  ${!sess.length?`<div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:var(--radius-md);
+    padding:12px 16px;font-size:12.5px;line-height:1.75;margin-bottom:16px">
+    <i class="fa-solid fa-circle-info"></i> ขณะนี้ยังไม่มีรอบเรียนที่เปิดให้ลา
+    — ท่านยังยื่นใบลาแบบระบุวันที่เองได้ เจ้าหน้าที่จะนำไปจับคู่กับรอบเรียนให้</div>`:''}
+
+  ${mine.length?mine.map(x=>{
+    const s=schSessionById(x.sessionId);
+    const b=x.status==='approved'?'mp-badge-ok':x.status==='rejected'?'mp-badge-no':'mp-badge-pend';
+    const t=x.status==='approved'?'อนุมัติแล้ว':x.status==='rejected'?'ไม่อนุมัติ':'รอพิจารณา';
+    const when = s ? `${escapeHtml(s.title)} — ${formatThaiDate(s.date)}`
+                   : (x.leaveDate ? `วันที่ ${formatThaiDate(x.leaveDate)}` : '(ไม่ได้ระบุรอบเรียน)');
+    return `<div class="mp-leave">
+      <div style="min-width:0;flex:1">
+        <b style="font-size:14.5px">${escapeHtml(x.type||'ลากิจ')} — ${when}</b>
+        <div style="font-size:12.5px;color:var(--text-secondary);margin-top:4px">
+          ยื่นเมื่อ ${formatThaiDateShort(x.createdAt)}
+          ${x.updatedAt?` • แก้ไขล่าสุด ${formatThaiDateShort(x.updatedAt)}`:''}</div>
+        <div style="font-size:13px;margin-top:6px">${escapeHtml(x.reason||'')}</div>
+        ${x.note?`<div style="font-size:12px;color:var(--text-faint);margin-top:4px">
+          <i class="fa-solid fa-comment-dots"></i> เจ้าหน้าที่: ${escapeHtml(x.note)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+        <span class="schp-chip ${b}">${t}</span>
+        ${mpLeaveEditable(x)?`
+        <button class="schp-mini" title="แก้ไข" onclick="mpLeaveForm(null,'${x.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="schp-mini" title="ยกเลิกใบลา" onclick="mpLeaveCancel('${x.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>`
+        :`<span style="font-size:11px;color:var(--text-faint)">พิจารณาแล้ว แก้ไขไม่ได้</span>`}
+      </div></div>`}).join('')
+   :`<div class="mp-empty"><i class="fa-solid fa-file-circle-check big"></i>
+      <h3>ยังไม่มีใบลา</h3><p>เมื่อไม่สามารถเข้าร่วมกิจกรรมได้ กรุณาแจ้งลาล่วงหน้า</p>
+      <button class="btn btn-primary" onclick="mpLeaveForm()"><i class="fa-solid fa-file-pen"></i> ยื่นใบลาใหม่</button></div>`}`;
+}
+
+function mpLeaveForm(_unused, leaveId){
+  const m=mpMyMember(); if(!m) return;
+  const editing=!!leaveId;
+  const x = editing ? (state.osmLeaves||[]).find(v=>v.id===leaveId) : null;
+  if(editing && (!x || x.osmId!==m.id)){ toast('ไม่พบใบลา หรือไม่ใช่ใบลาของท่าน','error'); return; }
+  if(editing && !mpLeaveEditable(x)){ toast('ใบลานี้พิจารณาแล้ว แก้ไขไม่ได้','error'); return; }
+
+  const sess=mpLeavableSessions();
+  const today=toISODate(new Date());
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-file-pen"></i> ${editing?'แก้ไข':'ยื่น'}ใบลา</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-lf"><div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:16px">
+      <b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</b>
+      <span style="color:var(--text-secondary)">— หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</span></div>
+
+    <div class="form-group"><label>รอบเรียนที่ขอลา</label>
+      <select id="lf-sess" class="input">
+        ${sess.map(s=>`<option value="${s.id}" ${x&&x.sessionId===s.id?'selected':''}>
+          ${formatThaiDateShort(s.date)} — ${escapeHtml(s.title)}${s.closedAt?' (ปิดรอบแล้ว)':''}</option>`).join('')}
+        <option value="" ${(!sess.length||(x&&!x.sessionId))?'selected':''}>— ไม่ระบุรอบ / ระบุวันที่เอง —</option>
+      </select></div>
+
+    <div class="form-group ${(!sess.length||(x&&!x.sessionId))?'':'hidden'}" id="lf-date-group">
+      <label>วันที่ขอลา <span class="req">*</span></label>
+      <input id="lf-date" type="date" class="input" value="${x&&x.leaveDate?x.leaveDate:today}">
+      <small style="color:var(--text-faint);font-size:11.5px">ใช้เมื่อยังไม่มีรอบเรียนในระบบ เจ้าหน้าที่จะจับคู่ให้ภายหลัง</small></div>
+
+    <div class="form-group"><label>ประเภทการลา <span class="req">*</span></label>
+      <select id="lf-type" class="input">${MP_LEAVE_TYPES.map(t=>
+        `<option value="${escapeHtml(t)}" ${x&&x.type===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}</select></div>
+
+    <div class="form-group"><label>เหตุผล <span class="req">*</span></label>
+      <textarea id="lf-reason" class="input" rows="3" placeholder="ระบุเหตุผลโดยย่อ">${escapeHtml(x&&x.reason||'')}</textarea></div>
+
+    <div class="field-error" id="lf-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-paper-plane"></i> ${editing?'บันทึกการแก้ไข':'ส่งใบลา'}</button>
+  </div></form>`,{size:'sm'});
+
+  document.getElementById('lf-sess').addEventListener('change',function(){
+    document.getElementById('lf-date-group').classList.toggle('hidden', !!this.value);
+  });
+
+  document.getElementById('mp-lf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const sid=document.getElementById('lf-sess').value;
+    const reason=document.getElementById('lf-reason').value.trim();
+    const type=document.getElementById('lf-type').value;
+    const ldate=document.getElementById('lf-date').value;
+    const er=document.getElementById('lf-err');
+    const bad=t=>{ er.textContent=t; er.style.display='block'; };
+    er.style.display='none';
+
+    if(!reason) return bad('กรุณาระบุเหตุผล');
+    if(!sid && !ldate) return bad('กรุณาเลือกรอบเรียน หรือระบุวันที่ขอลา');
+    const dup=(state.osmLeaves||[]).find(v=>v.id!==leaveId && v.osmId===m.id && v.status!=='rejected'
+      && (sid ? v.sessionId===sid : v.leaveDate===ldate));
+    if(dup) return bad('ท่านยื่นใบลาสำหรับรอบ/วันที่นี้ไว้แล้ว');
+
+    if(editing){
+      Object.assign(x,{ sessionId:sid, leaveDate:sid?'':ldate, type, reason,
+        updatedAt:new Date().toISOString() });
+      schLog('อสม. แก้ไขใบลา',`${m.firstName} ${m.lastName} — ${type}`);
+    }else{
+      state.osmLeaves.push({ id:uid('lv'), osmId:m.id, sessionId:sid, leaveDate:sid?'':ldate,
+        type, reason, status:'pending', createdAt:new Date().toISOString(),
+        decidedAt:'', decidedBy:'', note:'' });
+      schLog('อสม. ยื่นใบลา',`${m.firstName} ${m.lastName} — ${type}`);
+    }
+    persistState(); closeModal(); renderCurrentView();
+    toast(editing?'แก้ไขใบลาเรียบร้อยแล้ว':'ส่งใบลาเรียบร้อยแล้ว รอเจ้าหน้าที่พิจารณา','success');
+  });
+}
+
+function mpLeaveCancel(id){
+  const m=mpMyMember();
+  const x=(state.osmLeaves||[]).find(v=>v.id===id);
+  if(!x||!m||x.osmId!==m.id){ toast('ไม่ใช่ใบลาของท่าน','error'); return; }
+  if(!mpLeaveEditable(x)){ toast('ใบลานี้พิจารณาแล้ว ยกเลิกไม่ได้','error'); return; }
+  confirmDialog('ต้องการยกเลิกใบลานี้ใช่หรือไม่',()=>{
+    state.osmLeaves=state.osmLeaves.filter(v=>v.id!==id);
+    schLog('อสม. ยกเลิกใบลา',`${m.firstName} ${m.lastName}`);
+    persistState(); closeModal(); renderCurrentView(); toast('ยกเลิกใบลาแล้ว','info');
+  },{confirmLabel:'ยกเลิกใบลา'});
+}
+
+/* ============================================================================================
+   VIEW : บันทึกรายงานการประชุมของ อสม.
+   ============================================================================================ */
+function mpMyMinutes(){
+  const m=mpMyMember(); if(!m) return [];
+  return (state.meetings||[]).filter(x=>x.osmId===m.id)
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function renderMemberMinutes(){
+  mpInit();
+  const el=document.getElementById('view-member-minutes');
+  const m=mpMyMember(); if(!m){ el.innerHTML='<div class="mp-empty">ไม่พบข้อมูล</div>'; return; }
+  const mine=mpMyMinutes();
+  const official=(state.meetings||[]).filter(x=>!x.osmId)
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>บันทึกรายงานการประชุม</h2>
+      <p>จดบันทึกสาระการประชุมโรงเรียน อสม. ที่ท่านเข้าร่วม เพื่อทบทวนและส่งให้เจ้าหน้าที่</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-primary" onclick="mpMinuteForm()"><i class="fa-solid fa-file-circle-plus"></i> เขียนบันทึกใหม่</button>
+    </div></div>
+
+  <div style="background:var(--brand-blue-100);color:var(--brand-navy-700);border-radius:var(--radius-md);
+    padding:12px 16px;font-size:12.5px;line-height:1.75;margin-bottom:16px">
+    <i class="fa-solid fa-circle-info"></i>
+    บันทึกของท่านจะติดป้าย “อสม. บันทึก” ให้เจ้าหน้าที่เห็น และแก้ไขได้ตลอดจนกว่าเจ้าหน้าที่จะรับรอง</div>
+
+  ${mine.length?mine.map(x=>`
+    <div class="mp-leave" style="align-items:flex-start">
+      <div style="min-width:0;flex:1">
+        <b style="font-size:15px"><i class="fa-solid fa-file-lines" style="color:var(--brand-navy-600)"></i>
+          ${escapeHtml(x.title||'')}</b>
+        <div style="font-size:12.5px;color:var(--text-secondary);margin-top:5px">
+          ${formatThaiDate(x.date)} • ${(x.agendas||[]).length} วาระ
+          ${x.approvedByStaff?' • <span style="color:var(--success)">เจ้าหน้าที่รับรองแล้ว</span>':''}</div>
+        ${(x.agendas||[]).filter(a=>a.title).slice(0,4).map(a=>
+          `<div style="font-size:12.5px;margin-top:6px"><b>• ${escapeHtml(a.title)}</b>
+            ${a.content?`<div style="color:var(--text-secondary);font-size:12px;margin-right:11px">${escapeHtml(String(a.content).slice(0,110))}${String(a.content).length>110?'…':''}</div>`:''}</div>`).join('')}
+      </div>
+      <div style="display:flex;gap:7px">
+        ${x.approvedByStaff?'<span class="schp-chip good">รับรองแล้ว</span>':`
+        <button class="btn btn-outline btn-sm" onclick="mpMinuteForm('${x.id}')"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+        <button class="btn btn-ghost btn-sm" onclick="mpMinuteDelete('${x.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>`}
+      </div>
+    </div>`).join('')
+  :`<div class="mp-empty"><i class="fa-solid fa-file-lines big"></i>
+      <h3>ยังไม่มีบันทึกการประชุม</h3>
+      <p>จดบันทึกสาระสำคัญของการประชุมโรงเรียน อสม. ที่เข้าร่วม</p>
+      <button class="btn btn-primary" onclick="mpMinuteForm()"><i class="fa-solid fa-file-circle-plus"></i> เขียนบันทึกใหม่</button></div>`}
+
+  ${official.length?`
+  <h3 style="margin:24px 0 12px;font-size:16px;font-weight:800">
+    <i class="fa-solid fa-building-columns" style="color:var(--brand-navy-600)"></i> รายงานการประชุมอย่างเป็นทางการ</h3>
+  <div class="mp-hist">
+    ${official.map(x=>{const d=new Date(x.date);return `<div class="mp-hrow">
+      <div class="mp-hdate"><b>${d.getDate()}</b><span>${THAI_MONTHS_SHORT[d.getMonth()]}</span></div>
+      <div><b style="font-size:14px">${escapeHtml(x.title||'')}</b>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:3px">
+          ${formatThaiDate(x.date)} • ${(x.agendas||[]).length} วาระ
+          ${x.recorder?` • ผู้บันทึก ${escapeHtml(x.recorder)}`:''}</div></div>
+      <button class="btn btn-outline btn-sm" onclick="mpViewMinute('${x.id}')"><i class="fa-solid fa-eye"></i> อ่าน</button>
+    </div>`}).join('')}
+  </div>`:''}`;
+}
+
+function mpMinuteForm(id){
+  const m=mpMyMember(); if(!m) return;
+  const editing=!!id;
+  const mt = editing ? (state.meetings||[]).find(x=>x.id===id) : null;
+  if(editing && (!mt || mt.osmId!==m.id)){ toast('ไม่ใช่บันทึกของท่าน','error'); return; }
+  if(editing && mt.approvedByStaff){ toast('เจ้าหน้าที่รับรองแล้ว แก้ไขไม่ได้','error'); return; }
+
+  let ag = editing ? JSON.parse(JSON.stringify(mt.agendas||[]))
+    : [{id:uid('ag'),title:'ประธานแจ้งเพื่อทราบ',content:''},
+       {id:uid('ag'),title:'เรื่องทั่วไป',content:''},
+       {id:uid('ag'),title:'เรื่องอื่น ๆ',content:''}];
+  const sess=(state.schoolSessions||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid ${editing?'fa-pen':'fa-file-circle-plus'}"></i>
+    ${editing?'แก้ไข':'เขียน'}บันทึกรายงานการประชุม</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-mf"><div class="modal-body">
+    <div class="form-group"><label>รอบเรียน / การประชุม</label>
+      <select id="mf2-sess" class="input">
+        <option value="">— ไม่ระบุรอบ —</option>
+        ${sess.map(s=>`<option value="${s.id}" ${mt&&mt.sessionId===s.id?'selected':''}>
+          ${formatThaiDateShort(s.date)} — ${escapeHtml(s.title)}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label>หัวเรื่อง <span class="req">*</span></label>
+      <input class="input" id="mf2-title" value="${escapeHtml(mt?mt.title:'')}" placeholder="เช่น การประชุมโรงเรียน อสม. ประจำเดือน"></div>
+    <div class="form-group"><label>วันที่ประชุม <span class="req">*</span></label>
+      <input type="date" class="input" id="mf2-date" value="${mt?mt.date:toISODate(new Date())}"></div>
+    <div class="form-group"><label style="margin-bottom:9px">วาระการประชุม</label>
+      <div id="mf2-list"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="mf2-add" style="margin-top:8px">
+        <i class="fa-solid fa-plus"></i> เพิ่มวาระ</button></div>
+    <div class="field-error" id="mf2-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+  </div></form>`,{size:'md'});
+
+  const draw=()=>{
+    const box=document.getElementById('mf2-list');
+    box.innerHTML=ag.map((a,i)=>`
+      <div style="border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:9px;background:var(--bg-surface-2)">
+        <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+          <b style="font-size:12.5px;color:var(--text-secondary);white-space:nowrap">วาระที่ ${i+1}</b>
+          <input class="input mf2-t" data-i="${i}" value="${escapeHtml(a.title||'')}" placeholder="หัวข้อวาระ">
+          <button type="button" class="btn btn-ghost mf2-x" data-i="${i}" style="flex:none;width:38px">
+            <i class="fa-solid fa-xmark" style="color:var(--danger)"></i></button>
+        </div>
+        <textarea class="input mf2-c" data-i="${i}" rows="3" placeholder="รายละเอียด / มติที่ประชุม">${escapeHtml(a.content||'')}</textarea>
+      </div>`).join('');
+    box.querySelectorAll('.mf2-t').forEach(i=>i.addEventListener('input',()=>{ ag[+i.dataset.i].title=i.value; }));
+    box.querySelectorAll('.mf2-c').forEach(i=>i.addEventListener('input',()=>{ ag[+i.dataset.i].content=i.value; }));
+    box.querySelectorAll('.mf2-x').forEach(b=>b.addEventListener('click',()=>{ ag.splice(+b.dataset.i,1); draw(); }));
+    if(typeof modalWatchScroll==='function') modalWatchScroll();
+  };
+  draw();
+  document.getElementById('mf2-add').addEventListener('click',()=>{ ag.push({id:uid('ag'),title:'',content:''}); draw(); });
+
+  document.getElementById('mf2-sess').addEventListener('change',function(){
+    const s=schSessionById(this.value); if(!s) return;
+    const t=document.getElementById('mf2-title'), d=document.getElementById('mf2-date');
+    if(!t.value) t.value=s.title||'';
+    d.value=s.date;
+  });
+
+  document.getElementById('mp-mf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const title=document.getElementById('mf2-title').value.trim();
+    const date=document.getElementById('mf2-date').value;
+    const sid=document.getElementById('mf2-sess').value;
+    const er=document.getElementById('mf2-err');
+    if(!title||!date){ er.textContent='กรุณากรอกหัวเรื่องและวันที่ประชุม'; er.style.display='block'; return; }
+    const clean=ag.filter(a=>String(a.title||'').trim()||String(a.content||'').trim());
+    if(!clean.length){ er.textContent='กรุณากรอกวาระการประชุมอย่างน้อย 1 วาระ'; er.style.display='block'; return; }
+
+    if(editing){
+      Object.assign(mt,{ title, date, sessionId:sid, agendas:clean, updatedAt:new Date().toISOString() });
+      schLog('อสม. แก้ไขบันทึกประชุม',`${m.firstName} ${m.lastName} — ${title}`);
+    }else{
+      state.meetings.push({ id:uid('mt'), osmId:m.id, sessionId:sid, title, date, agendas:clean,
+        recorder:`${m.firstName} ${m.lastName}`, approver:'', photos:[],
+        recordedBy:'อสม.', createdAt:new Date().toISOString() });
+      schLog('อสม. บันทึกรายงานประชุม',`${m.firstName} ${m.lastName} — ${title}`);
+    }
+    persistState(); closeModal(); renderCurrentView();
+    toast(editing?'แก้ไขบันทึกเรียบร้อยแล้ว':'บันทึกรายงานการประชุมเรียบร้อยแล้ว','success');
+  });
+}
+
+function mpMinuteDelete(id){
+  const m=mpMyMember();
+  const mt=(state.meetings||[]).find(x=>x.id===id);
+  if(!mt||!m||mt.osmId!==m.id){ toast('ไม่ใช่บันทึกของท่าน','error'); return; }
+  if(mt.approvedByStaff){ toast('เจ้าหน้าที่รับรองแล้ว ลบไม่ได้','error'); return; }
+  confirmDialog(`ลบบันทึก “${mt.title}” ใช่หรือไม่`,()=>{
+    state.meetings=state.meetings.filter(x=>x.id!==id);
+    schLog('อสม. ลบบันทึกประชุม',`${m.firstName} ${m.lastName}`);
+    persistState(); closeModal(); renderCurrentView(); toast('ลบบันทึกแล้ว','success');
+  },{confirmLabel:'ลบบันทึก'});
+}
+
+function mpViewMinute(id){
+  const mt=(state.meetings||[]).find(x=>x.id===id); if(!mt) return;
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-file-lines"></i> ${escapeHtml(mt.title||'')}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <p style="font-size:12.5px;color:var(--text-secondary);margin:0 0 14px">
+      ${formatThaiDate(mt.date)}${mt.recorder?` • ผู้บันทึก ${escapeHtml(mt.recorder)}`:''}
+      ${mt.approver?` • ผู้รับรอง ${escapeHtml(mt.approver)}`:''}</p>
+    ${(mt.agendas||[]).map((a,i)=>`
+      <div style="margin-bottom:14px">
+        <b style="font-size:14px">วาระที่ ${i+1} ${escapeHtml(a.title||'')}</b>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-top:4px;white-space:pre-wrap">${escapeHtml(a.content||'—')}</div>
+      </div>`).join('')||'<p>ไม่มีวาระ</p>'}
+  </div>
+  <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">ปิด</button></div>`,{size:'md'});
+}
+
+/* ============================================================================================
+   WIRING
+   ============================================================================================ */
+VIEW_TITLES['member-minutes'] = ['พื้นที่ของฉัน','บันทึกรายงานการประชุม'];
+
+/* เจ้าหน้าที่รับรองบันทึกของ อสม. */
+function mpApproveMinute(id){
+  const mt=(state.meetings||[]).find(x=>x.id===id); if(!mt) return;
+  confirmDialog(`รับรองบันทึก “${mt.title}” ใช่หรือไม่ หลังรับรองแล้ว อสม. จะแก้ไขไม่ได้อีก`,()=>{
+    mt.approvedByStaff=true; mt.approver=currentUserFullName(); mt.approvedAt=new Date().toISOString();
+    schLog('รับรองบันทึกประชุมของ อสม.',mt.title);
+    persistState(); closeModal(); renderCurrentView(); toast('รับรองบันทึกแล้ว','success');
+  },{confirmLabel:'รับรอง'});
+}
+const MEMBER_VIEWS4 = ['member-home','member-history','member-leave','member-profile',
+                       'member-households','member-activity','member-minutes'];
+
+function switchView(viewName){
+  const member = isMember();
+  if(member && !MEMBER_VIEWS4.includes(viewName) && viewName!=='dashboard'){
+    toast('หน้านี้สำหรับเจ้าหน้าที่เท่านั้น','info'); viewName='member-home';
+  }
+  if(!member && viewName!=='dashboard' && !isAdmin()){ requestAdminLogin(viewName); return; }
+  if(state.currentView==='school-roster' && viewName!=='school-roster') schStopScan();
+
+  state.currentView=viewName;
+  document.querySelectorAll('.view-section').forEach(s=>s.classList.add('hidden'));
+  const t=document.getElementById('view-'+viewName); if(t) t.classList.remove('hidden');
+  document.querySelectorAll('.nav-link[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===viewName));
+  const ti=VIEW_TITLES[viewName]||['',''];
+  document.getElementById('topbar-title').innerHTML=ti[0]+`<small id="topbar-sub">${ti[1]}</small>`;
+
+  if(['osm-list','osm-households'].includes(viewName)){
+    document.getElementById('grp-osm-sub').classList.remove('closed');
+    document.getElementById('grp-osm').classList.add('open');
+  }
+  if(['activity-checkin','activity-report'].includes(viewName)){
+    document.getElementById('grp-activity-sub').classList.remove('closed');
+    document.getElementById('grp-activity').classList.add('open');
+  }
+  if(SCHOOL_VIEWS2.includes(viewName)){
+    document.getElementById('grp-school-sub').classList.remove('closed');
+    document.getElementById('grp-school').classList.add('open');
+  }
+  closeSidebar(); renderCurrentView(); window.scrollTo(0,0);
+}
+
+function renderCurrentView(){
+  switch(state.currentView){
+    case 'dashboard': renderDashboard(); dashRegistryCard(); dgChecklist(); break;
+    case 'osm-list': renderOsmListView(); impInjectButton(); break;
+    case 'osm-households': renderHouseholdsView(); break;
+    case 'activity-checkin': renderCheckinView(); break;
+    case 'activity-report': renderActivityReportView(); break;
+    case 'school-sessions': renderSchoolSessionsView(); break;
+    case 'school-roster': renderSchoolRosterView(); break;
+    case 'school-report': renderSchoolReportView(); break;
+    case 'school-docs': renderSchoolDocsView(); break;
+    case 'school-members': renderOsmAccountsView(); break;
+    case 'member-home': renderMemberHome(); break;
+    case 'member-history': renderMemberHistory(); break;
+    case 'member-leave': renderMemberLeave(); break;
+    case 'member-profile': renderMemberProfile(); break;
+    case 'member-households': renderMemberHouseholds(); break;
+    case 'member-activity': renderMemberActivity(); break;
+    case 'member-minutes': renderMemberMinutes(); break;
+    case 'meetings': renderMeetingsView(); break;
+    case 'export': renderExportView(); break;
+    case 'admin': renderAdminView(); break;
+  }
+}
+
+(function mpMinBoot(){
+  const go=()=>{
+    const ref=document.getElementById('view-member-activity')
+           || document.getElementById('view-member-leave');
+    if(!document.getElementById('view-member-minutes')){
+      const sec=document.createElement('section');
+      sec.className='view-section hidden'; sec.id='view-member-minutes';
+      (ref&&ref.parentNode)?ref.parentNode.appendChild(sec):document.body.appendChild(sec);
+    }
+    const g=document.getElementById('mp-nav-group');
+    if(g && !g.querySelector('[data-view="member-minutes"]')){
+      const b=document.createElement('button');
+      b.className='nav-link'; b.dataset.view='member-minutes';
+      b.innerHTML='<i class="fa-solid fa-file-lines nav-ic"></i><span>บันทึกรายงานการประชุม</span>';
+      b.addEventListener('click',()=>switchView('member-minutes'));
+      g.appendChild(b);
+    }
+    // เมนูเจ้าหน้าที่ที่ อสม. ไม่ควรเห็น
+    ['meetings','export'].forEach(v=>{
+      const el=document.querySelector(`.nav-link[data-view="${v}"]`);
+      if(el && isMember()) el.style.display='none';
+    });
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,420));
+  else setTimeout(go,420);
+})();
+
+/* ============================================================================================
+   LOGIN DIAGNOSTIC  v1.0
+   ตรวจว่า อสม. คนหนึ่ง ๆ เข้าระบบไม่ได้เพราะอะไร พร้อมปุ่มแก้ในที่เดียว
+   ============================================================================================ */
+
+function mpWhyCantLogin(){
+  mpInit();
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-user-magnifying-glass"></i> ตรวจสอบ: ทำไม อสม. เข้าระบบไม่ได้</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div class="form-group"><label>พิมพ์ชื่อ อสม. ที่เข้าระบบไม่ได้</label>
+      <input class="input" id="wc-q" placeholder="เช่น อนงค์ หรือ สุขเหลือง" autocomplete="off"></div>
+    <div id="wc-result"><p style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:22px 0">
+      พิมพ์ชื่อเพื่อค้นหา ระบบจะตรวจให้ทีละขั้นว่าติดตรงไหน</p></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">ปิด</button></div>`,{size:'md'});
+
+  const q=document.getElementById('wc-q');
+  q.addEventListener('input',()=>mpWhyRender(q.value));
+  setTimeout(()=>q.focus(),80);
+}
+
+function mpWhyRender(term){
+  const box=document.getElementById('wc-result'); if(!box) return;
+  const t=String(term||'').toLowerCase().trim();
+  if(t.length<2){ box.innerHTML='<p style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:22px 0">พิมพ์อย่างน้อย 2 ตัวอักษร</p>'; return; }
+
+  const words=t.split(/\s+/).filter(Boolean);
+  const hit=m=>words.every(w=>`${m.firstName} ${m.lastName} ${m.village||''} ${m.moo||''} ${mpDigits(m.idCard)}`.toLowerCase().includes(w));
+  const mems=schMembers().filter(hit);
+  // ค้นในบัญชีด้วย เผื่อมีบัญชีแต่ไม่มีในทะเบียน
+  const accs=(state.osmAccounts||[]).filter(a=>words.every(w=>
+    `${a.firstName} ${a.lastName} ${mpDigits(a.citizenId)}`.toLowerCase().includes(w)));
+
+  if(!mems.length && !accs.length){
+    box.innerHTML=`<div style="background:var(--sch-rose-bg);color:var(--sch-rose);border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.8">
+      <b><i class="fa-solid fa-circle-xmark"></i> ไม่พบชื่อนี้ทั้งในทะเบียน อสม. และในบัญชีผู้ใช้</b><br>
+      แปลว่ายังไม่ได้นำเข้ารายชื่อท่านนี้ — กรุณาเพิ่มในเมนู <b>ข้อมูล อสม. → รายชื่อและข้อมูล อสม.</b> ก่อน
+      แล้วค่อยสร้างบัญชีให้</div>`;
+    return;
+  }
+
+  const cards=[];
+
+  mems.forEach(m=>{
+    const cid=mpDigits(m.idCard);
+    const acc=(state.osmAccounts||[]).find(a=>a.osmId===m.id) || mpAccountByCid(cid);
+    const steps=[];
+    const add=(ok,label,detail,fix)=>steps.push({ok,label,detail,fix});
+
+    // 1 เลขบัตรในทะเบียน
+    add(validateIdCard(cid), 'เลขบัตรประชาชนในทะเบียนถูกต้อง',
+      cid?`เลขบัตร: ${cid}`:'ยังไม่ได้กรอกเลขบัตรในทะเบียน',
+      validateIdCard(cid)?'':`<b>ต้องแก้ก่อน:</b> เลขบัตรต้องเป็นตัวเลข 13 หลัก
+        ไปที่เมนู “รายชื่อและข้อมูล อสม.” แล้วแก้เลขบัตรของท่านนี้ให้ถูกต้อง
+        — ถ้าเลขบัตรไม่ถูก จะสมัครและเข้าระบบไม่ได้เลย`);
+
+    // 2 เลขบัตรซ้ำในทะเบียน
+    const dupN=(state.osmMembers||[]).filter(x=>mpDigits(x.idCard)===cid).length;
+    if(cid) add(dupN<=1,'เลขบัตรไม่ซ้ำกับ อสม. คนอื่น',
+      dupN>1?`ซ้ำกับอีก ${dupN-1} คน`:'ไม่ซ้ำ',
+      dupN>1?'<b>ต้องแก้ก่อน:</b> มี อสม. มากกว่าหนึ่งคนใช้เลขบัตรนี้ ระบบจะจับคู่ผิดคน กรุณาแก้ในทะเบียนให้ถูกต้อง':'');
+
+    // 3 มีบัญชีหรือยัง
+    add(!!acc,'มีบัญชีผู้ใช้งานแล้ว', acc?'มีบัญชี':'ยังไม่มีบัญชี',
+      acc?'':`<b>นี่คือสาเหตุ:</b> ท่านนี้ยังไม่มีบัญชีในระบบ
+        <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="mpQuickCreate('${m.id}')">
+        <i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้เลย (ออกรหัสชั่วคราว)</button>`);
+
+    if(acc){
+      // 4 สถานะ
+      add(acc.status==='approved','บัญชีได้รับอนุมัติแล้ว',
+        acc.status==='approved'?'ใช้งานได้':acc.status==='pending'?'ยังรออนุมัติ':'ถูกระงับการใช้งาน',
+        acc.status==='pending'?`<b>นี่คือสาเหตุ:</b> คำขอยังไม่ได้อนุมัติ
+          <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="mpApprove('${acc.id}');mpWhyRender(document.getElementById('wc-q').value)">
+          <i class="fa-solid fa-check"></i> อนุมัติเลย</button>`
+        : acc.status==='suspended'?`<b>นี่คือสาเหตุ:</b> บัญชีถูกระงับ
+          <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="mpSuspend('${acc.id}',false)">
+          <i class="fa-solid fa-rotate-left"></i> คืนสิทธิ์</button>`:'');
+
+      // 5 เชื่อมทะเบียน
+      const st=mpLinkStatus(acc);
+      add(st.type==='ok','เชื่อมกับทะเบียน อสม. ถูกต้อง',
+        st.type==='ok'?'เชื่อมถูกคน':(st.msg||'ยังไม่ได้เชื่อม'),
+        st.type==='ok'?'':`<b>นี่คือสาเหตุ:</b> ${escapeHtml(st.msg||'')}
+          ${st.correct?`<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="mpRelinkOne('${acc.id}');mpWhyRender(document.getElementById('wc-q').value)">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> แก้ให้ถูกต้อง</button>`
+          :`<button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="closeModal();mpLinkForm('${acc.id}')">เลือกเอง</button>`}`);
+
+      // 6 เลขบัตรที่ใช้ล็อกอินตรงกับทะเบียน
+      add(mpDigits(acc.citizenId)===cid,'เลขบัตรที่ใช้เข้าระบบตรงกับทะเบียน',
+        `บัญชีใช้ ${mpDigits(acc.citizenId)} • ทะเบียน ${cid}`,
+        mpDigits(acc.citizenId)===cid?'':`ท่านต้องกรอกเลข <b>${escapeHtml(mpDigits(acc.citizenId))}</b> ตอนเข้าระบบ (ไม่ใช่เลขในทะเบียน)`);
+
+      // 7 รหัสผ่าน
+      add(true,'รหัสผ่าน',
+        acc.tempPw?`ใช้รหัสชั่วคราว ${acc.tempPw}`:(acc.pwChangedAt?'ตั้งรหัสเองแล้ว':'ตั้งตอนสมัคร'),
+        `<div style="line-height:1.8">ถ้าจำรหัสไม่ได้ ให้ตั้งรหัสชั่วคราวใหม่แล้วแจ้งเจ้าตัว
+          <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="closeModal();mpCredentials('${acc.id}')">
+          <i class="fa-solid fa-id-card-clip"></i> ดูข้อมูลเข้าระบบ / ตั้งรหัสใหม่</button></div>`);
+
+      // 8 เคยเข้าระบบไหม
+      add(!!acc.lastLogin,'เคยเข้าระบบสำเร็จ',
+        acc.lastLogin?`ล่าสุด ${new Date(acc.lastLogin).toLocaleString('th-TH')}`:'ยังไม่เคยเข้าสำเร็จเลย','');
+    }
+
+    const blockers=steps.filter(x=>!x.ok && x.fix);
+    cards.push(`
+    <div style="border:1px solid var(--border);border-radius:var(--radius-md);padding:15px 17px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <b style="font-size:15px">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}
+          <span style="color:var(--text-faint);font-weight:400;font-size:12.5px">
+            หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}</span></b>
+        <span class="schp-chip ${blockers.length?'risk':'good'}">
+          ${blockers.length?`ติด ${blockers.length} จุด`:'พร้อมเข้าระบบ'}</span>
+      </div>
+      ${steps.map(x=>`
+        <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border)">
+          <i class="fa-solid ${x.ok?'fa-circle-check':'fa-circle-xmark'}"
+             style="color:${x.ok?'var(--success)':'var(--danger)'};margin-top:2px"></i>
+          <div style="flex:1;min-width:0">
+            <b style="font-size:13px">${x.label}</b>
+            <div style="font-size:12px;color:var(--text-secondary)">${escapeHtml(x.detail||'')}</div>
+            ${x.fix?`<div style="font-size:12.5px;background:var(--sch-amber-bg);color:var(--sch-amber);
+              border-radius:8px;padding:9px 12px;margin-top:7px;line-height:1.7">${x.fix}</div>`:''}
+          </div>
+        </div>`).join('')}
+      ${!blockers.length&&acc?`
+      <div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:9px;padding:11px 13px;
+        font-size:12.5px;margin-top:11px;line-height:1.8">
+        <b><i class="fa-solid fa-circle-check"></i> บัญชีพร้อมใช้งาน</b><br>
+        ให้ อสม. เข้าที่ปุ่ม “สำหรับ อสม.” มุมขวาบน แล้วกรอก<br>
+        ชื่อผู้ใช้ <b>${escapeHtml(mpDigits(acc.citizenId))}</b>
+        ${acc.tempPw?`และรหัส <b>${escapeHtml(acc.tempPw)}</b>`:'และรหัสผ่านที่ตั้งไว้'}
+        <br><span style="color:var(--text-secondary)">ถ้ายังเข้าไม่ได้ มักเป็นเพราะกรอกรหัสผิด — ให้ตั้งรหัสชั่วคราวใหม่</span>
+      </div>`:''}
+    </div>`);
+  });
+
+  // บัญชีที่ไม่มีตัวตนในทะเบียน
+  accs.filter(a=>!mems.some(m=>m.id===a.osmId)).forEach(a=>{
+    if(mems.some(m=>mpDigits(m.idCard)===mpDigits(a.citizenId))) return;
+    cards.push(`
+    <div style="border:1px solid var(--sch-amber);border-radius:var(--radius-md);padding:15px 17px;margin-bottom:14px">
+      <b style="font-size:15px">${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}</b>
+      <span class="schp-chip watch" style="margin-right:8px">มีบัญชี แต่ไม่มีในทะเบียน</span>
+      <div style="font-size:12.5px;color:var(--text-secondary);margin-top:8px;line-height:1.8">
+        เลขบัตร ${mpMaskCid(a.citizenId)} — บัญชีนี้ไม่ได้เชื่อมกับ อสม. คนใดในทะเบียน จึงเข้าระบบไม่ได้<br>
+        ให้เพิ่มท่านนี้ในทะเบียน อสม. ก่อน แล้วกดเชื่อม</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:9px" onclick="closeModal();mpLinkForm('${a.id}')">
+        <i class="fa-solid fa-link"></i> เชื่อมทะเบียน</button>
+    </div>`);
+  });
+
+  box.innerHTML=cards.join('') || '<p style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0">ไม่พบผลลัพธ์</p>';
+  if(typeof modalWatchScroll==='function') modalWatchScroll();
+}
+
+async function mpQuickCreate(osmId){
+  const a=await mpCreateAccountFor(osmId);
+  if(a){
+    const q=document.getElementById('wc-q');
+    if(q) mpWhyRender(q.value);
+    toast(`สร้างบัญชีแล้ว — รหัสชั่วคราว ${a.tempPw}`,'success');
+  }
 }
 
 </script>
