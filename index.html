@@ -9303,6 +9303,7 @@ function renderMemberMinutes(){
             ${a.content?`<div style="color:var(--text-secondary);font-size:12px;margin-right:11px">${escapeHtml(String(a.content).slice(0,110))}${String(a.content).length>110?'…':''}</div>`:''}</div>`).join('')}
       </div>
       <div style="display:flex;gap:7px">
+        <button class="btn btn-outline btn-sm" onclick="mtPrintOptions('${x.id}')"><i class="fa-solid fa-file-export"></i> ออกรายงาน</button>
         ${x.approvedByStaff?'<span class="schp-chip good">รับรองแล้ว</span>':`
         <button class="btn btn-outline btn-sm" onclick="mpMinuteForm('${x.id}')"><i class="fa-solid fa-pen"></i> แก้ไข</button>
         <button class="btn btn-ghost btn-sm" onclick="mpMinuteDelete('${x.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>`}
@@ -9323,7 +9324,10 @@ function renderMemberMinutes(){
         <div style="font-size:12px;color:var(--text-secondary);margin-top:3px">
           ${formatThaiDate(x.date)} • ${(x.agendas||[]).length} วาระ
           ${x.recorder?` • ผู้บันทึก ${escapeHtml(x.recorder)}`:''}</div></div>
-      <button class="btn btn-outline btn-sm" onclick="mpViewMinute('${x.id}')"><i class="fa-solid fa-eye"></i> อ่าน</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" onclick="mpViewMinute('${x.id}')"><i class="fa-solid fa-eye"></i> อ่าน</button>
+        <button class="btn btn-outline btn-sm" onclick="mtPrintOptions('${x.id}')"><i class="fa-solid fa-print"></i></button>
+      </div>
     </div>`}).join('')}
   </div>`:''}`;
 }
@@ -10017,6 +10021,260 @@ function dashRegistryCard(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,450));
   else setTimeout(go,450);
 })();
+
+
+/* ============================================================================================
+   MEETING REPORT  v1.0
+   ออกรายงานการประชุมรูปแบบเอกสารราชการ A4 พร้อมตราสัญลักษณ์ อสม.
+   ============================================================================================ */
+
+function mtById(id){ return (state.meetings||[]).find(x=>x.id===id); }
+function mtAttendanceOf(mt){
+  // ถ้าผูกกับรอบเรียน ให้ดึงผลเช็กชื่อของรอบนั้นมาประกอบรายงาน
+  if(!mt || !mt.sessionId) return null;
+  const s=schSessionById(mt.sessionId); if(!s) return null;
+  const st=schStats(s.id);
+  const mem=schMembers();
+  return { s, st,
+    present: mem.filter(m=>SCH_PRESENT.includes((schRec(s.id,m.id)||{}).status)),
+    leave:   mem.filter(m=>(schRec(s.id,m.id)||{}).status==='ลา'),
+    absent:  mem.filter(m=>(schRec(s.id,m.id)||{}).status==='ขาด') };
+}
+
+/* ---------------------------------------------------------------- เอกสารรายงานการประชุม */
+function mtReportHtml(mt, opt){
+  opt=opt||{};
+  const c=state.schoolCfg||{};
+  const att=mtAttendanceOf(mt);
+  const thNum=['๑','๒','๓','๔','๕','๖','๗','๘','๙','๑๐','๑๑','๑๒','๑๓','๑๔','๑๕'];
+  const nm=i=>thNum[i]||String(i+1);
+
+  const namesBlock=(title,list)=>{
+    if(!list||!list.length) return `<p style="margin:0 0 6px"><b>${title}</b> – ไม่มี –</p>`;
+    return `<p style="margin:0 0 8px"><b>${title} (${list.length} คน)</b><br>
+      ${list.map((m,i)=>`${i+1}. ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}`).join(' &nbsp;&nbsp; ')}</p>`;
+  };
+
+  return `
+  <div class="pg">
+    ${schGovHead('รายงานการประชุม')}
+
+    <div class="meta" style="display:block;line-height:2">
+      <div><b>เรื่อง:</b> ${escapeHtml(mt.title||'')}</div>
+      <div><b>วันที่ประชุม:</b> ${formatThaiDate(mt.date)}
+        ${att?` &nbsp; <b>เวลา:</b> ${escapeHtml(att.s.startTime||'')}–${escapeHtml(att.s.endTime||'')} น.`:''}</div>
+      <div><b>สถานที่:</b> ${escapeHtml((att&&att.s.location)||SCH_ORG.name)}</div>
+    </div>
+
+    ${att?`
+    <h3 class="sec">ผู้เข้าร่วมประชุม</h3>
+    <div class="kbox">
+      <div><b>${att.st.total}</b><small>อสม. ทั้งหมด (คน)</small></div>
+      <div><b>${att.st.attended}</b><small>เข้าร่วมประชุม (คน)</small></div>
+      <div><b>${att.st['ลา']}</b><small>ลา (คน)</small></div>
+      <div><b>${att.st['ขาด']}</b><small>ขาดประชุม (คน)</small></div>
+      <div><b>${att.st.pct}%</b><small>ร้อยละการเข้าร่วม</small></div>
+    </div>
+    ${opt.names!==false?`
+      <div style="font-size:13px;line-height:1.9;margin-top:8px">
+        ${namesBlock('ผู้ลาประชุม:', att.leave)}
+        ${namesBlock('ผู้ขาดประชุม:', att.absent)}
+      </div>`:''}
+    `:''}
+
+    <h3 class="sec">ระเบียบวาระการประชุม</h3>
+    ${(mt.agendas||[]).map((ag,i)=>`
+      <div style="margin-bottom:14px">
+        <p style="margin:0 0 4px;font-weight:700;font-size:15px">
+          วาระที่ ${nm(i)} &nbsp;${escapeHtml(ag.title||'')}</p>
+        <p style="margin:0;text-indent:2.5em;white-space:pre-wrap">${escapeHtml(ag.content||'– ไม่มีรายละเอียด –')}</p>
+      </div>`).join('') || '<p>– ไม่มีวาระการประชุม –</p>'}
+
+    <h3 class="sec">มติที่ประชุม / ข้อสั่งการ</h3>
+    <p style="border-bottom:1px dotted #666;height:20px;margin:6px 0"></p>
+    <p style="border-bottom:1px dotted #666;height:20px;margin:6px 0"></p>
+
+    <p style="margin-top:16px">เลิกประชุมเวลา ....................... น.</p>
+
+    <div class="signrow">
+      <div><span class="dots"></span>( ${escapeHtml(mt.recorder||c.reporter||'............................')} )<br>
+        ผู้บันทึกรายงานการประชุม</div>
+      <div><span class="dots"></span>( ${escapeHtml(mt.approver||c.principal||'............................')} )<br>
+        ผู้ตรวจ/รับรองรายงานการประชุม</div>
+    </div>
+
+    <div class="pnum">พิมพ์จากระบบฐานข้อมูล อสม. ${SCH_ORG.name} เมื่อ ${schThaiToday()}</div>
+  </div>
+
+  ${(opt.photos!==false && mt.photos && mt.photos.length)?`
+  <div class="pg">
+    ${schGovHead('ภาพประกอบการประชุม')}
+    <div class="meta" style="display:block"><div><b>เรื่อง:</b> ${escapeHtml(mt.title||'')}
+      &nbsp; <b>วันที่:</b> ${formatThaiDate(mt.date)}</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-top:8mm">
+      ${mt.photos.slice(0,6).map((p,i)=>`
+        <div style="border:1px solid #000;padding:3mm;text-align:center">
+          <img src="${p}" style="width:100%;height:62mm;object-fit:cover">
+          <div style="font-size:12px;margin-top:3px">ภาพที่ ${i+1}</div>
+        </div>`).join('')}
+    </div>
+    <div class="signrow" style="margin-top:26px">
+      <div style="flex:0 0 55%"></div>
+      <div><span class="dots"></span>( ${escapeHtml(mt.recorder||c.reporter||'............................')} )<br>ผู้บันทึก</div>
+    </div>
+    <div class="pnum">พิมพ์เมื่อ ${schThaiToday()}</div>
+  </div>`:''}`;
+}
+
+function mtPrintReport(id, opt){
+  const mt=mtById(id);
+  if(!mt){ toast('ไม่พบบันทึกการประชุม','error'); return; }
+  schPrintWindow(`รายงานการประชุม — ${mt.title||''}`, mtReportHtml(mt,opt));
+  schLog('พิมพ์รายงานการประชุม', mt.title||'');
+  persistState();
+}
+
+/* ตัวเลือกก่อนพิมพ์ */
+function mtPrintOptions(id){
+  const mt=mtById(id); if(!mt) return;
+  const att=mtAttendanceOf(mt);
+  const hasPhotos=!!(mt.photos&&mt.photos.length);
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-file-export"></i> ออกรายงานการประชุม</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.85;margin-bottom:16px">
+      <b>${escapeHtml(mt.title||'')}</b><br>
+      <span style="color:var(--text-secondary)">${formatThaiDate(mt.date)} • ${(mt.agendas||[]).length} วาระ</span>
+      ${att?`<div style="color:var(--success);font-size:12px;margin-top:5px">
+        <i class="fa-solid fa-link"></i> เชื่อมกับรอบเรียน “${escapeHtml(att.s.title)}”
+        — รายงานจะแนบสรุปผู้เข้าร่วม ${att.st.attended}/${att.st.total} คน ให้อัตโนมัติ</div>`
+      :`<div style="color:var(--text-faint);font-size:12px;margin-top:5px">
+        <i class="fa-solid fa-circle-info"></i> ไม่ได้เชื่อมกับรอบเรียน จึงไม่มีสรุปผู้เข้าร่วมในรายงาน</div>`}
+    </div>
+
+    ${att?`<label style="display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:10px;cursor:pointer;line-height:1.7">
+      <input type="checkbox" id="mtp-names" checked style="width:17px;height:17px;margin-top:2px">
+      <span>แนบรายชื่อผู้ลาและผู้ขาดประชุม
+        <small style="display:block;color:var(--text-faint);font-size:11.5px">ใช้ประกอบการติดตามและการเบิกจ่ายค่าป่วยการ</small></span></label>`:''}
+
+    ${hasPhotos?`<label style="display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:10px;cursor:pointer;line-height:1.7">
+      <input type="checkbox" id="mtp-photos" checked style="width:17px;height:17px;margin-top:2px">
+      <span>แนบหน้าภาพประกอบการประชุม (${mt.photos.length} รูป)
+        <small style="display:block;color:var(--text-faint);font-size:11.5px">พิมพ์เป็นหน้าที่ 2 สูงสุด 6 รูป</small></span></label>`:''}
+
+    <div style="background:var(--brand-blue-100);color:var(--brand-navy-700);border-radius:10px;
+      padding:11px 14px;font-size:12.5px;line-height:1.75;margin-top:14px">
+      <i class="fa-solid fa-circle-info"></i> เอกสารเป็นขนาด A4 มีตราสัญลักษณ์ อสม. หัวกระดาษราชการ
+      และช่องลงนามผู้บันทึก/ผู้รับรอง — กดพิมพ์แล้วเลือก “บันทึกเป็น PDF” ได้
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="mtDoPrint('${id}')"><i class="fa-solid fa-print"></i> พิมพ์ / บันทึก PDF</button>
+  </div>`,{size:'sm'});
+}
+function mtDoPrint(id){
+  const n=document.getElementById('mtp-names');
+  const p=document.getElementById('mtp-photos');
+  const opt={ names: n?n.checked:true, photos: p?p.checked:true };
+  closeModal();
+  setTimeout(()=>mtPrintReport(id,opt),120);
+}
+
+/* พิมพ์รวมหลายฉบับ */
+function mtPrintAll(){
+  const list=(state.meetings||[]).filter(m=>!m.osmId)
+    .slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(!list.length){ toast('ยังไม่มีบันทึกรายงานการประชุม','info'); return; }
+  confirmDialog(`พิมพ์รายงานการประชุมทั้งหมด ${list.length} ฉบับ ใช่หรือไม่ (ไม่รวมหน้าภาพประกอบ)`,()=>{
+    closeModal();
+    schPrintWindow(`รายงานการประชุม (${list.length} ฉบับ)`,
+      list.map(m=>mtReportHtml(m,{photos:false})).join(''));
+    schLog('พิมพ์รายงานการประชุมรวม',`${list.length} ฉบับ`); persistState();
+  },{confirmLabel:'พิมพ์ทั้งหมด'});
+}
+
+/* ---------------------------------------------------------------- หน้าประชุม (เพิ่มปุ่มออกรายงาน) */
+function renderMeetingsView(){
+  const el = document.getElementById('view-meetings');
+  const n=(state.meetings||[]).length;
+  el.innerHTML = `
+    <div class="page-head">
+      <div><h2>บันทึกรายงานการประชุม</h2><p>บันทึกวาระและรายละเอียดการประชุม อสม. • ออกรายงานเป็นเอกสารราชการได้</p></div>
+      <div class="page-head-actions">
+        ${n?`<button class="btn btn-outline" onclick="mtPrintAll()"><i class="fa-solid fa-print"></i> พิมพ์ทั้งหมด</button>`:''}
+        ${isAdmin() ? `<button class="btn btn-primary" onclick="openMeetingForm()"><i class="fa-solid fa-file-circle-plus"></i> เพิ่มบันทึกการประชุม</button>` : ''}
+      </div>
+    </div>
+    <div id="meetings-list"></div>`;
+  renderMeetingsList();
+}
+
+function renderMeetingsList(){
+  const wrap = document.getElementById('meetings-list');
+  const list = (state.meetings||[]).slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  if(!list.length){
+    wrap.innerHTML = `<div class="card"><div class="empty-state"><div class="ring-ic-lg"><i class="fa-solid fa-file-signature"></i></div>
+      <h4>ยังไม่มีบันทึกรายงานการประชุม</h4>
+      <p>${isAdmin() ? 'กดปุ่ม "เพิ่มบันทึกการประชุม" เพื่อเริ่มบันทึกข้อมูล' : 'ยังไม่มีการบันทึกข้อมูลในระบบ'}</p></div></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;">${list.map(mt=>{
+    const owner = mt.osmId ? osmById(mt.osmId) : null;
+    return `
+    <div class="card meeting-card">
+      <h4>${escapeHtml(mt.title)}
+        ${mt.osmId?`<span class="schp-chip ${mt.approvedByStaff?'good':'watch'}" style="font-size:11px;vertical-align:middle">
+          <i class="fa-solid fa-user-pen"></i> อสม. บันทึก${mt.approvedByStaff?' • รับรองแล้ว':''}</span>`:''}</h4>
+      <div class="meeting-meta">
+        <span><i class="fa-regular fa-calendar"></i> ${formatThaiDate(mt.date)}</span>
+        <span><i class="fa-regular fa-pen-to-square"></i> ผู้บันทึก: ${escapeHtml(mt.recorder)||'-'}</span>
+        <span><i class="fa-solid fa-stamp"></i> ผู้รับรอง: ${escapeHtml(mt.approver)||'-'}</span>
+        ${mt.photos&&mt.photos.length ? `<span><i class="fa-regular fa-images"></i> ${mt.photos.length} รูปภาพ</span>`:''}
+        ${owner?`<span><i class="fa-solid fa-user"></i> ${escapeHtml(owner.firstName)} ${escapeHtml(owner.lastName)} (ม.${escapeHtml(owner.moo||'-')})</span>`:''}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="openMeetingDetail('${mt.id}')"><i class="fa-regular fa-eye"></i> ดูรายละเอียด</button>
+        <button class="btn btn-outline btn-sm" onclick="mtPrintOptions('${mt.id}')"><i class="fa-solid fa-file-export"></i> ออกรายงาน</button>
+        ${(isAdmin()&&mt.osmId&&!mt.approvedByStaff)?`<button class="btn btn-primary btn-sm" onclick="mpApproveMinute('${mt.id}')"><i class="fa-solid fa-stamp"></i> รับรอง</button>`:''}
+      </div>
+    </div>`;}).join('')}</div>`;
+}
+
+function openMeetingDetail(id){
+  const mt = mtById(id); if(!mt) return;
+  const owner = mt.osmId ? osmById(mt.osmId) : null;
+  const att = mtAttendanceOf(mt);
+  openModal(`
+    <div class="modal-header"><h3><i class="fa-solid fa-file-signature"></i> ${escapeHtml(mt.title)}</h3>
+      <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <div class="meeting-meta" style="margin-bottom:16px;">
+        <span><i class="fa-regular fa-calendar"></i> วันที่ประชุม: ${formatThaiDate(mt.date)}</span>
+        ${owner?`<span><i class="fa-solid fa-user-pen"></i> บันทึกโดย อสม. ${escapeHtml(owner.firstName)} ${escapeHtml(owner.lastName)}</span>`:''}
+      </div>
+      ${att?`<div style="background:var(--bg-surface-2);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:14px">
+        <i class="fa-solid fa-users"></i> ผู้เข้าร่วม <b>${att.st.attended}/${att.st.total}</b> คน
+        (${att.st.pct}%) • ลา ${att.st['ลา']} • ขาด ${att.st['ขาด']}</div>`:''}
+      ${(mt.agendas||[]).map((ag,idx)=>`
+        <div class="agenda-item">
+          <div class="agenda-item-head"><b>วาระที่ ${idx+1}: ${escapeHtml(ag.title)}</b></div>
+          <p style="white-space:pre-wrap;font-size:14px;color:var(--text-primary);">${escapeHtml(ag.content)||'-'}</p>
+        </div>`).join('')}
+      <div class="detail-grid" style="margin-top:6px;">
+        <div class="detail-item"><span>ผู้บันทึกรายงานการประชุม</span><b>${escapeHtml(mt.recorder)||'-'}</b></div>
+        <div class="detail-item"><span>ผู้รับรองรายงานการประชุม</span><b>${escapeHtml(mt.approver)||'-'}</b></div>
+      </div>
+      ${mt.photos && mt.photos.length ? `<div style="margin-top:18px;"><label>รูปภาพประกอบการประชุม</label>
+        <div class="photo-grid">${mt.photos.map(p=>`<div class="photo-thumb"><img src="${p}" alt="รูปภาพการประชุม"></div>`).join('')}</div></div>` : ''}
+    </div>
+    <div class="modal-footer">
+      ${isAdmin() ? `<button class="btn btn-danger" onclick="deleteMeeting('${mt.id}')"><i class="fa-solid fa-trash"></i> ลบบันทึก</button>` : ''}
+      <button class="btn btn-outline" onclick="mtPrintOptions('${mt.id}')"><i class="fa-solid fa-file-export"></i> ออกรายงาน</button>
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="openMeetingForm('${mt.id}')"><i class="fa-solid fa-pen"></i> แก้ไขข้อมูล</button>` : ''}
+    </div>`, {size:'lg'});
+}
 
 </script>
 <script type="module">
