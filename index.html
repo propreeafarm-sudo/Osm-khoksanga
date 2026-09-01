@@ -4911,6 +4911,7 @@ async function fbPush(){
     await flush();
     if(fbCfg().publicCheckin) await fbPublishRoster();
     fbNeedUp=false; fbLastSync=new Date(); fbStatusMsg='';
+    if(typeof fbSchedulePublishStats==='function') fbSchedulePublishStats();
   } finally { fbBusy=false; fbPaint(); }
 }
 
@@ -9496,7 +9497,10 @@ function switchView(viewName){
 
 function renderCurrentView(){
   switch(state.currentView){
-    case 'dashboard': renderDashboard(); dashRegistryCard(); dgChecklist(); break;
+    case 'dashboard':
+      if(dashIsVisitor() && dashLocalEmpty()){ dashRegistryCard(); }
+      else { renderDashboard(); dashRegistryCard(); dgChecklist(); }
+      break;
     case 'osm-list': renderOsmListView(); impInjectButton(); break;
     case 'osm-households': renderHouseholdsView(); break;
     case 'activity-checkin': renderCheckinView(); break;
@@ -9713,6 +9717,306 @@ async function mpQuickCreate(osmId){
     toast(`สร้างบัญชีแล้ว — รหัสชั่วคราว ${a.tempPw}`,'success');
   }
 }
+
+
+/* ============================================================================================
+   PUBLIC LIVE DASHBOARD  v1.0
+   เผยแพร่ "สรุปตัวเลข" ลง Firestore ที่ public_stats/summary ให้ผู้เยี่ยมชมอ่านได้
+   โดยไม่ต้องเข้าสู่ระบบ และไม่มีข้อมูลส่วนบุคคลใด ๆ (ไม่มีชื่อ เลขบัตร เบอร์โทร ที่อยู่)
+   ============================================================================================ */
+
+let fbStats = null;           // สรุปล่าสุดที่อ่านมาจาก cloud
+let fbStatsUnsub = null;
+let fbStatsTimer = null;
+let fbStatsLast = '';
+
+/* ---------------------------------------------------------------- สร้างสรุป */
+function fbBuildStats(){
+  schInit(); mpInit();
+  const all=(state.osmMembers||[]);
+  const active=all.filter(m=>!['ลาออก','เสียชีวิต'].includes(m.statusType));
+  const hh=(state.households||[]);
+  const y=schYearOfDate(new Date());
+  const ss=schSessionsOfYear(y);
+
+  const moos=[...new Set(active.map(m=>String(m.moo||'').trim()).filter(Boolean))]
+    .sort((a,b)=>(parseInt(a,10)||99)-(parseInt(b,10)||99))
+    .map(mo=>{
+      const ms=active.filter(m=>String(m.moo||'').trim()===mo);
+      const v=(ms.find(m=>m.village)||{}).village||'';
+      const hn=hh.filter(h=>ms.some(m=>m.id===h.osmId)).length;
+      return { moo:mo, village:v, osm:ms.length, households:hn };
+    });
+
+  const sessions=ss.map(s=>{
+    const st=schStats(s.id);
+    return { date:s.date, title:s.title||'', topic:s.topic||'',
+      total:st.total, attended:st.attended, absent:st['ขาด'], pct:st.pct,
+      closed:!!s.closedAt };
+  });
+  const avg=sessions.length
+    ? Math.round(sessions.reduce((a,s)=>a+s.pct,0)/sessions.length*10)/10 : 0;
+
+  const acts={};
+  (state.attendance||[]).forEach(r=>{
+    if(!r.date) return;
+    const rg=schYearRange(y);
+    if(r.date<rg.start||r.date>rg.end) return;
+    acts[r.activityLabel||'อื่น ๆ']=(acts[r.activityLabel||'อื่น ๆ']||0)+1;
+  });
+
+  return {
+    org: SCH_ORG.name,
+    tambon: SCH_ORG.tambon, amphoe: SCH_ORG.amphoe, province: SCH_ORG.province,
+    year: y, yearMode: schYearMode(),
+    yearLabel: schYearLabel(y), yearRange: schYearRangeLabel(y),
+    osmTotal: all.length,
+    osmActive: active.length,
+    villages: moos.length,
+    households: hh.length,
+    population: hh.reduce((a,h)=>a+((h.members||[]).length),0),
+    accounts: (state.osmAccounts||[]).filter(a=>a.status==='approved').length,
+    sessionsCount: sessions.length,
+    avgAttendance: avg,
+    moos,
+    sessions: sessions.slice(-12),
+    activities: Object.entries(acts).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({name:k,count:v})),
+    meetings: (state.meetings||[]).length,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/* ---------------------------------------------------------------- เผยแพร่ */
+async function fbPublishStats(){
+  if(!fbStaff()) return;
+  const F=window.FBX; if(!F||!F.db) return;
+  try{
+    const st=fbBuildStats();
+    const ser=fbSer(Object.assign({},st,{updatedAt:''}));   // ไม่นับเวลาในการเทียบ
+    if(ser===fbStatsLast) return;                            // ไม่มีอะไรเปลี่ยน ไม่ต้องเขียน
+    await F.setDoc(F.doc(F.db,'public_stats','summary'), JSON.parse(fbSer(st)));
+    fbStatsLast=ser;
+  }catch(e){ console.warn('[FBX stats]', e && (e.code||e.message)); }
+}
+function fbSchedulePublishStats(){
+  if(!fbStaff()) return;
+  clearTimeout(fbStatsTimer);
+  fbStatsTimer=setTimeout(()=>{ fbPublishStats(); }, 2500);
+}
+
+/* ---------------------------------------------------------------- อ่านแบบเรียลไทม์ */
+function fbStatsAttach(){
+  const F=window.FBX;
+  if(!F || F.fatal || F.loading || !F.db || fbStatsUnsub) return;
+  try{
+    fbStatsUnsub=F.onSnapshot(F.doc(F.db,'public_stats','summary'), d=>{
+      if(!d.exists()) return;
+      fbStats=d.data()||null;
+      if(state.currentView==='dashboard'){
+        clearTimeout(fbStatsAttach._t);
+        fbStatsAttach._t=setTimeout(()=>{ try{ renderCurrentView(); }catch(e){} },200);
+      }
+    }, e=>{ console.warn('[FBX stats read]', e && (e.code||e.message)); });
+  }catch(e){ console.warn(e); }
+}
+
+/* ---------------------------------------------------------------- แดชบอร์ดสาธารณะ */
+function dashIsVisitor(){ return !isAdmin() && !isMember(); }
+function dashLocalEmpty(){ return !((state.osmMembers||[]).length); }
+
+function dashPublicHtml(st){
+  const upd = st.updatedAt ? new Date(st.updatedAt) : null;
+  const ago = (()=>{
+    if(!upd) return '';
+    const s=Math.floor((Date.now()-upd.getTime())/1000);
+    if(s<60) return 'เมื่อสักครู่';
+    if(s<3600) return `${Math.floor(s/60)} นาทีที่แล้ว`;
+    if(s<86400) return `${Math.floor(s/3600)} ชั่วโมงที่แล้ว`;
+    return `${Math.floor(s/86400)} วันที่แล้ว`;
+  })();
+  const kpi=(k,lab,val,sub)=>`
+    <div class="schp-kpi" style="--k:${k}"><div class="k-lab">${lab}</div>
+      <div class="k-val">${val}</div><div class="k-sub">${sub}</div></div>`;
+
+  return `
+  <div class="page-head">
+    <div><h2>แดชบอร์ด <span class="public-badge" style="vertical-align:middle;margin-left:6px">
+      <i class="fa-solid fa-globe"></i> Public</span></h2>
+      <p>ภาพรวมข้อมูลการดำเนินงาน อสม. ${escapeHtml(st.org||SCH_ORG.name)} • หน้านี้เปิดดูได้โดยไม่ต้องเข้าสู่ระบบ</p></div>
+  </div>
+
+  <div class="schp-hero" style="margin-bottom:18px">
+    <h2><i class="fa-solid fa-tower-broadcast"></i> ข้อมูลสด</h2>
+    <p>ตัวเลขทั้งหมดในหน้านี้อัปเดตอัตโนมัติจากระบบจริง ไม่ต้องรีเฟรชหน้าเว็บ</p>
+    <div class="schp-hero-meta">
+      <span class="schp-pill"><i class="fa-solid fa-circle" style="color:#6EE7B7;font-size:8px"></i> อัปเดตเรียลไทม์</span>
+      ${ago?`<span class="schp-pill"><i class="fa-solid fa-clock"></i> ข้อมูล ณ ${ago}</span>`:''}
+      <span class="schp-pill"><i class="fa-solid fa-calendar-range"></i> ${escapeHtml(st.yearLabel||'')}</span>
+      <span class="schp-pill"><i class="fa-solid fa-location-dot"></i> ต.${escapeHtml(st.tambon||'')} อ.${escapeHtml(st.amphoe||'')} จ.${escapeHtml(st.province||'')}</span>
+    </div>
+  </div>
+
+  <div class="schp-kpis">
+    ${kpi('var(--brand-navy-700)','อสม. ในทะเบียน', st.osmTotal||0, `ปฏิบัติงานอยู่ ${st.osmActive||0} คน`)}
+    ${kpi('var(--sch-violet)','หมู่บ้านที่ดูแล', st.villages||0, (st.moos||[]).length?'หมู่ '+(st.moos||[]).map(m=>m.moo).join(', '):'—')}
+    ${kpi('var(--sch-emerald)','หลังคาเรือนที่รับผิดชอบ', st.households||0, st.population?`ประชากรรวม ${st.population} คน`:'หลัง')}
+    ${kpi('var(--info)','จัดโรงเรียน อสม.', st.sessionsCount||0, `ครั้ง ${escapeHtml(st.yearLabel||'')}`)}
+    ${kpi('var(--sch-amber)','เข้าร่วมเฉลี่ย', (st.avgAttendance||0)+'%', 'ของ อสม. ทั้งหมด')}
+  </div>
+
+  ${(st.moos||[]).length?`
+  <div class="card" style="margin-bottom:18px"><div class="card-pad">
+    <h3 style="margin:0 0 4px;font-size:16px;font-weight:800">จำนวน อสม. รายหมู่บ้าน</h3>
+    <p style="margin:0 0 14px;font-size:12.5px;color:var(--text-secondary)">
+      รวม ${st.osmActive||0} คน ใน ${st.villages||0} หมู่บ้าน</p>
+    <div class="report-table-wrap"><table class="table">
+      <thead><tr><th>หมู่ที่</th><th>ชื่อหมู่บ้าน</th><th>จำนวน อสม.</th><th>หลังคาเรือนที่บันทึก</th></tr></thead>
+      <tbody>${st.moos.map(m=>`<tr>
+        <td><b>หมู่ ${escapeHtml(m.moo)}</b></td>
+        <td>${escapeHtml(m.village||'—')}</td>
+        <td>${m.osm} คน</td>
+        <td>${m.households} หลัง</td></tr>`).join('')}</tbody>
+    </table></div>
+  </div></div>`:''}
+
+  ${(st.sessions||[]).length?`
+  <div class="card" style="margin-bottom:18px"><div class="card-pad">
+    <h3 style="margin:0 0 4px;font-size:16px;font-weight:800">ผลการจัดโรงเรียน อสม.</h3>
+    <p style="margin:0 0 14px;font-size:12.5px;color:var(--text-secondary)">
+      ${escapeHtml(st.yearLabel||'')} • ${escapeHtml(st.yearRange||'')}</p>
+    <div class="report-table-wrap"><table class="table">
+      <thead><tr><th>ครั้งที่</th><th>วันที่</th><th>หัวข้อ</th><th>เข้าร่วม</th><th>ขาด</th><th>ร้อยละ</th></tr></thead>
+      <tbody>${st.sessions.map((s,i)=>`<tr>
+        <td>${i+1}</td>
+        <td>${formatThaiDateShort(s.date)}</td>
+        <td>${escapeHtml(s.topic||s.title||'')}</td>
+        <td><b>${s.attended}</b>/${s.total}</td>
+        <td style="color:${s.absent?'var(--danger)':'inherit'}">${s.absent}</td>
+        <td style="min-width:120px"><b>${s.pct}%</b>
+          <div class="mini-progress" style="color:${s.pct<70?'var(--danger)':s.pct<85?'var(--warning)':'var(--success)'}">
+            <span style="width:${s.pct}%"></span></div></td></tr>`).join('')}</tbody>
+    </table></div>
+  </div></div>`:''}
+
+  ${(st.activities||[]).length?`
+  <div class="card" style="margin-bottom:18px"><div class="card-pad">
+    <h3 style="margin:0 0 12px;font-size:16px;font-weight:800">การเข้าร่วมกิจกรรมรายประเภท</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${st.activities.map(a=>`<span class="badge badge-info" style="padding:8px 13px;font-size:12.5px">
+        ${escapeHtml(a.name)} <b style="margin-right:5px">${a.count}</b> ครั้ง</span>`).join('')}
+    </div>
+  </div></div>`:''}
+
+  <p style="text-align:center;font-size:12px;color:var(--text-faint);line-height:1.9;margin-top:20px">
+    หน้านี้แสดงเฉพาะข้อมูลสรุปในภาพรวม ไม่มีข้อมูลส่วนบุคคลของ อสม.<br>
+    เจ้าหน้าที่และ อสม. เข้าสู่ระบบเพื่อดูรายละเอียดได้ที่ปุ่มมุมขวาบน
+  </p>`;
+}
+
+/* แสดงข้อความเมื่อยังไม่มีสรุปบน cloud */
+function dashPublicWaitingHtml(){
+  const F=window.FBX;
+  const loading = F && F.loading;
+  return `
+  <div class="page-head">
+    <div><h2>แดชบอร์ด <span class="public-badge" style="vertical-align:middle;margin-left:6px">
+      <i class="fa-solid fa-globe"></i> Public</span></h2>
+      <p>ภาพรวมข้อมูลการดำเนินงาน อสม. ${SCH_ORG.name} • หน้านี้เปิดดูได้โดยไม่ต้องเข้าสู่ระบบ</p></div>
+  </div>
+  <div class="schp-empty">
+    <div class="ic"><i class="fa-solid ${loading?'fa-circle-notch fa-spin':'fa-tower-broadcast'}"></i></div>
+    <h3>${loading?'กำลังโหลดข้อมูล...':'ยังไม่มีข้อมูลสรุปสาธารณะ'}</h3>
+    <p>${loading?'กรุณารอสักครู่'
+      :`เจ้าหน้าที่ต้องเข้าสู่ระบบและซิงก์ข้อมูลอย่างน้อยหนึ่งครั้ง<br>ข้อมูลสรุปจึงจะเผยแพร่ให้ผู้เยี่ยมชมเห็น`}</p>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- แทนที่แดชบอร์ดสำหรับผู้เยี่ยมชม */
+function dashRegistryCard(){
+  const host=document.getElementById('view-dashboard'); if(!host) return;
+
+  // ผู้เยี่ยมชมที่ไม่มีข้อมูลในเครื่อง → ใช้สรุปสาธารณะจาก cloud
+  if(dashIsVisitor() && dashLocalEmpty()){
+    host.innerHTML = fbStats ? dashPublicHtml(fbStats) : dashPublicWaitingHtml();
+    return;
+  }
+
+  const all=state.osmMembers||[];
+  const active=all.filter(m=>!['ลาออก','เสียชีวิต'].includes(m.statusType));
+  const hh=(state.households||[]).length;
+  const hhSum=(state.households||[]).reduce((a,h)=>a+(Array.isArray(h.members)?h.members.length:0),0);
+  const moos=[...new Set(active.map(m=>String(m.moo||'').trim()).filter(Boolean))]
+    .sort((a,b)=>parseInt(a,10)-parseInt(b,10));
+  const acc=(state.osmAccounts||[]).filter(a=>a.status==='approved').length;
+  const noHh=active.filter(m=>!(state.households||[]).some(h=>h.osmId===m.id)).length;
+
+  const live = (typeof fbStaff==='function' && fbStaff())
+    ? '<span class="schp-pill" style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-color:transparent"><i class="fa-solid fa-bolt"></i> อัปเดตเรียลไทม์</span>'
+    : '<span class="schp-pill" style="background:var(--sch-amber-bg);color:var(--sch-amber);border-color:transparent"><i class="fa-solid fa-cloud-slash"></i> ยังไม่เชื่อม Firebase</span>';
+
+  const el=document.createElement('div');
+  el.id='dash-registry';
+  el.innerHTML = all.length===0 ? `
+    <div class="schp-empty" style="margin-bottom:20px">
+      <div class="ic"><i class="fa-solid fa-users-slash"></i></div>
+      <h3>ยังไม่มีรายชื่อ อสม. ในทะเบียน</h3>
+      <p>แดชบอร์ดและรายงานทั้งหมดคำนวณจากทะเบียนนี้<br>นำเข้ารายชื่อทั้งหมดครั้งเดียวจากไฟล์ Excel ที่มีอยู่ได้เลย</p>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="impOpen()"><i class="fa-solid fa-file-import"></i> นำเข้ารายชื่อ อสม.</button>`:''}
+    </div>` : `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-pad">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+          <div><h3 style="margin:0;font-size:17px;font-weight:800">ภาพรวมทะเบียน อสม.</h3>
+            <p style="margin:4px 0 0;font-size:12.5px;color:var(--text-secondary)">
+              ข้อมูล ณ ${formatThaiDate(new Date())}</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${live}
+            ${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="impOpen()"><i class="fa-solid fa-file-import"></i> นำเข้ารายชื่อ</button>`:''}
+          </div>
+        </div>
+        <div class="schp-kpis" style="margin:0">
+          <div class="schp-kpi" style="--k:var(--brand-navy-700)"><div class="k-lab">อสม. ในทะเบียน</div>
+            <div class="k-val">${all.length}</div><div class="k-sub">ปฏิบัติงานอยู่ ${active.length} คน</div></div>
+          <div class="schp-kpi" style="--k:var(--sch-violet)"><div class="k-lab">หมู่บ้านที่ดูแล</div>
+            <div class="k-val">${moos.length}</div><div class="k-sub">${moos.length?'หมู่ '+moos.join(', '):'ยังไม่ระบุหมู่'}</div></div>
+          <div class="schp-kpi" style="--k:var(--sch-emerald)"><div class="k-lab">หลังคาเรือนที่รับผิดชอบ</div>
+            <div class="k-val">${hh}</div><div class="k-sub">${hhSum?`ประชากรรวม ${hhSum} คน`:'ยังไม่บันทึกสมาชิกครัวเรือน'}</div></div>
+          <div class="schp-kpi" style="--k:${noHh?'var(--sch-amber)':'var(--sch-emerald)'}"><div class="k-lab">ยังไม่มีหลังคาเรือน</div>
+            <div class="k-val">${noHh}</div><div class="k-sub">คน ที่ยังไม่ได้บันทึก</div></div>
+          <div class="schp-kpi" style="--k:var(--info)"><div class="k-lab">บัญชีผู้ใช้งาน อสม.</div>
+            <div class="k-val">${acc}</div><div class="k-sub">จาก ${active.length} คน</div></div>
+        </div>
+        ${moos.length?`
+        <h4 style="margin:20px 0 10px;font-size:14px">จำนวน อสม. รายหมู่บ้าน</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${moos.map(mo=>{
+            const n=active.filter(m=>String(m.moo||'').trim()===mo).length;
+            const v=active.find(m=>String(m.moo||'').trim()===mo)?.village||'';
+            return `<span class="badge badge-info" style="padding:8px 13px;font-size:12.5px">
+              หมู่ ${escapeHtml(mo)}${v?' '+escapeHtml(v):''} <b style="margin-right:5px">${n}</b> คน</span>`;
+          }).join('')}
+        </div>`:''}
+      </div>
+    </div>`;
+
+  const old=document.getElementById('dash-registry'); if(old) old.remove();
+  const head=host.querySelector('.page-head');
+  if(head&&head.nextSibling) host.insertBefore(el,head.nextSibling);
+  else host.insertBefore(el,host.firstChild);
+}
+
+/* ---------------------------------------------------------------- boot */
+(function fbStatsBoot(){
+  const go=()=>{
+    if(window.FBX && !window.FBX.loading) fbStatsAttach();
+    window.addEventListener('fbx-loaded',()=>setTimeout(fbStatsAttach,150));
+    window.addEventListener('fbx-state',()=>{
+      fbStatsAttach();
+      if(fbStaff()) fbSchedulePublishStats();
+    });
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,450));
+  else setTimeout(go,450);
+})();
 
 </script>
 <script type="module">
