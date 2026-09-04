@@ -5053,6 +5053,13 @@ function fbOpenPanel(){
       <input type="checkbox" id="fb-auto" ${c.autoSync?'checked':''} style="width:17px;height:17px"
         onchange="fbSetCfg({autoSync:this.checked});toast(this.checked?'เปิดซิงก์อัตโนมัติ':'ปิดซิงก์อัตโนมัติ','info')">
       ซิงก์อัตโนมัติทุกครั้งที่มีการแก้ไขข้อมูล</label>
+    <label style="display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" id="fb-remember" ${c.remember!==false?'checked':''} style="width:17px;height:17px;margin-top:2px"
+        onchange="fbSetCfg({remember:this.checked});if(!this.checked){try{localStorage.removeItem('fb_pw')}catch(e){}}
+          toast(this.checked?'จะเชื่อมต่อให้อัตโนมัติทุกครั้งที่เปิดเว็บ':'ต้องเข้าสู่ระบบใหม่ทุกครั้ง','info')">
+      <span>เชื่อมต่ออัตโนมัติทุกครั้งที่เปิดเว็บ (ไม่ต้องกดเชื่อมต่อ)
+        <small style="display:block;color:var(--text-faint);font-size:11.5px">
+          เก็บรหัสไว้ในเครื่องนี้ — ใช้เฉพาะเครื่องของเจ้าหน้าที่เท่านั้น</small></span></label>
     <label style="display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:6px;cursor:pointer">
       <input type="checkbox" id="fb-pub" ${c.publicCheckin?'checked':''} style="width:17px;height:17px;margin-top:2px"
         onchange="fbTogglePublic(this.checked)">
@@ -8278,6 +8285,7 @@ function renderOsmAccountsView(){
     <div class="page-head-actions">
       ${temp?`<button class="btn btn-outline" onclick="mpPrintAllSlips()"><i class="fa-solid fa-print"></i> พิมพ์ใบแจ้งรหัส (${temp})</button>`:''}
       <button class="btn btn-primary" onclick="mpWhyCantLogin()"><i class="fa-solid fa-user-magnifying-glass"></i> เข้าระบบไม่ได้?</button>
+      <button class="btn btn-outline" onclick="mpRepairAll()"><i class="fa-solid fa-wand-magic-sparkles"></i> ซ่อมบัญชีทั้งหมด</button>
       <button class="btn btn-outline" onclick="mpCreateAccountForm()"><i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้ อสม.</button>
       <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบบัญชี${issues.count?` <span class="badge mp-badge-pend">${issues.count}</span>`:''}</button>
       <button class="btn btn-outline" onclick="mpPrintRegPoster()"><i class="fa-solid fa-qrcode"></i> ป้าย QR ลงทะเบียน</button>
@@ -8398,6 +8406,9 @@ function mpCredentials(id){
         <button class="btn btn-primary" onclick="mpResetPw('${a.id}','last6')"><i class="fa-solid fa-id-card"></i> ตั้งเป็นเลขบัตร 6 ตัวท้าย</button>
         <button class="btn btn-outline" onclick="mpResetPw('${a.id}','random')"><i class="fa-solid fa-dice"></i> สุ่มรหัส 6 หลัก</button>
       </div>`}
+
+    ${m?`<button class="btn btn-outline" style="width:100%;justify-content:center;margin-bottom:14px"
+      onclick="mpRebuildOne('${m.id}')"><i class="fa-solid fa-rotate"></i> ลบบัญชีนี้และสร้างใหม่</button>`:''}
 
     <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
     <div style="font-size:12px;color:var(--text-faint);line-height:1.8">
@@ -9692,6 +9703,11 @@ function mpWhyRender(term){
               border-radius:8px;padding:9px 12px;margin-top:7px;line-height:1.7">${x.fix}</div>`:''}
           </div>
         </div>`).join('')}
+      ${acc?`<div style="border-top:1px dashed var(--border);margin-top:10px;padding-top:10px">
+        <button class="btn btn-outline btn-sm" onclick="mpRebuildOne('${m.id}')">
+          <i class="fa-solid fa-rotate"></i> ลบบัญชีเดิมและสร้างใหม่</button>
+        <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px;line-height:1.7">
+          ใช้เมื่อแก้อย่างอื่นแล้วยังเข้าไม่ได้ — ประวัติการเข้าเรียนและกิจกรรมยังอยู่ครบ</div></div>`:''}
       ${!blockers.length&&acc?`
       <div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:9px;padding:11px 13px;
         font-size:12.5px;margin-top:11px;line-height:1.8">
@@ -10911,6 +10927,307 @@ function schSessionCard(s, admin){
     </div>
   </div>`;
 }
+
+
+/* ============================================================================================
+   ACCOUNT SYNC FIX  v1.0
+   แก้ต้นเหตุ: ตอน อสม. สมัครเอง ระบบยังไม่ถือว่าเป็น "เจ้าหน้าที่" หรือ "สมาชิก"
+   fbSchedulePush() จึงไม่ผลักข้อมูลขึ้น Firestore → คำขอค้างอยู่ในเครื่องผู้สมัครเท่านั้น
+   เจ้าหน้าที่จึงไม่เห็นคำขอ และ อสม. เข้าระบบไม่ได้
+   ============================================================================================ */
+
+/* ---------------------------------------------------------------- ผลักบัญชีขึ้น cloud ทันที */
+async function fbPushAccountNow(acc){
+  const F=window.FBX;
+  if(!acc) return false;
+  if(!F || F.fatal || F.loading || !F.db || !F.ready) return false;
+  try{
+    await F.setDoc(F.doc(F.db,'osm_accounts',fbSafeId(acc.id)), JSON.parse(fbSer(acc)));
+    fbLast.osmAccounts = fbLast.osmAccounts || {};
+    fbLast.osmAccounts[fbSafeId(acc.id)] = fbSer(acc);
+    return true;
+  }catch(e){ console.warn('[FBX account push]', e && (e.code||e.message)); return false; }
+}
+async function fbDeleteAccountNow(acc){
+  const F=window.FBX;
+  if(!acc || !F || F.fatal || !F.db || !F.ready) return false;
+  try{
+    await F.deleteDoc(F.doc(F.db,'osm_accounts',fbSafeId(acc.id)));
+    if(fbLast.osmAccounts) delete fbLast.osmAccounts[fbSafeId(acc.id)];
+    return true;
+  }catch(e){ console.warn('[FBX account delete]', e && (e.code||e.message)); return false; }
+}
+
+/* คิวสำรอง: ถ้าตอนสมัครยังต่อ cloud ไม่ได้ เก็บไว้ส่งซ้ำเมื่อเชื่อมต่อได้ */
+const FB_QUEUE_KEY='khoksanga_pending_accounts';
+function fbQueueAdd(acc){
+  try{
+    const q=JSON.parse(localStorage.getItem(FB_QUEUE_KEY)||'[]');
+    if(!q.some(x=>x.id===acc.id)) q.push(acc);
+    localStorage.setItem(FB_QUEUE_KEY, JSON.stringify(q));
+  }catch(e){}
+}
+async function fbQueueFlush(){
+  let q=[];
+  try{ q=JSON.parse(localStorage.getItem(FB_QUEUE_KEY)||'[]'); }catch(e){ return; }
+  if(!q.length) return;
+  const left=[];
+  for(const acc of q){ const ok=await fbPushAccountNow(acc); if(!ok) left.push(acc); }
+  try{ localStorage.setItem(FB_QUEUE_KEY, JSON.stringify(left)); }catch(e){}
+  if(q.length!==left.length) console.info('[FBX] ส่งคำขอที่ค้างขึ้น cloud แล้ว', q.length-left.length, 'รายการ');
+}
+
+/* ---------------------------------------------------------------- สมัครแล้วต้องขึ้น cloud ทันที */
+async function mpDoRegister(e){
+  e.preventDefault();
+  mpInit();
+  const g=x=>document.getElementById(x).value.trim();
+  const er=document.getElementById('oa-rerr');
+  const btn=e.target.querySelector('button[type=submit]');
+  const reset=()=>{ btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> ส่งคำขอลงทะเบียน'; };
+  const fail=(m,html)=>{ er.innerHTML = html||escapeHtml(m); er.style.display='block';
+    try{ er.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){}
+    reset(); };
+  er.style.display='none';
+
+  const cid=g('oa-rcid').replace(/\D/g,''), fn=g('oa-fn'), ln=g('oa-ln'),
+        ph=g('oa-ph').replace(/\D/g,''), moo=g('oa-moo'),
+        pw=document.getElementById('oa-pw').value, pw2=document.getElementById('oa-pw2').value;
+
+  if(!validateIdCard(cid)) return fail('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก');
+  if(!fn||!ln)             return fail('กรุณากรอกชื่อและนามสกุล');
+  if(!validatePhone(ph))   return fail('เบอร์โทรศัพท์ไม่ถูกต้อง (9–10 หลัก)');
+  if(!moo)                 return fail('กรุณากรอกหมู่ที่');
+  if(pw.length<6)          return fail('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+  if(pw!==pw2)             return fail('รหัสผ่านทั้งสองช่องไม่ตรงกัน');
+  if(!document.getElementById('oa-consent').checked) return fail('กรุณายอมรับเงื่อนไขการเก็บข้อมูลส่วนบุคคล');
+
+  btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบ';
+
+  const exist=mpAccountByCid(cid);
+  if(exist){
+    if(exist.status==='approved')
+      return fail('', `ท่านมีบัญชีในระบบอยู่แล้ว <b>ไม่ต้องสมัครใหม่</b><br>
+        กรุณากดแท็บ “เข้าสู่ระบบ” แล้วใช้เลขบัตรประชาชนกับรหัสผ่านเดิม<br>
+        <span style="color:var(--text-secondary)">ถ้าจำรหัสไม่ได้ ให้แจ้งเจ้าหน้าที่ รพ.สต. ตั้งรหัสชั่วคราวให้</span><br>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:9px" onclick="mpSetTab('login')">
+          <i class="fa-solid fa-right-to-bracket"></i> ไปหน้าเข้าสู่ระบบ</button>`);
+    if(exist.status==='pending')
+      return fail('','คำขอของท่าน<b>อยู่ระหว่างรอเจ้าหน้าที่อนุมัติ</b> ไม่ต้องสมัครซ้ำ<br>หากรอเกิน 2 วันทำการ กรุณาติดต่อ '+escapeHtml(SCH_ORG.name));
+    if(exist.status==='suspended')
+      return fail('','บัญชีของท่าน<b>ถูกระงับการใช้งาน</b> กรุณาติดต่อเจ้าหน้าที่ '+escapeHtml(SCH_ORG.name));
+  }
+
+  try{
+    let uid='', email='';
+    try{
+      const r=await mpFbCreate(cid,pw);
+      if(r){ uid=r.uid; email=r.email; }
+    }catch(err){ console.warn('cloud signup:',err && (err.code||err.message)); }
+
+    const salt=mpSalt();
+    const acc={ id: uid || uid_('acc'), uid, fbEmail:email, citizenId:cid,
+      firstName:fn, lastName:ln, phone:ph, moo,
+      salt, pwHash: await mpHash(pw,salt), osmId:'', status:'pending',
+      createdAt:new Date().toISOString(), approvedAt:'', approvedBy:'', lastLogin:'' };
+    const m=(state.osmMembers||[]).find(x=>String(x.idCard||'').replace(/\D/g,'')===cid);
+    if(m){ acc.osmId=m.id; acc.matched=true; }
+    state.osmAccounts.push(acc);
+    schLog('ลงทะเบียน อสม.',`${fn} ${ln} (${mpMaskCid(cid)})`);
+    persistState();
+
+    /* จุดที่เคยพลาด: ต้องผลักคำขอขึ้น Firestore เดี๋ยวนั้น
+       เพราะผู้สมัครยังไม่ใช่ทั้งเจ้าหน้าที่และสมาชิก ระบบซิงก์ปกติจึงข้ามไป */
+    const pushed = await fbPushAccountNow(acc);
+    if(!pushed) fbQueueAdd(acc);
+    mpAuthDone(acc, pushed);
+  }catch(err){
+    fail('เกิดข้อผิดพลาด: '+(err.message||err));
+  }
+}
+
+/* หน้าจอยืนยันหลังสมัคร — บอกตรง ๆ ว่าคำขอถึงเจ้าหน้าที่แล้วหรือยัง */
+function mpAuthDone(acc, pushed){
+  document.querySelector('#osm-auth .oa-card').innerHTML=`
+  <div class="oa-head" style="padding:34px 26px">
+    <div class="orb" style="background:rgba(255,255,255,.22);font-size:30px"><i class="fa-solid fa-circle-check"></i></div>
+    <h2>ส่งคำขอเรียบร้อยแล้ว</h2>
+    <p>${escapeHtml(acc.firstName)} ${escapeHtml(acc.lastName)}</p>
+  </div>
+  <div class="oa-body" style="text-align:center">
+    <p style="font-size:14px;line-height:1.8;margin:0 0 6px">
+      คำขอของท่านอยู่ระหว่าง<b style="color:var(--warning)">รอเจ้าหน้าที่อนุมัติ</b><br>
+      ${acc.matched?'ระบบพบชื่อท่านในทะเบียน อสม. แล้ว':'เจ้าหน้าที่จะตรวจสอบข้อมูลกับทะเบียน อสม.'}</p>
+    ${pushed
+      ? `<div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:10px;padding:11px 14px;
+          font-size:12.5px;margin-top:14px"><i class="fa-solid fa-cloud-arrow-up"></i>
+          ส่งคำขอถึงเจ้าหน้าที่เรียบร้อยแล้ว</div>`
+      : `<div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:11px 14px;
+          font-size:12.5px;line-height:1.75;margin-top:14px"><i class="fa-solid fa-triangle-exclamation"></i>
+          <b>ยังส่งถึงเจ้าหน้าที่ไม่ได้</b> (อินเทอร์เน็ตขัดข้อง)<br>
+          ระบบจะส่งให้อัตโนมัติเมื่อเชื่อมต่อได้ — หรือแจ้งเจ้าหน้าที่ให้สร้างบัญชีให้โดยตรง</div>`}
+    <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.8;margin:14px 0 0">
+      เมื่ออนุมัติแล้วท่านจะเข้าสู่ระบบได้ด้วย<br><b>เลขบัตรประชาชน + รหัสผ่านที่ตั้งไว้</b><br>
+      หากรอเกิน 2 วันทำการ กรุณาติดต่อ ${SCH_ORG.name}</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:22px" onclick="mpCloseAuth()">เสร็จสิ้น</button>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- ลบบัญชีเดิม แล้วสร้างใหม่ */
+async function mpRebuildAccount(osmId, mode){
+  mpInit();
+  const m=osmById(osmId); if(!m) return null;
+  const cid=mpDigits(m.idCard);
+  if(!validateIdCard(cid)){ toast('เลขบัตรประชาชนในทะเบียนไม่ถูกต้อง ต้องแก้ก่อน','error'); return null; }
+
+  // เก็บบัญชีที่เกี่ยวข้องทั้งหมด (ทั้งที่ผูก osmId นี้ และที่ใช้เลขบัตรนี้)
+  const doomed=(state.osmAccounts||[]).filter(a=>a.osmId===osmId || mpDigits(a.citizenId)===cid);
+  for(const a of doomed) await fbDeleteAccountNow(a);
+  state.osmAccounts=(state.osmAccounts||[]).filter(a=>!(a.osmId===osmId || mpDigits(a.citizenId)===cid));
+
+  const acc=await mpCreateAccountFor(osmId,{silent:true,pwMode:mode||'last6'});
+  if(acc){ await fbPushAccountNow(acc); }
+  schLog('ลบบัญชีเดิมและสร้างใหม่',`${m.firstName} ${m.lastName} — ลบ ${doomed.length} บัญชี`);
+  persistState();
+  return { acc, removed:doomed.length };
+}
+
+async function mpRebuildOne(osmId){
+  const m=osmById(osmId); if(!m) return;
+  confirmDialog(`ลบบัญชีเดิมทั้งหมดของ ${m.firstName} ${m.lastName} แล้วสร้างใหม่ใช่หรือไม่ ชื่อผู้ใช้จะเป็นเลขบัตรประชาชน 13 หลัก และรหัสผ่านเป็นเลขบัตร 6 ตัวท้าย ประวัติการเข้าเรียนและกิจกรรมยังอยู่ครบ ไม่ถูกลบ`,async()=>{
+    closeModal();
+    const r=await mpRebuildAccount(osmId,'last6');
+    if(!r||!r.acc){ toast('สร้างบัญชีใหม่ไม่สำเร็จ','error'); return; }
+    if(state.currentView==='school-members') renderOsmAccountsView();
+    mpCredentials(r.acc.id);
+    toast(`สร้างบัญชีใหม่แล้ว — รหัส ${r.acc.tempPw}`+(r.removed?` (ลบของเดิม ${r.removed} บัญชี)`:''),'success');
+  },{confirmLabel:'ลบและสร้างใหม่'});
+}
+
+/* ---------------------------------------------------------------- ซ่อมทั้งระบบในคลิกเดียว */
+async function mpRepairAll(){
+  mpInit();
+  if(!isAdmin()){ toast('เฉพาะเจ้าหน้าที่','error'); return; }
+  const link=mpLinkAudit().filter(o=>o.st.correct).length;
+  const used=new Set((state.osmAccounts||[]).map(a=>a.osmId).filter(Boolean));
+  const missing=schMembers().filter(m=>!used.has(m.id) && validateIdCard(mpDigits(m.idCard))).length;
+  const dup=mpAccountIssues().dupAcc.length;
+
+  confirmDialog(`ระบบจะซ่อมบัญชีทั้งหมดให้อัตโนมัติ ดังนี้\n`
+    +`1. รวมบัญชีที่ใช้เลขบัตรซ้ำกัน ${dup} กลุ่ม\n`
+    +`2. แก้บัญชีที่เชื่อมผิดคน ${link} รายการ\n`
+    +`3. สร้างบัญชีให้ผู้ที่ยังไม่มี ${missing} คน (รหัส = เลขบัตร 6 ตัวท้าย)\n`
+    +`4. อนุมัติคำขอที่ค้างและซิงก์ขึ้น Cloud ทั้งหมด\n\n`
+    +`ประวัติการเข้าเรียน กิจกรรม และใบลา ยังอยู่ครบ ไม่ถูกลบ`,async()=>{
+    closeModal();
+    toast('กำลังซ่อมบัญชี...','info');
+
+    // 1) รวมบัญชีซ้ำ
+    let merged=0;
+    mpAccountIssues().dupAcc.forEach(d=>{ mpKeepBest(d.cid); merged++; });
+    try{ closeModal(); }catch(e){}
+
+    // 2) แก้การเชื่อมผิดคน (ทำเป็นชุด กันการชนกันตอนสลับคู่)
+    const bad=mpLinkAudit().filter(o=>o.st.correct);
+    const targets=new Map();
+    bad.forEach(o=>{ targets.set(o.acc.id,o.st.correct.id); o.acc.osmId=''; });
+    const wanted=new Set([...targets.values()]);
+    (state.osmAccounts||[]).forEach(x=>{ if(!targets.has(x.id) && wanted.has(x.osmId)) x.osmId=''; });
+    targets.forEach((oid,aid)=>{ const a=mpAccountById(aid); if(a) a.osmId=oid; });
+
+    // 3) อนุมัติคำขอที่ค้างและเชื่อมทะเบียนให้
+    let approved=0;
+    (state.osmAccounts||[]).forEach(a=>{
+      if(!a.osmId){ const m=mpMemberByCid(a.citizenId); if(m) a.osmId=m.id; }
+      if(a.status==='pending' && a.osmId){
+        a.status='approved'; a.approvedAt=new Date().toISOString();
+        a.approvedBy=currentUserFullName(); approved++;
+      }
+    });
+
+    // 4) สร้างบัญชีให้ผู้ที่ยังไม่มี
+    const used2=new Set((state.osmAccounts||[]).map(a=>a.osmId).filter(Boolean));
+    const need=schMembers().filter(m=>!used2.has(m.id) && validateIdCard(mpDigits(m.idCard)));
+    let created=0;
+    for(const m of need){
+      const before=(state.osmAccounts||[]).length;
+      await mpCreateAccountFor(m.id,{silent:true,pwMode:'last6'});
+      if((state.osmAccounts||[]).length>before) created++;
+    }
+
+    schLog('ซ่อมบัญชีทั้งระบบ',
+      `รวมซ้ำ ${merged} • แก้การเชื่อม ${targets.size} • อนุมัติ ${approved} • สร้างใหม่ ${created}`);
+    persistState();
+    try{ await fbQueueFlush(); }catch(e){}
+    try{ await fbPush(); }catch(e){ console.warn(e); }
+    if(state.currentView==='school-members') renderOsmAccountsView();
+
+    openModal(`
+    <div class="modal-header"><h3><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> ซ่อมบัญชีเรียบร้อย</h3>
+      <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <div style="background:var(--sch-emerald-bg);color:var(--sch-emerald);border-radius:10px;padding:14px 16px;
+        font-size:13.5px;line-height:2;margin-bottom:14px">
+        รวมบัญชีที่ซ้ำกัน <b>${merged}</b> กลุ่ม<br>
+        แก้บัญชีที่เชื่อมผิดคน <b>${targets.size}</b> รายการ<br>
+        อนุมัติคำขอที่ค้าง <b>${approved}</b> รายการ<br>
+        สร้างบัญชีใหม่ <b>${created}</b> คน
+      </div>
+      <p style="font-size:13px;line-height:1.9;margin:0 0 12px">
+        <b>แจ้ง อสม. ได้เลยว่า</b><br>
+        ชื่อผู้ใช้ = เลขบัตรประชาชน 13 หลัก<br>
+        รหัสผ่าน = เลขบัตรประชาชน 6 ตัวท้าย</p>
+      <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:11px 14px;font-size:12.5px;line-height:1.75">
+        <i class="fa-solid fa-triangle-exclamation"></i> บัญชีที่แก้ไขจะใช้รหัสเดิมที่เคยตั้งไว้
+        ถ้าใครยังเข้าไม่ได้ ให้ใช้ปุ่ม “เข้าระบบไม่ได้?” แล้วกด “ลบบัญชีเดิมและสร้างใหม่”</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">เสร็จสิ้น</button></div>`,{size:'sm'});
+  },{confirmLabel:'ซ่อมทั้งหมด'});
+}
+
+/* ---------------------------------------------------------------- เชื่อมต่ออัตโนมัติ */
+function fbRemember(){ return fbCfg().remember!==false; }
+async function fbAutoSignIn(){
+  const F=window.FBX; if(!F||F.fatal||F.loading) return;
+  if(F.ready) return;
+  const c=fbCfg();
+  const pw = sessionStorage.getItem('fb_pw') || (fbRemember()? localStorage.getItem('fb_pw') : '');
+  if(c.email && pw){
+    try{ await F.signInWithEmailAndPassword(F.auth,c.email,pw); return; }
+    catch(e){ console.warn('[FBX auto sign-in]', e && (e.code||e.message)); }
+  }
+}
+async function fbSignInStaff(email,pw){
+  const F=window.FBX;
+  if(!F||F.fatal) throw new Error('Firebase ยังโหลดไม่สำเร็จ');
+  await F.signInWithEmailAndPassword(F.auth,email,pw);
+  fbSetCfg({email});
+  sessionStorage.setItem('fb_pw',pw);
+  if(fbRemember()){ try{ localStorage.setItem('fb_pw',pw); }catch(e){} }
+}
+async function fbSignOut(){
+  const F=window.FBX; if(!F) return;
+  fbDetach();
+  sessionStorage.removeItem('fb_pw');
+  try{ localStorage.removeItem('fb_pw'); }catch(e){}
+  try{ await F.signOut(F.auth); }catch(e){}
+  fbLast={}; fbPaint(); toast('ออกจากระบบ Firebase แล้ว','info');
+}
+
+/* ---------------------------------------------------------------- boot */
+(function fbFixBoot(){
+  const go=()=>{
+    // ส่งคำขอที่ค้างขึ้น cloud ทันทีที่เชื่อมต่อได้
+    window.addEventListener('fbx-state',()=>{ if(window.FBX && window.FBX.ready) fbQueueFlush(); });
+    window.addEventListener('online',()=>{ if(window.FBX && window.FBX.ready) fbQueueFlush(); });
+    setTimeout(()=>{ if(window.FBX && window.FBX.ready) fbQueueFlush(); }, 3000);
+    // พยายามเข้าสู่ระบบอัตโนมัติซ้ำ เผื่อ SDK โหลดช้า
+    setTimeout(()=>{ try{ fbAutoSignIn(); }catch(e){} }, 2500);
+    setTimeout(()=>{ try{ fbAutoSignIn(); }catch(e){} }, 7000);
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,500));
+  else setTimeout(go,500);
+})();
 
 </script>
 <script type="module">
