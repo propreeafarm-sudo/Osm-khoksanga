@@ -3590,7 +3590,7 @@ function setSchoolStatus(sid,oid,st){ schSet(sid,oid,st); }
 function setSchoolNote(sid,oid,n){ schSetNote(sid,oid,n); }
 
 /* ---------------------------------------------------------------- ลายมือชื่อ */
-function schSignModal(sid,oid){
+function schSignModalBase(sid,oid){
   const m=osmById(oid), r=schRec(sid,oid)||{};
   openModal(`
   <div class="modal-header"><h3><i class="fa-solid fa-signature"></i> ลงลายมือชื่อ</h3>
@@ -10504,6 +10504,412 @@ async function mpFbUpdatePw(acc, newPw){
   if(!F.user || !acc.uid || F.user.uid!==acc.uid) return false;
   await F.updatePassword(F.user, mpFbPw(newPw));
   return true;
+}
+
+
+/* ============================================================================================
+   POST-CLOSE EDIT  v1.0
+   แก้ไขผลการเช็กชื่อหลังปิดรอบได้ โดยบันทึกร่องรอยการแก้ไขไว้ทุกครั้ง
+   (ใครแก้ แก้เมื่อไหร่ จากอะไรเป็นอะไร) เพื่อให้ข้อมูลยังตรวจสอบย้อนหลังได้
+   ============================================================================================ */
+
+let schUnlocked = null;      // id ของรอบที่กำลังเปิดให้แก้ไขชั่วคราว
+let schUnlockReason = '';
+
+function schCanEdit(s){
+  if(!s) return false;
+  if(!s.closedAt) return true;
+  return schUnlocked === s.id;
+}
+function schIsUnlocked(s){ return !!(s && s.closedAt && schUnlocked===s.id); }
+
+/* ---------------------------------------------------------------- ปลดล็อก / ล็อกกลับ */
+function schUnlockSession(sid){
+  const s=schSessionById(sid); if(!s) return;
+  if(!isAdmin()){ toast('เฉพาะเจ้าหน้าที่เท่านั้นที่แก้ไขได้','error'); return; }
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-unlock"></i> ขอแก้ไขข้อมูลรอบที่ปิดแล้ว</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="sch-unlock"><div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.85;margin-bottom:16px">
+      <b>${escapeHtml(s.title)}</b><br>
+      <span style="color:var(--text-secondary)">${formatThaiDate(s.date)}
+        • ปิดรอบเมื่อ ${s.closedAt?new Date(s.closedAt).toLocaleString('th-TH'):'-'}</span>
+    </div>
+    <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.75;margin:0 0 14px">
+      ใช้เมื่อเช็กชื่อผิดพลาด เช่น บันทึกคนที่มาเป็นขาด หรือมี อสม. แจ้งลาย้อนหลัง
+      ระบบจะเปิดให้แก้เฉพาะรอบนี้ และ<b>บันทึกทุกการแก้ไขไว้ตรวจสอบได้</b></p>
+    <div class="form-group"><label>เหตุผลในการแก้ไข <span class="req">*</span></label>
+      <input class="input" id="ul-reason" list="ul-reasons" placeholder="เช่น บันทึกผิดพลาด / อสม. แจ้งลาย้อนหลัง">
+      <datalist id="ul-reasons">
+        <option value="บันทึกผิดพลาด ต้องแก้ให้ถูกต้อง">
+        <option value="อสม. แจ้งลาย้อนหลัง มีหลักฐานประกอบ">
+        <option value="ตกหล่นตอนเช็กชื่อหน้างาน">
+        <option value="ตรวจสอบกับใบลงชื่อแล้วไม่ตรงกัน">
+        <option value="ปิดรอบเร็วเกินไป ยังมีผู้มาสาย">
+      </datalist></div>
+    <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:11px 14px;
+      font-size:12.5px;line-height:1.75">
+      <i class="fa-solid fa-clipboard-check"></i> ทุกการแก้ไขจะถูกบันทึกชื่อผู้แก้ เวลา และค่าก่อน–หลัง
+      ดูย้อนหลังได้ที่ปุ่ม “ประวัติการแก้ไข”</div>
+    <div class="field-error" id="ul-err" style="display:none;margin-top:10px"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-unlock"></i> เปิดให้แก้ไข</button>
+  </div></form>`,{size:'sm'});
+
+  document.getElementById('sch-unlock').addEventListener('submit',e=>{
+    e.preventDefault();
+    const r=document.getElementById('ul-reason').value.trim();
+    if(!r){ const er=document.getElementById('ul-err'); er.textContent='กรุณาระบุเหตุผล'; er.style.display='block'; return; }
+    schUnlocked=sid; schUnlockReason=r;
+    schLog('ปลดล็อกรอบที่ปิดแล้ว',`${s.title} — เหตุผล: ${r}`);
+    persistState(); closeModal(); renderSchoolRosterView();
+    toast('เปิดให้แก้ไขแล้ว — แก้เสร็จกด “ล็อกกลับ”','success');
+  });
+}
+
+function schRelock(sid){
+  const s=schSessionById(sid); if(!s) return;
+  const n=(s.editLog||[]).length;
+  schUnlocked=null; schUnlockReason='';
+  schLog('ล็อกรอบกลับ',`${s.title}${n?` — แก้ไขทั้งหมด ${n} รายการ`:''}`);
+  persistState(); renderSchoolRosterView();
+  toast('ล็อกรอบเรียบร้อยแล้ว','success');
+}
+
+/* ---------------------------------------------------------------- บันทึกสถานะ (รองรับการแก้หลังปิด) */
+function schSet(sid,oid,status,opts){
+  opts=opts||{};
+  const s=schSessionById(sid); if(!s) return;
+  if(!schCanEdit(s)){
+    toast('รอบนี้ปิดแล้ว — กด “ขอแก้ไขข้อมูล” ก่อนจึงจะแก้ได้','error');
+    return;
+  }
+  let r=schRec(sid,oid);
+  const prevStatus = r ? r.status : '';
+  schUndo.push({sid,oid,prev:r?{status:r.status,note:r.note,checkinAt:r.checkinAt}:null});
+  if(schUndo.length>40) schUndo.shift();
+
+  const now=new Date().toISOString();
+  const afterClose = !!s.closedAt;
+
+  if(!r){
+    r={id:uid('sa'),sessionId:sid,osmId:oid,status,note:opts.note||'',
+       checkinAt:SCH_PRESENT.includes(status)?now:'',source:opts.source||'เจ้าหน้าที่',updatedAt:now};
+    state.schoolAttendance.push(r);
+  }else{
+    r.status=status; r.updatedAt=now;
+    if(opts.note) r.note=opts.note;
+    if(opts.source) r.source=opts.source;
+    if(SCH_PRESENT.includes(status)&&!r.checkinAt) r.checkinAt=now;
+  }
+
+  // บันทึกร่องรอยเมื่อแก้หลังปิดรอบ
+  if(afterClose && prevStatus!==status){
+    const m=osmById(oid)||{};
+    r.editedAfterClose=true;
+    r.editedBy=currentUserFullName();
+    r.editedAt=now;
+    r.editReason=schUnlockReason||'';
+    s.editLog=Array.isArray(s.editLog)?s.editLog:[];
+    s.editLog.unshift({ at:now, by:currentUserFullName(), osmId:oid,
+      name:`${m.firstName||''} ${m.lastName||''}`.trim(),
+      from:prevStatus||'(ยังไม่บันทึก)', to:status, reason:schUnlockReason||'' });
+    if(s.editLog.length>500) s.editLog.length=500;
+    s.lastEditedAt=now; s.lastEditedBy=currentUserFullName();
+    schLog('แก้ไขหลังปิดรอบ',
+      `${s.title} — ${m.firstName||''} ${m.lastName||''}: ${prevStatus||'(ว่าง)'} → ${status}`);
+  }
+
+  schSave();
+  if(!opts.silent) renderSchoolRosterView();
+  return r;
+}
+
+/* ---------------------------------------------------------------- ประวัติการแก้ไข */
+function schEditHistory(sid){
+  const s=schSessionById(sid); if(!s) return;
+  const log=s.editLog||[];
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการแก้ไขหลังปิดรอบ</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.85;margin-bottom:16px">
+      <b>${escapeHtml(s.title)}</b><br>
+      <span style="color:var(--text-secondary)">${formatThaiDate(s.date)}
+        • ปิดรอบ ${s.closedAt?new Date(s.closedAt).toLocaleString('th-TH'):'-'}</span>
+      ${log.length?`<div style="color:var(--sch-amber);margin-top:5px">
+        <i class="fa-solid fa-pen"></i> แก้ไขหลังปิดรอบ ${log.length} รายการ</div>`:''}
+    </div>
+    ${log.length? log.map(x=>`
+      <div style="border-bottom:1px solid var(--border);padding:11px 0;font-size:13px;line-height:1.75">
+        <b>${escapeHtml(x.name||'-')}</b>
+        <span class="mx mx-${x.from}" style="width:auto;padding:2px 8px;font-size:11px">${escapeHtml(x.from)}</span>
+        <i class="fa-solid fa-arrow-right" style="font-size:10px;color:var(--text-faint)"></i>
+        <span class="mx mx-${x.to}" style="width:auto;padding:2px 8px;font-size:11px">${escapeHtml(x.to)}</span>
+        <div style="font-size:11.5px;color:var(--text-faint);margin-top:3px">
+          ${new Date(x.at).toLocaleString('th-TH')} โดย ${escapeHtml(x.by||'-')}
+          ${x.reason?` • เหตุผล: ${escapeHtml(x.reason)}`:''}</div>
+      </div>`).join('')
+    : `<div class="mp-empty" style="border:0"><i class="fa-solid fa-circle-check big" style="color:var(--success)"></i>
+        <h3>ไม่มีการแก้ไขหลังปิดรอบ</h3><p>ผลการเช็กชื่อของรอบนี้เป็นไปตามที่บันทึกไว้หน้างาน</p></div>`}
+  </div>
+  <div class="modal-footer">
+    ${log.length?`<button class="btn btn-outline" onclick="schPrintEditLog('${sid}')"><i class="fa-solid fa-print"></i> พิมพ์ประวัติ</button>`:''}
+    <button class="btn btn-primary" onclick="closeModal()">ปิด</button>
+  </div>`,{size:'md'});
+}
+
+function schPrintEditLog(sid){
+  const s=schSessionById(sid); if(!s) return;
+  const log=s.editLog||[];
+  schPrintWindow(`ประวัติการแก้ไข — ${s.title}`,`
+  <div class="pg">
+    ${schGovHead('บันทึกการแก้ไขผลการเช็กชื่อหลังปิดรอบ')}
+    <div class="meta" style="display:block;line-height:2">
+      <div><b>รอบเรียน:</b> ${escapeHtml(s.title)}</div>
+      <div><b>วันที่จัด:</b> ${formatThaiDate(s.date)}</div>
+      <div><b>ปิดรอบเมื่อ:</b> ${s.closedAt?new Date(s.closedAt).toLocaleString('th-TH'):'-'}</div>
+      <div><b>จำนวนรายการที่แก้ไข:</b> ${log.length} รายการ</div>
+    </div>
+    <table><thead><tr><th style="width:7%">ที่</th><th style="width:24%">ชื่อ – นามสกุล</th>
+      <th style="width:11%">จากเดิม</th><th style="width:11%">แก้เป็น</th>
+      <th style="width:20%">วันเวลาที่แก้</th><th>ผู้แก้ไข / เหตุผล</th></tr></thead>
+      <tbody>${log.map((x,i)=>`<tr>
+        <td class="c">${i+1}</td><td class="l">${escapeHtml(x.name||'-')}</td>
+        <td class="c">${escapeHtml(x.from)}</td><td class="c">${escapeHtml(x.to)}</td>
+        <td class="c">${new Date(x.at).toLocaleString('th-TH')}</td>
+        <td class="l">${escapeHtml(x.by||'-')}${x.reason?`<br><small>${escapeHtml(x.reason)}</small>`:''}</td>
+      </tr>`).join('')||'<tr><td colspan="6" class="c">ไม่มีการแก้ไข</td></tr>'}</tbody></table>
+    ${schSignBlock()}
+    <div class="pnum">พิมพ์เมื่อ ${schThaiToday()}</div>
+  </div>`);
+}
+
+/* ---------------------------------------------------------------- หน้าเช็กชื่อ (รองรับรอบที่ปิดแล้ว) */
+function renderSchoolRosterView(){
+  schInit();
+  const el=document.getElementById('view-school-roster');
+  const s=getActiveSchoolSession();
+  if(!s){
+    el.innerHTML=`<div class="schp-empty"><div class="ic"><i class="fa-solid fa-school-lock"></i></div>
+      <h3>ยังไม่มีรอบเรียน</h3><p>กรุณาสร้างรอบเรียนประจำเดือนก่อนจึงจะเช็กชื่อได้</p>
+      <button class="btn btn-primary" onclick="switchView('school-sessions')"><i class="fa-solid fa-calendar-plus"></i> ไปสร้างรอบเรียน</button></div>`;
+    return;
+  }
+  // เปลี่ยนรอบแล้วต้องยกเลิกการปลดล็อกเดิม
+  if(schUnlocked && schUnlocked!==s.id){ schUnlocked=null; schUnlockReason=''; }
+
+  const st=schStats(s.id);
+  const closed=!!s.closedAt;
+  const unlocked=schIsUnlocked(s);
+  const locked=!schCanEdit(s);
+  const edits=(s.editLog||[]).length;
+  const seg=SCH_ST.map(k=>st[k]?`<i style="width:${st[k]/Math.max(1,st.total)*100}%;background:${SCH_COLOR[k]}"></i>`:'').join('');
+
+  el.innerHTML=`
+  <div class="page-head">
+    <div><h2>${escapeHtml(s.title)}</h2>
+      <p>${formatThaiDate(s.date)} • ${escapeHtml(s.startTime||'09:00')}–${escapeHtml(s.endTime||'12:00')} น. • ${escapeHtml(s.location||SCH_ORG.name)}</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-outline" onclick="showSchoolQR('${s.id}')"><i class="fa-solid fa-qrcode"></i> QR รอบนี้</button>
+      <button class="btn btn-outline" onclick="schPrintSignSheet('${s.id}')"><i class="fa-solid fa-file-signature"></i> ใบลงชื่อ</button>
+      ${edits?`<button class="btn btn-outline" onclick="schEditHistory('${s.id}')"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการแก้ไข (${edits})</button>`:''}
+      ${!closed?`<button class="btn btn-primary" onclick="closeSchoolSession('${s.id}')"><i class="fa-solid fa-lock"></i> ปิดรอบ &amp; สรุปผล</button>`:''}
+    </div>
+  </div>
+
+  ${closed && !unlocked ? `
+  <div style="background:var(--sch-slate-bg);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:16px;
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:230px;font-size:13px;line-height:1.75">
+      <b><i class="fa-solid fa-lock"></i> รอบนี้ปิดแล้ว</b>
+      <span style="color:var(--text-secondary)">— ปิดเมื่อ ${new Date(s.closedAt).toLocaleString('th-TH')}
+      ${s.lastEditedAt?` • แก้ไขล่าสุด ${new Date(s.lastEditedAt).toLocaleString('th-TH')} โดย ${escapeHtml(s.lastEditedBy||'-')}`:''}</span><br>
+      <span style="color:var(--text-faint);font-size:12px">ถ้าเช็กชื่อผิดพลาดหรือมี อสม. แจ้งลาย้อนหลัง สามารถขอแก้ไขได้</span></span>
+    ${isAdmin()?`<button class="btn btn-primary" onclick="schUnlockSession('${s.id}')">
+      <i class="fa-solid fa-unlock"></i> ขอแก้ไขข้อมูล</button>`:''}
+  </div>` : ''}
+
+  ${unlocked ? `
+  <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:var(--radius-md);
+    padding:14px 18px;margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    border:1.5px solid var(--sch-amber)">
+    <span style="flex:1;min-width:230px;font-size:13px;line-height:1.75">
+      <b><i class="fa-solid fa-unlock"></i> กำลังแก้ไขรอบที่ปิดแล้ว</b><br>
+      <span>เหตุผล: ${escapeHtml(schUnlockReason||'-')}
+      ${edits?` • แก้ไปแล้ว ${edits} รายการ`:''}</span><br>
+      <span style="font-size:12px">ทุกการแก้ไขถูกบันทึกชื่อผู้แก้และเวลาไว้ แก้เสร็จแล้วกดล็อกกลับ</span></span>
+    <button class="btn btn-primary" onclick="schRelock('${s.id}')"><i class="fa-solid fa-lock"></i> ล็อกกลับ</button>
+  </div>` : ''}
+
+  <div class="schp-live">
+    <div class="schp-live-top">
+      <span><i class="fa-solid fa-gauge-high" style="color:var(--brand-navy-700)"></i>
+        เช็กชื่อแล้ว <b style="font-size:17px">${st.checked}</b> / ${st.total} คน
+        <span style="color:var(--text-faint);font-weight:600">• เหลืออีก ${st.pending} คน</span></span>
+      <span style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px">
+        ${SCH_ST.map(k=>`<span style="color:${SCH_COLOR[k]}"><i class="fa-solid ${SCH_ICON[k]}"></i> ${k} <b>${st[k]}</b></span>`).join('')}
+        <span style="font-weight:800">เข้าร่วม ${st.pct}%</span></span>
+    </div>
+    <div class="schp-live-bar">${seg}<i style="width:${st.pending/Math.max(1,st.total)*100}%;background:var(--bg-surface-2)"></i></div>
+  </div>
+
+  <div class="schp-bar">
+    <div class="fg"><label>รอบเรียน</label>
+      <select class="input" onchange="sessionStorage.setItem('school_active_session',this.value);schStopScan();schUnlocked=null;renderSchoolRosterView()">
+        ${schSessions().map(x=>`<option value="${x.id}" ${x.id===s.id?'selected':''}>${formatThaiDateShort(x.date)} — ${escapeHtml(x.title)}${x.closedAt?' 🔒':''}</option>`).join('')}
+      </select></div>
+    <div class="fg grow"><label>วิธีเช็กชื่อ</label>
+      <div class="schp-tabs">
+        <button class="schp-tab ${schTab==='list'?'on':''}" onclick="schSetTab('list')"><i class="fa-solid fa-list-check"></i> รายชื่อทั้งห้อง</button>
+        <button class="schp-tab ${schTab==='scan'?'on':''}" onclick="schSetTab('scan')"><i class="fa-solid fa-camera"></i> สแกนบัตร QR</button>
+        <button class="schp-tab ${schTab==='quick'?'on':''}" onclick="schSetTab('quick')"><i class="fa-solid fa-keyboard"></i> รหัส 4 หลัก</button>
+      </div></div>
+    ${schUndo.length&&!locked?`<button class="btn btn-outline" onclick="schUndoLast()"><i class="fa-solid fa-rotate-left"></i> ย้อนกลับ</button>`:''}
+  </div>
+
+  <div id="schp-panel"></div>`;
+
+  const p=document.getElementById('schp-panel');
+  if(schTab==='list')  schRenderList(p,s,locked);
+  if(schTab==='scan')  schRenderScan(p,s,locked);
+  if(schTab==='quick') schRenderQuick(p,s,locked);
+}
+
+/* แถวรายชื่อ: แสดงเครื่องหมายรายการที่ถูกแก้หลังปิดรอบ */
+function schRosterRow(s,m,i,locked){
+  const r=schRec(s.id,m.id)||{};
+  const cls=r.status?(SCH_PRESENT.includes(r.status)?'done':(r.status==='ขาด'?'miss':'')):'';
+  return `
+  <div class="schp-row ${cls}" id="row-${m.id}">
+    <div class="schp-idx">${i+1}</div>
+    <div class="schp-person">
+      <div class="schp-av">${escapeHtml(initials(m.firstName,m.lastName))}</div>
+      <div style="min-width:0">
+        <b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}
+          ${r.editedAfterClose?`<i class="fa-solid fa-pen" title="แก้ไขหลังปิดรอบ โดย ${escapeHtml(r.editedBy||'')} เมื่อ ${r.editedAt?new Date(r.editedAt).toLocaleString('th-TH'):''}"
+            style="color:var(--sch-amber);font-size:11px;margin-right:5px"></i>`:''}</b>
+        <small>หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')} • รหัส ${schCode(m)}
+        ${r.checkinAt?` • <i class="fa-solid fa-clock"></i> ${new Date(r.checkinAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} น.`:''}</small>
+      </div>
+    </div>
+    <div class="schp-seg">
+      ${SCH_ST.map(k=>`<button class="schp-sbtn ${r.status===k?'on':''}" data-s="${k}" ${locked?'disabled':''}
+        onclick="schSet('${s.id}','${m.id}','${k}')">${k}</button>`).join('')}
+    </div>
+    <div class="schp-row-tools">
+      ${r.sign?`<img src="${r.sign}" class="schp-sig-thumb" alt="ลายมือชื่อ" title="ลายมือชื่อดิจิทัล">`:''}
+      <button class="schp-mini ${r.sign?'has':''}" title="ลงลายมือชื่อ" ${locked?'disabled':''}
+        onclick="schSignModal('${s.id}','${m.id}')"><i class="fa-solid fa-signature"></i></button>
+      <input class="schp-note" placeholder="หมายเหตุ" value="${escapeHtml(r.note||'')}" ${locked?'disabled':''}
+        onchange="schSetNote('${s.id}','${m.id}',this.value)">
+    </div>
+  </div>`;
+}
+
+/* ปุ่มเหมารวมต้องเช็กสิทธิ์แบบเดียวกัน */
+function schMarkAll(sid,status){
+  const s=schSessionById(sid);
+  if(!schCanEdit(s)){ toast('รอบนี้ปิดแล้ว — กด “ขอแก้ไขข้อมูล” ก่อน','error'); return; }
+  confirmDialog(`ทำเครื่องหมาย “${status}” ให้ อสม. ที่ยังไม่ได้เช็กชื่อทั้งหมดใช่หรือไม่? (คนที่เช็กไว้แล้วจะไม่ถูกเปลี่ยน)`,()=>{
+    schMembers().forEach(m=>{ if(!schRec(sid,m.id)?.status) schSet(sid,m.id,status,{silent:true,source:'เหมารวม'}); });
+    schLog('เช็กชื่อเหมารวม',`${s.title} → ${status}`);
+    schSave(); closeModal(); renderSchoolRosterView(); toast('บันทึกแล้ว แก้ไขรายคนได้ตามปกติ','success');
+  },{confirmLabel:'ยืนยัน'});
+}
+function schClearAll(sid){
+  const s=schSessionById(sid);
+  if(!schCanEdit(s)){ toast('รอบนี้ปิดแล้ว — กด “ขอแก้ไขข้อมูล” ก่อน','error'); return; }
+  confirmDialog('ล้างผลการเช็กชื่อทั้งหมดของรอบนี้ใช่หรือไม่',()=>{
+    state.schoolAttendance=state.schoolAttendance.filter(r=>r.sessionId!==sid);
+    schLog('ล้างผลเช็กชื่อ',s.title||'');
+    schSave(); closeModal(); renderSchoolRosterView(); toast('ล้างข้อมูลเช็กชื่อแล้ว','success');
+  },{confirmLabel:'ล้างข้อมูล'});
+}
+function schSetNote(sid,oid,note){
+  const s=schSessionById(sid);
+  if(!schCanEdit(s)){ toast('รอบนี้ปิดแล้ว — กด “ขอแก้ไขข้อมูล” ก่อน','error'); renderSchoolRosterView(); return; }
+  let r=schRec(sid,oid);
+  if(!r){ r={id:uid('sa'),sessionId:sid,osmId:oid,status:'',note,updatedAt:new Date().toISOString()}; state.schoolAttendance.push(r); }
+  else r.note=note;
+  schSave();
+}
+function schSignModal(sid,oid){
+  const s=schSessionById(sid);
+  if(!schCanEdit(s)){ toast('รอบนี้ปิดแล้ว — กด “ขอแก้ไขข้อมูล” ก่อน','error'); return; }
+  return schSignModalBase(sid,oid);
+}
+
+/* สแกน QR ก็ต้องเคารพสถานะล็อกเช่นกัน */
+function schHandleScan(sid,text){
+  const s=schSessionById(sid);
+  if(!schCanEdit(s)){ schBeep(false); schPushLog('err','—','รอบนี้ปิดแล้ว'); return; }
+  const raw=String(text||'').trim();
+  const key=raw.replace(/^OSM:/i,'').trim();
+  let m=schMembers().find(x=>x.id===key);
+  if(!m){ const dg=key.replace(/\D/g,'');
+    if(dg.length===13) m=schMembers().find(x=>String(x.idCard||'').replace(/\D/g,'')===dg);
+    else if(dg.length>=9) m=schMembers().find(x=>String(x.phone||'').replace(/\D/g,'')===dg);
+  }
+  if(!m){ schBeep(false); schPushLog('err',raw.slice(0,24),'ไม่พบข้อมูลในทะเบียน อสม.'); return; }
+  const exist=schRec(sid,m.id);
+  const nm=`${m.firstName} ${m.lastName}`;
+  if(exist&&exist.status&&exist.source!=='เหมารวม'){
+    schBeep(false); schPushLog('warn',nm,`เช็กชื่อไปแล้ว (${exist.status})`); return;
+  }
+  const status=schIsLate(s)?'สาย':'มา';
+  schSet(sid,m.id,status,{silent:true,source:'สแกน QR'});
+  schBeep(true);
+  schPushLog(status==='สาย'?'warn':'ok',nm,`บันทึก “${status}” • หมู่ ${m.moo||'-'}`);
+  const st=schStats(sid);
+  const lb=document.querySelector('.schp-live-top b'); if(lb) lb.textContent=st.checked;
+}
+
+/* ---------------------------------------------------------------- ปุ่มในหน้ารอบเรียน */
+function schSessionCard(s, admin){
+  const st = schStats(s.id), d = new Date(s.date), ss = schSessionState(s);
+  const seg = SCH_ST.map(k=>st[k]?`<i style="width:${st[k]/Math.max(1,st.total)*100}%;background:${SCH_COLOR[k]}"></i>`:'').join('')
+            + (st.pending?`<i style="width:${st.pending/Math.max(1,st.total)*100}%;background:var(--bg-surface-2)"></i>`:'');
+  const edits=(s.editLog||[]).length;
+  const badge = ss==='closed' ? '<span class="badge" style="background:var(--sch-slate-bg);color:var(--sch-slate)"><i class="fa-solid fa-lock"></i> ปิดรอบแล้ว</span>'
+              : ss==='future'? '<span class="badge badge-info"><i class="fa-solid fa-hourglass-half"></i> รอถึงกำหนด</span>'
+              : '<span class="badge badge-success"><i class="fa-solid fa-circle-dot"></i> เปิดเช็กชื่อ</span>';
+  return `
+  <div class="schp-card is-${ss}">
+    <div class="schp-date"><b>${d.getDate()}</b><span>${THAI_MONTHS_SHORT[d.getMonth()]} ${String(beYear(d.getFullYear())).slice(-2)}</span></div>
+    <div class="schp-main">
+      <h3>${escapeHtml(s.title||'โรงเรียน อสม. ประจำเดือน')} ${badge}
+        ${edits?`<span class="badge" style="background:var(--sch-amber-bg);color:var(--sch-amber)" title="แก้ไขหลังปิดรอบ">
+          <i class="fa-solid fa-pen"></i> แก้ไข ${edits}</span>`:''}</h3>
+      <div class="meta">
+        <span><i class="fa-solid fa-clock"></i> ${escapeHtml(s.startTime||'09:00')}–${escapeHtml(s.endTime||'12:00')} น.</span>
+        <span><i class="fa-solid fa-location-dot"></i> ${escapeHtml(s.location||SCH_ORG.name)}</span>
+        ${s.topic?`<span><i class="fa-solid fa-book-open"></i> ${escapeHtml(s.topic)}</span>`:''}
+        ${s.pin?`<span><i class="fa-solid fa-key"></i> PIN ${escapeHtml(s.pin)}</span>`:''}
+      </div>
+      <div class="schp-progress">${seg||'<i style="width:100%;background:var(--bg-surface-2)"></i>'}</div>
+      <div class="schp-legend">
+        ${SCH_ST.map(k=>`<span><em style="background:${SCH_COLOR[k]}"></em>${k} ${st[k]}</span>`).join('')}
+        <span><em style="background:var(--border-strong)"></em>ยังไม่เช็ก ${st.pending}</span>
+        <span style="font-weight:800;color:var(--text-primary)">เข้าร่วม ${st.pct}%</span>
+      </div>
+    </div>
+    <div class="schp-actions">
+      <button class="btn btn-primary btn-sm" onclick="openSchoolRoster('${s.id}')">
+        <i class="fa-solid fa-${s.closedAt?'pen-to-square':'clipboard-user'}"></i> ${s.closedAt?'ดู / แก้ไข':'เช็กชื่อ'}</button>
+      <button class="btn btn-outline btn-sm" onclick="showSchoolQR('${s.id}')"><i class="fa-solid fa-qrcode"></i> QR</button>
+      <button class="btn btn-outline btn-sm" title="ใบลงชื่อ" onclick="schPrintSignSheet('${s.id}')"><i class="fa-solid fa-file-signature"></i></button>
+      <button class="btn btn-outline btn-sm" title="รายงานสรุป" onclick="schPrintSessionReport('${s.id}')"><i class="fa-solid fa-file-lines"></i></button>
+      ${edits?`<button class="btn btn-outline btn-sm" title="ประวัติการแก้ไข" onclick="schEditHistory('${s.id}')"><i class="fa-solid fa-clock-rotate-left"></i></button>`:''}
+      ${admin?`
+      <button class="btn btn-outline btn-sm" title="${s.closedAt?'เปิดรอบใหม่':'ปิดรอบ'}" onclick="closeSchoolSession('${s.id}')"><i class="fa-solid fa-${s.closedAt?'lock-open':'lock'}"></i></button>
+      <button class="btn btn-outline btn-sm" title="แก้ไข" onclick="openSchoolSessionForm('${s.id}')"><i class="fa-solid fa-pen"></i></button>
+      <button class="btn btn-ghost btn-sm" title="ลบ" onclick="deleteSchoolSession('${s.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>`:''}
+    </div>
+  </div>`;
 }
 
 </script>
