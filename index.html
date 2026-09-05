@@ -8285,6 +8285,7 @@ function renderOsmAccountsView(){
     <div class="page-head-actions">
       ${temp?`<button class="btn btn-outline" onclick="mpPrintAllSlips()"><i class="fa-solid fa-print"></i> พิมพ์ใบแจ้งรหัส (${temp})</button>`:''}
       <button class="btn btn-primary" onclick="mpWhyCantLogin()"><i class="fa-solid fa-user-magnifying-glass"></i> เข้าระบบไม่ได้?</button>
+      <button class="btn btn-outline" onclick="mpNamePanel()"><i class="fa-solid fa-user-check"></i> ชื่อไม่ตรง / สลับคน${(()=>{try{const n=mpNameAudit().length;return n?` <span class="badge mp-badge-pend">${n}</span>`:'';}catch(e){return '';}})()}</button>
       <button class="btn btn-outline" onclick="mpRepairAll()"><i class="fa-solid fa-wand-magic-sparkles"></i> ซ่อมบัญชีทั้งหมด</button>
       <button class="btn btn-outline" onclick="mpCreateAccountForm()"><i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้ อสม.</button>
       <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบบัญชี${issues.count?` <span class="badge mp-badge-pend">${issues.count}</span>`:''}</button>
@@ -8373,6 +8374,7 @@ function mpCredentials(id){
       <input class="input" id="cr-user" readonly value="${escapeHtml(cid)}"
         style="font-size:19px;letter-spacing:3px;font-weight:800;text-align:center">
       <button class="btn btn-outline" onclick="mpCopy('cr-user','คัดลอกชื่อผู้ใช้แล้ว')"><i class="fa-solid fa-copy"></i></button>
+      <button class="btn btn-outline" title="แก้ไขชื่อผู้ใช้" onclick="mpEditUsername('${a.id}')"><i class="fa-solid fa-pen"></i></button>
     </div>
     <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 18px">
       ชื่อผู้ใช้คือ <b>เลขบัตรประชาชน 13 หลัก</b> ของ อสม. เอง เปลี่ยนไม่ได้</p>
@@ -8677,9 +8679,8 @@ function mpAccountIssues(){
   // เลขบัตรไม่ถูกต้องในทะเบียน (สมัครไม่ได้แน่นอน)
   const badCid=schMembers().filter(m=>!validateIdCard(norm(m.idCard)));
 
-  const mislink=(state.osmAccounts||[]).filter(a=>{
-    const t=mpLinkStatus(a).type; return t==='mismatch'||t==='suspect'||t==='cid-diff';
-  });
+  const mislink=(state.osmAccounts||[]).filter(a=>
+    ['mismatch','name-mismatch','suspect','cid-diff'].includes(mpLinkStatus(a).type));
   return { dupAcc, dupMem, orphan, dupLink, stale, noAcc, badCid, mislink,
     count: dupAcc.length+dupMem.length+orphan.length+dupLink.length+stale.length+badCid.length+mislink.length };
 }
@@ -8954,11 +8955,11 @@ function mpLinkAudit(){
   const out=[];
   (state.osmAccounts||[]).forEach(a=>{
     const st=mpLinkStatus(a);
-    if(st.type==='mismatch'||st.type==='suspect'||st.type==='cid-diff') out.push({acc:a, st});
+    if(['mismatch','name-mismatch','suspect','cid-diff'].includes(st.type)) out.push({acc:a, st});
   });
   // ตรวจว่ามีคู่ที่สลับกันตรง ๆ หรือไม่ (A→B, B→A)
   out.forEach(o=>{
-    if(o.st.type!=='mismatch') return;
+    if(o.st.type!=='mismatch' && o.st.type!=='name-mismatch') return;
     const partner=out.find(p=>p!==o && p.acc.osmId===o.st.correct.id && p.st.correct && p.st.correct.id===o.acc.osmId);
     if(partner) o.swapWith=partner.acc;
   });
@@ -11127,13 +11128,23 @@ async function mpRepairAll(){
     mpAccountIssues().dupAcc.forEach(d=>{ mpKeepBest(d.cid); merged++; });
     try{ closeModal(); }catch(e){}
 
-    // 2) แก้การเชื่อมผิดคน (ทำเป็นชุด กันการชนกันตอนสลับคู่)
-    const bad=mpLinkAudit().filter(o=>o.st.correct);
+    // 2) แก้การเชื่อมผิดคน + ชื่อไม่ตรง (ทำเป็นชุด กันการชนกันตอนสลับคู่)
+    const seenAcc=new Set();
+    const bad=[...mpNameAudit(), ...mpLinkAudit()].filter(o=>{
+      if(!o.st.correct) return false;
+      if(seenAcc.has(o.acc.id)) return false;
+      seenAcc.add(o.acc.id); return true;
+    });
     const targets=new Map();
     bad.forEach(o=>{ targets.set(o.acc.id,o.st.correct.id); o.acc.osmId=''; });
     const wanted=new Set([...targets.values()]);
     (state.osmAccounts||[]).forEach(x=>{ if(!targets.has(x.id) && wanted.has(x.osmId)) x.osmId=''; });
-    targets.forEach((oid,aid)=>{ const a=mpAccountById(aid); if(a) a.osmId=oid; });
+    targets.forEach((oid,aid)=>{
+      const a=mpAccountById(aid); if(!a) return;
+      a.osmId=oid;
+      const m=osmById(oid), rc=m?mpDigits(m.idCard):'';
+      if(rc && validateIdCard(rc)) a.citizenId=rc;   // ยึดเลขบัตรจากทะเบียนเป็นหลัก
+    });
 
     // 3) อนุมัติคำขอที่ค้างและเชื่อมทะเบียนให้
     let approved=0;
@@ -11180,6 +11191,13 @@ async function mpRepairAll(){
       <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:11px 14px;font-size:12.5px;line-height:1.75">
         <i class="fa-solid fa-triangle-exclamation"></i> บัญชีที่แก้ไขจะใช้รหัสเดิมที่เคยตั้งไว้
         ถ้าใครยังเข้าไม่ได้ ให้ใช้ปุ่ม “เข้าระบบไม่ได้?” แล้วกด “ลบบัญชีเดิมและสร้างใหม่”</div>
+      ${(()=>{const d=mpDupIdGroups().length; return d?`
+      <div style="background:var(--sch-rose-bg);color:var(--sch-rose);border-radius:10px;padding:12px 15px;
+        font-size:12.5px;line-height:1.8;margin-top:12px">
+        <b><i class="fa-solid fa-id-card"></i> ยังมีเลขบัตรซ้ำในทะเบียน ${d} กลุ่ม</b><br>
+        ตราบใดที่ยังไม่แก้ ปัญหา “ชื่อข้างในเป็นคนอื่น” จะกลับมาอีก
+        <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="closeModal();mpDupIdFixer()">
+          <i class="fa-solid fa-pen"></i> แก้เลขบัตรซ้ำเลย</button></div>`:'';})()}
     </div>
     <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">เสร็จสิ้น</button></div>`,{size:'sm'});
   },{confirmLabel:'ซ่อมทั้งหมด'});
@@ -11228,6 +11246,321 @@ async function fbSignOut(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,500));
   else setTimeout(go,500);
 })();
+
+
+/* ============================================================================================
+   IDENTITY FIX  v1.0
+   แก้เคส "เข้าบัญชีได้ แต่ชื่อข้างในเป็นคนอื่น" ซึ่งเกิดจาก
+   เลขบัตรประชาชนซ้ำกัน/สลับกันในทะเบียน อสม.
+   ตรรกะเดิมเทียบแค่เลขบัตร ถ้าเลขซ้ำก็ผ่านทั้งที่ชื่อคนละคน — จึงตรวจไม่พบ
+   ============================================================================================ */
+
+/* ---------------------------------------------------------------- ตรวจการเชื่อม (เพิ่มการเทียบชื่อ) */
+function mpLinkStatus(a){
+  const c=mpDigits(a.citizenId);
+  const linked = a.osmId ? osmById(a.osmId) : null;
+  const byCid = mpMemberByCid(c);
+  const accName = `${a.firstName||''} ${a.lastName||''}`.trim();
+
+  if(!linked) return { type:'none', correct:byCid, msg:'ยังไม่ได้เชื่อมกับทะเบียน' };
+
+  const linkedName = `${linked.firstName||''} ${linked.lastName||''}`.trim();
+  const nameOk = mpSameName(accName, linkedName);
+  const cidOk  = mpDigits(linked.idCard)===c;
+
+  // ชื่อในบัญชีไม่ตรงกับชื่อในทะเบียนที่เชื่อมอยู่ = เชื่อมผิดคน แม้เลขบัตรจะ "ตรง"
+  if(!nameOk && accName){
+    const byName = mpMemberByName(accName);
+    const dupCid = c ? (state.osmMembers||[]).filter(m=>mpDigits(m.idCard)===c).length>1 : false;
+    if(byName && byName.id!==linked.id){
+      return { type:'name-mismatch', linked, correct:byName, dupCid,
+        msg:`บัญชีชื่อ “${accName}” แต่เชื่อมกับ “${linkedName}” ในทะเบียน`
+            + (dupCid?' • สาเหตุ: เลขบัตรนี้ซ้ำกันในทะเบียน':'') };
+    }
+    if(!cidOk && byCid){
+      return { type:'mismatch', linked, correct:byCid, dupCid,
+        msg:`เชื่อมกับ ${linkedName} แต่เลขบัตรตรงกับ ${byCid.firstName} ${byCid.lastName}` };
+    }
+    return { type:'suspect', linked, correct:byName||null, dupCid,
+      msg:`บัญชีชื่อ “${accName}” แต่เชื่อมกับ “${linkedName}” — ไม่พบชื่อนี้ในทะเบียน` };
+  }
+
+  if(cidOk) return { type:'ok', linked, correct:linked };
+
+  if(byCid) return { type:'mismatch', linked, correct:byCid,
+    msg:`เชื่อมกับ ${linkedName} แต่เลขบัตรตรงกับ ${byCid.firstName} ${byCid.lastName}` };
+  return { type:'cid-diff', linked, correct:null,
+    msg:'ชื่อตรงกัน แต่เลขบัตรในทะเบียนไม่ตรงกับที่สมัคร' };
+}
+
+function mpMemberByName(name){
+  const k=mpNameKey(name); if(!k) return null;
+  const list=(state.osmMembers||[]).filter(m=>mpNameKey(`${m.firstName||''} ${m.lastName||''}`)===k);
+  return list.length===1 ? list[0] : (list[0]||null);
+}
+
+/* ---------------------------------------------------------------- เลขบัตรซ้ำในทะเบียน */
+function mpDupIdGroups(){
+  const map={};
+  (state.osmMembers||[]).forEach(m=>{
+    const c=mpDigits(m.idCard); if(!c) return;
+    (map[c]=map[c]||[]).push(m);
+  });
+  return Object.entries(map).filter(([c,l])=>l.length>1).map(([c,l])=>({cid:c,list:l}));
+}
+
+function mpDupIdFixer(){
+  mpInit();
+  const groups=mpDupIdGroups();
+  const noCid=schMembers().filter(m=>!mpDigits(m.idCard));
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-id-card"></i> แก้เลขบัตรประชาชนซ้ำในทะเบียน</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:${groups.length?'var(--sch-rose-bg)':'var(--sch-emerald-bg)'};
+      color:${groups.length?'var(--sch-rose)':'var(--sch-emerald)'};border-radius:10px;padding:12px 15px;
+      font-size:13px;line-height:1.8;margin-bottom:16px">
+      ${groups.length
+        ? `<b><i class="fa-solid fa-triangle-exclamation"></i> พบเลขบัตรซ้ำ ${groups.length} กลุ่ม</b><br>
+           นี่คือสาเหตุที่ทำให้ “เข้าบัญชีได้ แต่ชื่อข้างในเป็นคนอื่น” และทำให้อีกคนสร้างบัญชีไม่ได้
+           — แก้เลขบัตรให้ถูกต้องด้านล่าง แล้วกดบันทึก`
+        : `<b><i class="fa-solid fa-circle-check"></i> ไม่พบเลขบัตรซ้ำในทะเบียน</b>`}
+    </div>
+
+    ${groups.map((g,gi)=>`
+      <div style="border:1px solid var(--border);border-radius:11px;padding:13px 15px;margin-bottom:12px">
+        <b style="font-size:13px">เลขบัตร ${escapeHtml(g.cid)} — ใช้ซ้ำ ${g.list.length} คน</b>
+        <div style="font-size:11.5px;color:var(--text-faint);margin:4px 0 10px">
+          แก้ให้เหลือคนละเลข โดยดูจากบัตรประชาชนตัวจริงของแต่ละท่าน</div>
+        ${g.list.map((m,i)=>`
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+            <span style="flex:1;min-width:150px;font-size:13px">
+              <b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</b>
+              <small style="display:block;color:var(--text-faint)">หมู่ ${escapeHtml(m.moo||'-')} ${escapeHtml(m.village||'')}
+                ${(state.osmAccounts||[]).some(a=>a.osmId===m.id)?' • มีบัญชีแล้ว':' • ยังไม่มีบัญชี'}</small></span>
+            <input class="input dup-cid" data-id="${m.id}" value="${escapeHtml(mpDigits(m.idCard))}"
+              inputmode="numeric" maxlength="13" style="width:190px;letter-spacing:1px;font-size:13px">
+          </div>`).join('')}
+      </div>`).join('')}
+
+    ${noCid.length?`
+    <div style="border:1px solid var(--sch-amber);border-radius:11px;padding:13px 15px;margin-bottom:12px">
+      <b style="font-size:13px">ยังไม่มีเลขบัตรในทะเบียน ${noCid.length} คน</b>
+      <div style="font-size:11.5px;color:var(--text-faint);margin:4px 0 10px">กลุ่มนี้สร้างบัญชีและเข้าระบบไม่ได้</div>
+      ${noCid.slice(0,10).map(m=>`
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+          <span style="flex:1;min-width:150px;font-size:13px"><b>${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</b>
+            <small style="display:block;color:var(--text-faint)">หมู่ ${escapeHtml(m.moo||'-')}</small></span>
+          <input class="input dup-cid" data-id="${m.id}" value="" placeholder="เลขบัตร 13 หลัก"
+            inputmode="numeric" maxlength="13" style="width:190px;letter-spacing:1px;font-size:13px">
+        </div>`).join('')}
+      ${noCid.length>10?`<div style="font-size:12px;color:var(--text-faint)">…และอีก ${noCid.length-10} คน (แก้ได้ในเมนูทะเบียน อสม.)</div>`:''}
+    </div>`:''}
+
+    <div class="field-error" id="dup-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ปิด</button>
+    ${(groups.length||noCid.length)?`<button class="btn btn-primary" onclick="mpDupIdSave()">
+      <i class="fa-solid fa-floppy-disk"></i> บันทึกและซ่อมบัญชี</button>`:''}
+  </div>`,{size:'md'});
+}
+
+async function mpDupIdSave(){
+  const inputs=[...document.querySelectorAll('.dup-cid')];
+  const err=document.getElementById('dup-err');
+  const changes=[];
+  const seen=new Map();
+  for(const i of inputs){
+    const id=i.dataset.id, v=mpDigits(i.value);
+    if(!v) continue;
+    if(!validateIdCard(v)){
+      err.innerHTML=`เลขบัตรของ <b>${escapeHtml((osmById(id)||{}).firstName||'')}</b> ไม่ถูกต้อง ต้องเป็นตัวเลข 13 หลัก`;
+      err.style.display='block'; i.focus(); return;
+    }
+    if(seen.has(v)){
+      err.innerHTML='ยังมีเลขบัตรซ้ำกันอยู่ กรุณาตรวจสอบอีกครั้ง';
+      err.style.display='block'; i.focus(); return;
+    }
+    seen.set(v,id);
+    const m=osmById(id);
+    if(m && mpDigits(m.idCard)!==v) changes.push({m, from:mpDigits(m.idCard), to:v});
+  }
+  // เลขที่แก้ต้องไม่ไปชนกับคนอื่นในทะเบียนที่ไม่ได้อยู่ในฟอร์ม
+  for(const ch of changes){
+    const clash=(state.osmMembers||[]).find(m=>m.id!==ch.m.id && mpDigits(m.idCard)===ch.to && !seen.has(mpDigits(m.idCard)));
+    if(clash && seen.get(ch.to)!==ch.m.id){
+      const other=(state.osmMembers||[]).find(m=>m.id!==ch.m.id && mpDigits(m.idCard)===ch.to);
+      if(other && !inputs.some(i=>i.dataset.id===other.id)){
+        err.innerHTML=`เลข ${ch.to} ซ้ำกับ <b>${escapeHtml(other.firstName)} ${escapeHtml(other.lastName)}</b> ที่อยู่นอกรายการนี้`;
+        err.style.display='block'; return;
+      }
+    }
+  }
+  if(!changes.length){ toast('ไม่มีการเปลี่ยนแปลง','info'); closeModal(); return; }
+
+  changes.forEach(ch=>{
+    ch.m.idCard=ch.to;
+    schLog('แก้เลขบัตรในทะเบียน',`${ch.m.firstName} ${ch.m.lastName}: ${ch.from||'(ว่าง)'} → ${ch.to}`);
+  });
+  // ปรับเลขบัตรของบัญชีที่ผูกกับคนเหล่านี้ให้ตรงกัน
+  let accFixed=0;
+  changes.forEach(ch=>{
+    (state.osmAccounts||[]).forEach(a=>{
+      if(a.osmId===ch.m.id && mpDigits(a.citizenId)!==ch.to){ a.citizenId=ch.to; accFixed++; }
+    });
+  });
+  persistState();
+  closeModal();
+  toast(`แก้เลขบัตร ${changes.length} รายการ`+(accFixed?` • ปรับชื่อผู้ใช้ของบัญชี ${accFixed} รายการ`:''),'success');
+  setTimeout(()=>mpNamePanel(),300);
+}
+
+/* ---------------------------------------------------------------- แผงแก้บัญชีสลับคน */
+function mpNameAudit(){
+  mpInit();
+  return (state.osmAccounts||[]).map(a=>({acc:a, st:mpLinkStatus(a)}))
+    .filter(o=>['name-mismatch','mismatch','suspect'].includes(o.st.type));
+}
+
+function mpNamePanel(){
+  mpInit();
+  const bad=mpNameAudit();
+  const dups=mpDupIdGroups();
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-user-check"></i> แก้บัญชีที่ชื่อไม่ตรงกับทะเบียน</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="background:${bad.length?'var(--sch-rose-bg)':'var(--sch-emerald-bg)'};
+      color:${bad.length?'var(--sch-rose)':'var(--sch-emerald)'};border-radius:10px;padding:12px 15px;
+      font-size:13px;line-height:1.8;margin-bottom:16px">
+      ${bad.length
+        ? `<b><i class="fa-solid fa-triangle-exclamation"></i> พบ ${bad.length} บัญชีที่ชื่อไม่ตรงกับทะเบียนที่เชื่อมอยู่</b><br>
+           อาการคือ “เข้าบัญชีได้ แต่ชื่อข้างในเป็นคนอื่น”`
+        : `<b><i class="fa-solid fa-circle-check"></i> ทุกบัญชีชื่อตรงกับทะเบียนแล้ว</b>`}
+    </div>
+
+    ${dups.length?`
+    <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:12px 15px;
+      font-size:12.5px;line-height:1.8;margin-bottom:16px">
+      <b><i class="fa-solid fa-id-card"></i> ต้นเหตุ: เลขบัตรซ้ำในทะเบียน ${dups.length} กลุ่ม</b><br>
+      ควรแก้เลขบัตรให้ถูกต้องก่อน มิฉะนั้นปัญหาจะกลับมาอีก
+      <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="mpDupIdFixer()">
+        <i class="fa-solid fa-pen"></i> แก้เลขบัตรซ้ำ</button></div>`:''}
+
+    ${bad.length?`
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:14px"
+      onclick="mpFixAllByName()"><i class="fa-solid fa-wand-magic-sparkles"></i>
+      แก้ทั้งหมดตามชื่อ (${bad.filter(o=>o.st.correct).length} รายการ)</button>`:''}
+
+    ${bad.map(o=>{
+      const a=o.acc, st=o.st;
+      return `<div style="border:1px solid var(--border);border-radius:11px;padding:13px 15px;margin-bottom:11px">
+        <b style="font-size:14px">${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}</b>
+        <span style="color:var(--text-faint);font-size:12px">• ${mpMaskCid(a.citizenId)}</span>
+        <div style="font-size:12.5px;color:var(--danger);margin-top:5px;line-height:1.7">${escapeHtml(st.msg||'')}</div>
+        <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+          ${st.correct?`<button class="btn btn-primary btn-sm" onclick="mpFixByName('${a.id}')">
+            <i class="fa-solid fa-link"></i> เชื่อมกับ ${escapeHtml(st.correct.firstName)} ${escapeHtml(st.correct.lastName)}</button>`:''}
+          <button class="btn btn-outline btn-sm" onclick="closeModal();mpLinkForm('${a.id}')">เลือกเอง</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="mpNamePanel()"><i class="fa-solid fa-rotate"></i> ตรวจอีกครั้ง</button>
+    <button class="btn btn-primary" onclick="closeModal()">ปิด</button>
+  </div>`,{size:'md'});
+}
+
+function mpFixByName(accId){
+  const a=mpAccountById(accId); if(!a) return;
+  const st=mpLinkStatus(a);
+  if(!st.correct){ toast('ไม่พบชื่อนี้ในทะเบียน อสม.','error'); return; }
+  const before=st.linked?`${st.linked.firstName} ${st.linked.lastName}`:'(ว่าง)';
+  (state.osmAccounts||[]).forEach(x=>{ if(x!==a && x.osmId===st.correct.id) x.osmId=''; });
+  a.osmId=st.correct.id;
+  // ถ้าเลขบัตรของทะเบียนไม่ตรงกับบัญชี ให้ยึดเลขในทะเบียนเป็นหลัก
+  const rc=mpDigits(st.correct.idCard);
+  if(rc && validateIdCard(rc) && rc!==mpDigits(a.citizenId)) a.citizenId=rc;
+  schLog('แก้บัญชีตามชื่อ',`${a.firstName} ${a.lastName}: ${before} → ${st.correct.firstName} ${st.correct.lastName}`);
+  persistState();
+  if(state.currentView==='school-members') renderOsmAccountsView();
+  mpNamePanel();
+  toast(`เชื่อม ${a.firstName} ${a.lastName} กับทะเบียนที่ถูกต้องแล้ว`,'success');
+}
+
+function mpFixAllByName(){
+  const bad=mpNameAudit().filter(o=>o.st.correct);
+  if(!bad.length){ toast('ไม่มีรายการที่แก้อัตโนมัติได้','info'); return; }
+  const lines=bad.slice(0,10).map(o=>
+    `• ${o.acc.firstName} ${o.acc.lastName} → ${o.st.correct.firstName} ${o.st.correct.lastName}`).join('\n');
+  confirmDialog(`เชื่อมบัญชีใหม่ตามชื่อให้ถูกต้อง ${bad.length} รายการ ดังนี้\n${lines}${bad.length>10?`\n…และอีก ${bad.length-10} รายการ`:''}\nประวัติการเข้าเรียนและกิจกรรมยังอยู่ครบ`,()=>{
+    const targets=new Map();
+    bad.forEach(o=>{ targets.set(o.acc.id,o.st.correct.id); o.acc.osmId=''; });
+    const wanted=new Set([...targets.values()]);
+    (state.osmAccounts||[]).forEach(x=>{ if(!targets.has(x.id) && wanted.has(x.osmId)) x.osmId=''; });
+    targets.forEach((oid,aid)=>{
+      const a=mpAccountById(aid); if(!a) return;
+      a.osmId=oid;
+      const m=osmById(oid), rc=m?mpDigits(m.idCard):'';
+      if(rc && validateIdCard(rc)) a.citizenId=rc;
+    });
+    schLog('แก้บัญชีตามชื่อ (อัตโนมัติ)',`${targets.size} รายการ`);
+    persistState(); closeModal();
+    if(state.currentView==='school-members') renderOsmAccountsView();
+    setTimeout(()=>mpNamePanel(),250);
+    toast(`แก้ ${targets.size} รายการแล้ว`,'success');
+  },{confirmLabel:'แก้ทั้งหมด'});
+}
+
+/* ---------------------------------------------------------------- แก้ชื่อผู้ใช้ (เลขบัตร) ของบัญชี */
+function mpEditUsername(accId){
+  const a=mpAccountById(accId); if(!a) return;
+  const m=mpLinkedMember(a);
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-user-pen"></i> แก้ไขชื่อผู้ใช้</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="mp-eu"><div class="modal-body">
+    <div style="background:var(--bg-surface-2);border-radius:10px;padding:11px 14px;font-size:12.5px;line-height:1.8;margin-bottom:14px">
+      <b>${escapeHtml(a.firstName)} ${escapeHtml(a.lastName)}</b>
+      ${m?`<br>เชื่อมกับทะเบียน: ${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}
+        (เลขบัตรในทะเบียน ${escapeHtml(mpDigits(m.idCard)||'ว่าง')})`:''}
+    </div>
+    <div class="form-group"><label>ชื่อผู้ใช้ = เลขบัตรประชาชน 13 หลัก</label>
+      <input class="input" id="eu-cid" inputmode="numeric" maxlength="13"
+        value="${escapeHtml(mpDigits(a.citizenId))}" style="letter-spacing:2px;text-align:center;font-size:17px;font-weight:700"></div>
+    ${m&&mpDigits(m.idCard)&&mpDigits(m.idCard)!==mpDigits(a.citizenId)?`
+      <button type="button" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-bottom:12px"
+        onclick="document.getElementById('eu-cid').value='${escapeHtml(mpDigits(m.idCard))}'">
+        <i class="fa-solid fa-arrows-rotate"></i> ใช้เลขบัตรจากทะเบียน (${escapeHtml(mpDigits(m.idCard))})</button>`:''}
+    <div style="background:var(--sch-amber-bg);color:var(--sch-amber);border-radius:10px;padding:11px 14px;font-size:12.5px;line-height:1.75">
+      <i class="fa-solid fa-circle-info"></i> เปลี่ยนแล้วต้องแจ้ง อสม. ให้ใช้เลขใหม่ในการเข้าระบบ
+      และควรตั้งรหัสผ่านใหม่ให้ด้วย</div>
+    <div class="field-error" id="eu-err" style="display:none;margin-top:10px"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+  </div></form>`,{size:'sm'});
+
+  document.getElementById('mp-eu').addEventListener('submit',e=>{
+    e.preventDefault();
+    const v=mpDigits(document.getElementById('eu-cid').value);
+    const er=document.getElementById('eu-err');
+    if(!validateIdCard(v)){ er.textContent='เลขบัตรต้องเป็นตัวเลข 13 หลัก'; er.style.display='block'; return; }
+    const clash=(state.osmAccounts||[]).find(x=>x.id!==accId && mpDigits(x.citizenId)===v);
+    if(clash){ er.innerHTML=`เลขนี้ถูกใช้โดยบัญชีของ <b>${escapeHtml(clash.firstName)} ${escapeHtml(clash.lastName)}</b> แล้ว`;
+      er.style.display='block'; return; }
+    const old=mpDigits(a.citizenId);
+    a.citizenId=v;
+    schLog('แก้ชื่อผู้ใช้',`${a.firstName} ${a.lastName}: ${old} → ${v}`);
+    persistState(); closeModal();
+    if(state.currentView==='school-members') renderOsmAccountsView();
+    mpCredentials(accId);
+    toast('เปลี่ยนชื่อผู้ใช้แล้ว — แนะนำให้ตั้งรหัสผ่านใหม่ด้วย','success');
+  });
+}
 
 </script>
 <script type="module">
