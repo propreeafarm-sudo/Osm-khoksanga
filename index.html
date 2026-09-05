@@ -5142,6 +5142,7 @@ function persistState(){
       osmAccounts:state.osmAccounts||[], osmLeaves:state.osmLeaves||[] };
     localStorage.setItem(APP_STORAGE_KEY,JSON.stringify(payload));
   }catch(e){ console.warn('persistState failed',e); }
+  try{ if(typeof mpInvalidateIdx==='function') mpInvalidateIdx(); }catch(e){}
   if(!fbApplying) fbSchedulePush();
 }
 function hydrateState(){
@@ -5351,8 +5352,8 @@ function mpLoginHtml(){
         placeholder="กรอกเลข 13 หลัก" style="letter-spacing:2px"></div>
     <div class="form-group"><label>รหัสผ่าน</label>
       <div style="position:relative">
-        <input id="oa-lpw" class="input" type="password" autocomplete="current-password" placeholder="รหัสผ่านของท่าน">
-        <button type="button" class="icon-btn" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;background:transparent;border:0"
+        <input id="oa-lpw" class="input" type="password" autocomplete="current-password" placeholder="รหัสผ่านของท่าน" style="padding-right:46px">
+        <button type="button" class="icon-btn" tabindex="-1" title="แสดง/ซ่อนรหัสผ่าน" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;background:transparent;border:0;color:var(--text-faint)"
           onclick="const i=document.getElementById('oa-lpw');i.type=i.type==='password'?'text':'password';this.innerHTML='<i class=\\'fa-solid fa-eye'+(i.type==='text'?'-slash':'')+'\\'></i>'"><i class="fa-solid fa-eye"></i></button>
       </div></div>
     <div class="field-error" id="oa-lerr" style="display:none;margin-bottom:12px"></div>
@@ -5493,7 +5494,12 @@ async function mpDoLogin(e){
     try{ ok = !!(await mpFbSignIn(cid,pw,acc.fbEmail)); }catch(err){ ok=false; }
     if(!ok) return fail('รหัสผ่านไม่ถูกต้อง');
   }
-  if(acc.status==='pending')   return fail('บัญชีของท่านอยู่ระหว่างรอเจ้าหน้าที่อนุมัติ');
+  // สถานะในเครื่องอาจเก่า — ดึงล่าสุดจาก cloud ก่อนตัดสิน
+  if(acc.status!=='approved' || !acc.osmId || !osmById(acc.osmId)){
+    btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบสถานะล่าสุด';
+    await mpSyncMyAccount(acc,pw);
+  }
+  if(acc.status==='pending')   return fail('บัญชีของท่านอยู่ระหว่างรอเจ้าหน้าที่อนุมัติ — หากรอนานกรุณาติดต่อ '+SCH_ORG.name);
   if(acc.status==='suspended') return fail('บัญชีของท่านถูกระงับการใช้งาน กรุณาติดต่อเจ้าหน้าที่');
   if(!acc.osmId)               return fail('บัญชียังไม่ได้เชื่อมกับทะเบียน อสม. กรุณาติดต่อเจ้าหน้าที่');
 
@@ -8286,7 +8292,7 @@ function renderOsmAccountsView(){
       ${temp?`<button class="btn btn-outline" onclick="mpPrintAllSlips()"><i class="fa-solid fa-print"></i> พิมพ์ใบแจ้งรหัส (${temp})</button>`:''}
       <button class="btn btn-primary" onclick="mpWhyCantLogin()"><i class="fa-solid fa-user-magnifying-glass"></i> เข้าระบบไม่ได้?</button>
       <button class="btn btn-outline" onclick="mpIdCardEditor()"><i class="fa-solid fa-id-card"></i> แก้เลขบัตร</button>
-      <button class="btn btn-outline" onclick="mpNamePanel()"><i class="fa-solid fa-user-check"></i> ชื่อไม่ตรง / สลับคน${(()=>{try{const n=mpNameAudit().length;return n?` <span class="badge mp-badge-pend">${n}</span>`:'';}catch(e){return '';}})()}</button>
+      <button class="btn btn-outline" onclick="mpNamePanel()"><i class="fa-solid fa-user-check"></i> ชื่อไม่ตรง / สลับคน${issues.mislink.length?` <span class="badge mp-badge-pend">${issues.mislink.length}</span>`:''}</button>
       <button class="btn btn-outline" onclick="mpRepairAll()"><i class="fa-solid fa-wand-magic-sparkles"></i> ซ่อมบัญชีทั้งหมด</button>
       <button class="btn btn-outline" onclick="mpCreateAccountForm()"><i class="fa-solid fa-user-plus"></i> สร้างบัญชีให้ อสม.</button>
       <button class="btn btn-outline" onclick="mpRepairPanel()"><i class="fa-solid fa-screwdriver-wrench"></i> ตรวจสอบบัญชี${issues.count?` <span class="badge mp-badge-pend">${issues.count}</span>`:''}</button>
@@ -11781,6 +11787,203 @@ function mpFixIdCardFor(osmId){
     (state.osmMembers||[]).forEach(x=>{ if(x.id!==osmId && mpDigits(x.idCard)===c) ids.push(x.id); });
   }
   mpIdCardEditor(ids);
+}
+
+
+/* ============================================================================================
+   PERFORMANCE & ACCURACY FIX  v1.0
+   1) เร่งความเร็ว: เดิมแต่ละครั้งที่วาดหน้า จะไล่สแกนทะเบียนซ้ำนับหมื่นรอบ
+      → ทำดัชนีไว้ใช้ร่วมกันภายในรอบการวาดเดียวกัน
+   2) ลดการแจ้งเตือนผิดพลาด: ถ้าเลขบัตรตรงกันและหาคนที่เหมาะกว่าไม่ได้ ให้ถือว่าปกติ
+   ============================================================================================ */
+
+/* ---------------------------------------------------------------- ดัชนีชั่วคราว (ล้างเองเมื่อจบงาน) */
+let _mpIdx = null;
+function mpIdx(){
+  if(_mpIdx) return _mpIdx;
+  const byCid=new Map(), byName=new Map(), byFirst=new Map();
+  (state.osmMembers||[]).forEach(m=>{
+    const c=mpDigits(m.idCard);
+    if(c && !byCid.has(c)) byCid.set(c,m);
+    const k=mpNameKey(`${m.firstName||''} ${m.lastName||''}`);
+    if(k){ (byName.get(k)||byName.set(k,[]).get(k)).push(m); }
+    const f=mpNameKey(String(m.firstName||'').replace(/^(นาย|นาง|นางสาว|น\.ส\.)\s*/,''));
+    if(f){ (byFirst.get(f)||byFirst.set(f,[]).get(f)).push(m); }
+  });
+  _mpIdx={byCid,byName,byFirst,status:new Map()};
+  // ล้างทิ้งเมื่อจบ task ปัจจุบัน — การวาดหน้าหนึ่งครั้งจึงใช้ดัชนีชุดเดียว
+  Promise.resolve().then(()=>{ _mpIdx=null; });
+  return _mpIdx;
+}
+function mpInvalidateIdx(){ _mpIdx=null; }
+
+function mpMemberByCid(cid){
+  const c=mpDigits(cid); if(!c) return null;
+  return mpIdx().byCid.get(c) || null;
+}
+function mpMemberByName(name){
+  const idx=mpIdx();
+  const k=mpNameKey(name);
+  const exact=k?idx.byName.get(k):null;
+  if(exact && exact.length) return exact[0];
+  const first=mpNameKey(String(name||'').trim().replace(/^(นาย|นาง|นางสาว|น\.ส\.)\s*/,'').split(/\s+/)[0]);
+  const byFirst=first?idx.byFirst.get(first):null;
+  return (byFirst && byFirst.length===1) ? byFirst[0] : null;
+}
+
+/* ---------------------------------------------------------------- ตรวจการเชื่อม (แม่นขึ้น + เร็วขึ้น) */
+function mpLinkStatus(a){
+  if(!a) return { type:'none' };
+  const idx=mpIdx();
+  const cached=idx.status.get(a.id);
+  if(cached) return cached;
+
+  const c=mpDigits(a.citizenId);
+  const linked = a.osmId ? osmById(a.osmId) : null;
+  const byCid = mpMemberByCid(c);
+  const accName = `${a.firstName||''} ${a.lastName||''}`.trim();
+  let r;
+
+  if(!linked){
+    r={ type:'none', correct:byCid, msg:'ยังไม่ได้เชื่อมกับทะเบียน' };
+  }else{
+    const linkedName=`${linked.firstName||''} ${linked.lastName||''}`.trim();
+    const nameLevel=mpNameCompare(accName, linkedName);   // same | first | diff
+    const cidOk=mpDigits(linked.idCard)===c;
+
+    if(nameLevel!=='diff' && cidOk){
+      r={ type:'ok', linked, correct:linked };
+    }else if(nameLevel==='diff' && accName){
+      const byName=mpMemberByName(accName);
+      const dupCid=c ? ((state.osmMembers||[]).filter(m=>mpDigits(m.idCard)===c).length>1) : false;
+      if(byName && byName.id!==linked.id){
+        r={ type:'name-mismatch', linked, correct:byName, dupCid,
+            msg:`บัญชีชื่อ “${accName}” แต่เชื่อมกับ “${linkedName}” ในทะเบียน`
+                + (dupCid?' • สาเหตุ: เลขบัตรนี้ซ้ำกันในทะเบียน':'') };
+      }else if(!cidOk && byCid && byCid.id!==linked.id){
+        r={ type:'mismatch', linked, correct:byCid, dupCid,
+            msg:`เชื่อมกับ ${linkedName} แต่เลขบัตรตรงกับ ${byCid.firstName} ${byCid.lastName}` };
+      }else{
+        /* ชื่อไม่ตรงแต่เลขบัตรตรง และหาคนที่เหมาะกว่าไม่ได้
+           → ยึดเลขบัตรเป็นหลัก ถือว่าปกติ (กันแจ้งเตือนผิดพลาด เช่น ชื่อมีคำนำหน้า/สะกดต่าง) */
+        r = cidOk ? { type:'ok', linked, correct:linked }
+                  : { type:'cid-diff', linked, correct:null,
+                      msg:'เลขบัตรในทะเบียนไม่ตรงกับที่ใช้เข้าระบบ' };
+      }
+    }else if(!cidOk && byCid && byCid.id!==linked.id){
+      r={ type:'mismatch', linked, correct:byCid,
+          msg:`เชื่อมกับ ${linkedName} แต่เลขบัตรตรงกับ ${byCid.firstName} ${byCid.lastName}` };
+    }else if(!cidOk){
+      r={ type:'cid-diff', linked, correct:null,
+          msg:'ชื่อตรงกัน แต่เลขบัตรในทะเบียนไม่ตรงกับที่ใช้เข้าระบบ' };
+    }else{
+      r={ type:'ok', linked, correct:linked };
+    }
+  }
+  idx.status.set(a.id, r);
+  return r;
+}
+
+/* ---------------------------------------------------------------- รวมการตรวจให้เหลือรอบเดียว */
+function mpAccountIssues(){
+  mpInit();
+  const accs=state.osmAccounts||[];
+  const norm=mpDigits;
+
+  const byCid={};
+  accs.forEach(a=>{ const c=norm(a.citizenId); (byCid[c]=byCid[c]||[]).push(a); });
+  const dupAcc=Object.entries(byCid).filter(([c,l])=>c&&l.length>1).map(([c,l])=>({cid:c,list:l}));
+
+  const byMem={};
+  (state.osmMembers||[]).forEach(m=>{ const c=norm(m.idCard); if(c) (byMem[c]=byMem[c]||[]).push(m); });
+  const dupMem=Object.entries(byMem).filter(([c,l])=>l.length>1).map(([c,l])=>({cid:c,list:l}));
+
+  const orphan=[], mislink=[], nameBad=[];
+  accs.forEach(a=>{
+    const st=mpLinkStatus(a);
+    if(st.type==='none') orphan.push(a);
+    else if(st.type!=='ok'){
+      mislink.push(a);
+      if(st.type==='name-mismatch') nameBad.push(a);
+    }
+  });
+
+  const byOsm={};
+  accs.forEach(a=>{ if(a.osmId) (byOsm[a.osmId]=byOsm[a.osmId]||[]).push(a); });
+  const dupLink=Object.entries(byOsm).filter(([k,l])=>l.length>1).map(([k,l])=>({osmId:k,list:l}));
+
+  const stale=accs.filter(a=>a.status==='pending' &&
+    (Date.now()-new Date(a.createdAt||0).getTime())>3*86400000);
+
+  const used=new Set(accs.map(a=>a.osmId).filter(Boolean));
+  const noAcc=schMembers().filter(m=>!used.has(m.id));
+  const badCid=schMembers().filter(m=>!validateIdCard(norm(m.idCard)));
+
+  return { dupAcc, dupMem, orphan, dupLink, stale, noAcc, badCid, mislink, nameBad,
+    count: dupAcc.length+dupMem.length+orphan.length+dupLink.length+stale.length+badCid.length+mislink.length };
+}
+
+function mpLinkAudit(){
+  mpInit();
+  const out=[];
+  (state.osmAccounts||[]).forEach(a=>{
+    const st=mpLinkStatus(a);
+    if(['mismatch','name-mismatch','suspect','cid-diff'].includes(st.type)) out.push({acc:a, st});
+  });
+  out.forEach(o=>{
+    if(o.st.type!=='mismatch' && o.st.type!=='name-mismatch') return;
+    const partner=out.find(p=>p!==o && p.acc.osmId===(o.st.correct&&o.st.correct.id)
+      && p.st.correct && p.st.correct.id===o.acc.osmId);
+    if(partner) o.swapWith=partner.acc;
+  });
+  return out;
+}
+function mpNameAudit(){
+  mpInit();
+  return (state.osmAccounts||[]).map(a=>({acc:a, st:mpLinkStatus(a)}))
+    .filter(o=>['name-mismatch','mismatch','suspect'].includes(o.st.type));
+}
+
+/* ---------------------------------------------------------------- ลดการวาดหน้าซ้ำระหว่างซิงก์ */
+function fbRepaintView(){
+  const v=state.currentView;
+  if(['dashboard','osm-list','osm-households','school-sessions','school-roster','school-report',
+      'activity-report','meetings','admin','school-members',
+      'member-home','member-history','member-leave','member-profile','member-households',
+      'member-activity','member-minutes'].includes(v)){
+    clearTimeout(fbRepaintView._t);
+    fbRepaintView._t=setTimeout(()=>{
+      mpInvalidateIdx();
+      try{ renderCurrentView(); }catch(e){}
+    }, 700);
+  }
+}
+
+/* ---------------------------------------------------------------- ดึงสถานะบัญชีล่าสุดจาก cloud ตอนเข้าระบบ */
+async function mpSyncMyAccount(acc, pw){
+  const F=window.FBX;
+  if(!F || F.fatal || F.loading || !F.db) return acc;
+  try{
+    if(!F.ready){ try{ await mpFbSignIn(acc.citizenId, pw, acc.fbEmail); }catch(e){} }
+    if(!F.ready) return acc;
+    const uid=(F.user && F.user.uid) || acc.id;
+    const d=await F.getDoc(F.doc(F.db,'osm_accounts',fbSafeId(uid)));
+    if(d && d.exists()){
+      const o=d.data()||{};
+      if(o.status) acc.status=o.status;
+      if(o.osmId)  acc.osmId=o.osmId;
+      if(o.approvedAt) acc.approvedAt=o.approvedAt;
+      if(o.approvedBy) acc.approvedBy=o.approvedBy;
+    }
+    // ดึงระเบียนทะเบียนของตัวเองมาด้วย เผื่อเครื่องนี้ยังไม่มีข้อมูล
+    if(acc.osmId && !osmById(acc.osmId)){
+      const md=await F.getDoc(F.doc(F.db,'osm_members',fbSafeId(acc.osmId)));
+      if(md && md.exists()){ const m=md.data()||{}; m.id=acc.osmId; state.osmMembers.push(m); }
+    }
+    mpInvalidateIdx();
+    persistState();
+  }catch(e){ console.warn('[FBX my account]', e && (e.code||e.message)); }
+  return acc;
 }
 
 </script>
