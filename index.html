@@ -5224,6 +5224,7 @@ function fbOpenPanel(){
         :'<span style="color:var(--text-faint)">ยังไม่ได้เข้าสู่ระบบ</span>'}</div>
       <div><b>ข้อมูลในเครื่อง:</b> ${counts}</div>
       ${fbLastSync?`<div><b>ซิงก์ล่าสุด:</b> ${fbLastSync.toLocaleString('th-TH')}</div>`:''}
+      <div><b>เชื่อมต่ออัตโนมัติ:</b> ${fbaAutoLabel()}</div>
       ${fbStatusMsg?`<div style="color:var(--warning);margin-top:6px"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(fbStatusMsg)}</div>`:''}
       ${fbNeedUp?`<div style="color:var(--warning);margin-top:6px"><i class="fa-solid fa-cloud-arrow-up"></i> ฐานข้อมูลบน Firebase ยังว่าง — กด “อัปโหลดข้อมูลทั้งหมด” เพื่อเริ่มใช้งาน</div>`:''}
     </div>
@@ -5239,8 +5240,7 @@ function fbOpenPanel(){
       ซิงก์อัตโนมัติทุกครั้งที่มีการแก้ไขข้อมูล</label>
     <label style="display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:8px;cursor:pointer">
       <input type="checkbox" id="fb-remember" ${c.remember!==false?'checked':''} style="width:17px;height:17px;margin-top:2px"
-        onchange="fbSetCfg({remember:this.checked});if(!this.checked){try{localStorage.removeItem('fb_pw')}catch(e){}}
-          toast(this.checked?'จะเชื่อมต่อให้อัตโนมัติทุกครั้งที่เปิดเว็บ':'ต้องเข้าสู่ระบบใหม่ทุกครั้ง','info')">
+        onchange="fbaSetRemember(this.checked)">
       <span>เชื่อมต่ออัตโนมัติทุกครั้งที่เปิดเว็บ (ไม่ต้องกดเชื่อมต่อ)
         <small style="display:block;color:var(--text-faint);font-size:11.5px">
           เก็บรหัสไว้ในเครื่องนี้ — ใช้เฉพาะเครื่องของเจ้าหน้าที่เท่านั้น</small></span></label>
@@ -7040,7 +7040,9 @@ function dgChecklist(){
 
   const steps=[
     { ok: (typeof fbStaff==='function' && fbStaff()), t:'เชื่อมต่อ Firebase',
-      d:'เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่เพื่อเปิดการซิงก์เรียลไทม์',
+      d:(typeof fbaAutoReady==='function'&&fbaAutoReady())
+          ? 'เชื่อมต่ออัตโนมัติทุกครั้งที่เปิดเว็บ ไม่ต้องกดเชื่อมเอง'
+          : 'เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่ครั้งเดียว แล้วระบบจะเชื่อมให้อัตโนมัติทุกครั้ง',
       btn:'ตรวจสอบการเชื่อมต่อ', fn:'dgOpen()' },
     { ok: (state.osmMembers||[]).length>=10, t:'นำเข้าทะเบียน อสม.',
       d:`ขณะนี้มี ${(state.osmMembers||[]).length} คนในทะเบียน`,
@@ -14669,6 +14671,315 @@ function lnQBulkSave(cid, phase, replace){
   lnTouch(c); persistState(); closeModal(); renderCurrentView();
   const need=parsed.filter(q=>q.__need).length;
   toast(`${replace?'บันทึก':'เพิ่ม'}ข้อสอบ ${qs.length} ข้อแล้ว`+(need?` (${need} ข้อยังไม่พบเฉลย กรุณาตรวจ)`:''),'success');
+}
+
+
+
+/* ============================================================================================
+   FIREBASE AUTO-CONNECT  v2.0
+   เชื่อมต่อฐานข้อมูลกลางให้อัตโนมัติ โดยไม่ต้องกดปุ่ม "เชื่อมต่อ" ทุกครั้งที่เปิดเว็บ
+
+   ปัญหาเดิมที่แก้ในรุ่นนี้
+   1) ถ้าเคยมีการเข้าใช้แบบผู้เยี่ยมชม (anonymous) ค้างอยู่ในเครื่อง  FBX.ready จะเป็น true
+      ตัวเชื่อมอัตโนมัติเดิมจึง "คิดว่าเชื่อมแล้ว" และไม่ยกระดับเป็นบัญชีเจ้าหน้าที่อีกเลย
+      → ต้องกดเชื่อมเองทุกครั้ง   รุ่นนี้ยกระดับจากผู้เยี่ยมชมเป็นเจ้าหน้าที่ให้อัตโนมัติ
+   2) เดิมลองเชื่อมแค่ 2 จังหวะเวลา ถ้า SDK โหลดช้าหรือเน็ตสะดุดก็จบ ไม่ลองใหม่
+      → รุ่นนี้ลองใหม่แบบถอยเวลา และลองอีกครั้งเมื่อกลับมาออนไลน์ / กลับมาที่แท็บนี้
+   3) อสม. ที่ล็อกอินค้างไว้ ก็เชื่อมต่อคลาวด์ให้อัตโนมัติเช่นกัน
+   4) ถ้ารหัสที่จำไว้ใช้ไม่ได้แล้ว จะหยุดลองและแจ้งให้ทราบ แทนที่จะวนลองไม่สิ้นสุด
+   ============================================================================================ */
+
+const FBA_PW_OLD = 'fb_pw';                 // ของเดิม (ข้อความธรรมดา) — ยังอ่านได้เพื่อความต่อเนื่อง
+const FBA_PW_NEW = 'khoksanga_fb_k';        // ของใหม่ (เข้ารหัสอย่างง่าย)
+const FBA_MEM_KEY = 'khoksanga_mp_k';       // ข้อมูลเข้าระบบของ อสม. สำหรับต่อคลาวด์อัตโนมัติ
+
+let fbaBusy = false;
+let fbaTries = 0;
+let fbaBlocked = '';        // '' = ลองได้, 'bad' = รหัสผิด, 'manual' = ผู้ใช้กดออกเอง
+let fbaLastTry = 0;
+let fbaAnnounced = false;
+let fbaConnecting = false;  // ใช้แสดงสถานะบนปุ่มเมฆ
+
+/* -------------------------------------------------------------- เก็บรหัสแบบกวนค่า
+   หมายเหตุตามตรง: นี่คือการ "กวนค่า" ไม่ใช่การเข้ารหัสที่ปลอดภัยจริง
+   เพราะต้องถอดกลับมาใช้เองได้ จึงกันได้แค่การเหลือบเห็นใน DevTools
+   เครื่องที่ใช้ต้องเป็นเครื่องของเจ้าหน้าที่เท่านั้น                                */
+function fbaMask(txt){
+  try{
+    const k='khoksanga-osm', s=String(txt||'');
+    let o='';
+    for(let i=0;i<s.length;i++) o+=String.fromCharCode(s.charCodeAt(i) ^ k.charCodeAt(i%k.length));
+    return btoa(unescape(encodeURIComponent(o)));
+  }catch(e){ return ''; }
+}
+function fbaUnmask(enc){
+  try{
+    const k='khoksanga-osm', s=decodeURIComponent(escape(atob(String(enc||''))));
+    let o='';
+    for(let i=0;i<s.length;i++) o+=String.fromCharCode(s.charCodeAt(i) ^ k.charCodeAt(i%k.length));
+    return o;
+  }catch(e){ return ''; }
+}
+
+function fbRemember(){ return fbCfg().remember!==false; }
+
+function fbaSavePw(pw){
+  try{ sessionStorage.setItem(FBA_PW_OLD, pw); }catch(e){}
+  if(fbRemember()){
+    try{ localStorage.setItem(FBA_PW_NEW, fbaMask(pw)); }catch(e){}
+  }
+  try{ localStorage.removeItem(FBA_PW_OLD); }catch(e){}   // เลิกเก็บแบบข้อความธรรมดา
+}
+function fbaReadPw(){
+  try{
+    const s=sessionStorage.getItem(FBA_PW_OLD);
+    if(s) return s;
+  }catch(e){}
+  if(!fbRemember()) return '';
+  try{
+    const n=localStorage.getItem(FBA_PW_NEW);
+    if(n){ const v=fbaUnmask(n); if(v) return v; }
+    const old=localStorage.getItem(FBA_PW_OLD);        // ของเดิม → ย้ายมารูปแบบใหม่
+    if(old){ try{ localStorage.setItem(FBA_PW_NEW, fbaMask(old)); localStorage.removeItem(FBA_PW_OLD); }catch(e){} return old; }
+  }catch(e){}
+  return '';
+}
+function fbaClearPw(){
+  try{ sessionStorage.removeItem(FBA_PW_OLD); }catch(e){}
+  try{ localStorage.removeItem(FBA_PW_OLD); localStorage.removeItem(FBA_PW_NEW); }catch(e){}
+}
+
+/* ข้อมูลเข้าระบบฝั่ง อสม. */
+function fbaSaveMember(cid, pw, email){
+  try{ localStorage.setItem(FBA_MEM_KEY, fbaMask(JSON.stringify({cid:String(cid||''), pw:String(pw||''), email:String(email||'')}))); }catch(e){}
+}
+function fbaReadMember(){
+  try{ const v=fbaUnmask(localStorage.getItem(FBA_MEM_KEY)||''); return v?JSON.parse(v):null; }catch(e){ return null; }
+}
+function fbaClearMember(){ try{ localStorage.removeItem(FBA_MEM_KEY); }catch(e){} }
+
+/* -------------------------------------------------------------- สถานะ */
+function fbaIsStaffSignedIn(){ const F=window.FBX; return !!(F && F.ready && !F.anon && F.user && !F.user.isAnonymous); }
+function fbaNeedsConnect(){
+  const F=window.FBX;
+  if(!F || F.fatal || F.loading) return false;
+  return !fbaIsStaffSignedIn();        // รวมถึงกรณีค้างอยู่ในโหมดผู้เยี่ยมชม
+}
+
+/* -------------------------------------------------------------- เชื่อมต่ออัตโนมัติ: เจ้าหน้าที่ */
+async function fbAutoSignIn(force){
+  const F=window.FBX;
+  if(!F || F.fatal || F.loading) return false;
+  if(fbaIsStaffSignedIn()) return true;
+  if(fbaBusy) return false;
+  if(fbaBlocked && !force) return false;
+  if(!force && Date.now()-fbaLastTry < 4000) return false;
+
+  const c=fbCfg(), pw=fbaReadPw();
+  if(!c.email || !pw) return false;
+
+  fbaBusy=true; fbaConnecting=true; fbaLastTry=Date.now();
+  try{ fbPaint(); }catch(e){}
+  try{
+    await F.signInWithEmailAndPassword(F.auth, c.email, pw);
+    fbaTries=0; fbaBlocked='';
+    if(!fbaAnnounced){
+      fbaAnnounced=true;
+      setTimeout(()=>{ try{ toast('เชื่อมต่อฐานข้อมูลกลางอัตโนมัติแล้ว','success'); }catch(e){} }, 400);
+    }
+    return true;
+  }catch(e){
+    const code=String((e&&(e.code||e.message))||e);
+    if(/wrong-password|invalid-credential|invalid-login|user-not-found|invalid-email|user-disabled/.test(code)){
+      fbaBlocked='bad'; fbaClearPw(); fbaWarnBad(code);
+    }else{
+      fbaTries++;
+      if(fbaTries<6){
+        const wait=Math.min(30000, 2000*Math.pow(1.8, fbaTries));
+        setTimeout(()=>{ fbAutoSignIn().catch(()=>{}); }, wait);
+      }
+      console.warn('[FBX auto]', code);
+    }
+    return false;
+  } finally {
+    fbaBusy=false; fbaConnecting=false;
+    try{ fbPaint(); }catch(e){}
+  }
+}
+
+let fbaWarned=false;
+function fbaWarnBad(code){
+  if(fbaWarned) return; fbaWarned=true;
+  setTimeout(()=>{
+    try{
+      toast('รหัสผ่าน Firebase ที่จำไว้ใช้ไม่ได้แล้ว กรุณากดปุ่มเมฆเพื่อเข้าสู่ระบบอีกครั้ง','error');
+      fbStatusMsg='รหัสผ่านที่จำไว้ใช้ไม่ได้ ('+code+') — กดปุ่มเมฆเพื่อเข้าสู่ระบบใหม่';
+      fbPaint();
+    }catch(e){}
+  }, 800);
+}
+
+/* -------------------------------------------------------------- เชื่อมต่ออัตโนมัติ: อสม. */
+async function fbaMemberAuto(){
+  const F=window.FBX;
+  if(!F || F.fatal || F.loading) return false;
+  if(F.ready && !F.anon) return true;
+  if(fbaBusy) return false;
+  if(!force_isMemberSession()) return false;
+  const m=fbaReadMember();
+  if(!m || !m.cid || !m.pw) return false;
+  if(!force_memberMatches(m)) return false;
+  if(Date.now()-fbaLastTry < 4000) return false;
+
+  fbaBusy=true; fbaConnecting=true; fbaLastTry=Date.now();
+  try{ fbPaint(); }catch(e){}
+  try{
+    await mpFbSignIn(m.cid, m.pw, m.email||'');
+    if(!fbaAnnounced){ fbaAnnounced=true; }
+    return true;
+  }catch(e){
+    const code=String((e&&(e.code||e.message))||e);
+    if(/wrong-password|invalid-credential|invalid-login|user-not-found|user-disabled/.test(code)) fbaClearMember();
+    console.warn('[FBX member auto]', code);
+    return false;
+  } finally {
+    fbaBusy=false; fbaConnecting=false;
+    try{ fbPaint(); }catch(e){}
+  }
+}
+function force_isMemberSession(){ try{ return typeof isMember==='function' && isMember(); }catch(e){ return false; } }
+function force_memberMatches(m){
+  try{
+    const acc=mpMyAccount();
+    if(!acc) return false;
+    return mpDigits(acc.citizenId)===mpDigits(m.cid);
+  }catch(e){ return false; }
+}
+
+/* -------------------------------------------------------------- ตัวเลือกเส้นทางให้อัตโนมัติ */
+async function fbaConnect(force){
+  const F=window.FBX;
+  if(!F || F.fatal || F.loading) return false;
+  if(force_isMemberSession()) return fbaMemberAuto();
+  return fbAutoSignIn(force);
+}
+
+/* -------------------------------------------------------------- เข้าสู่ระบบด้วยมือ (บันทึกให้ครั้งเดียวพอ) */
+async function fbSignInStaff(email,pw){
+  const F=window.FBX;
+  if(!F||F.fatal) throw new Error('Firebase ยังโหลดไม่สำเร็จ');
+  await F.signInWithEmailAndPassword(F.auth,email,pw);
+  fbSetCfg({email});
+  fbaSavePw(pw);
+  fbaBlocked=''; fbaWarned=false; fbaTries=0; fbStatusMsg='';
+  fbaAnnounced=true;              // เพิ่งเชื่อมเอง ไม่ต้องเด้งข้อความซ้ำ
+}
+async function fbSignOut(){
+  const F=window.FBX; if(!F) return;
+  fbDetach();
+  fbaClearPw(); fbaClearMember();
+  fbaBlocked='manual';            // อย่าเชื่อมกลับอัตโนมัติจนกว่าจะเข้าสู่ระบบใหม่
+  try{ await F.signOut(F.auth); }catch(e){}
+  fbLast={}; fbPaint();
+  toast('ออกจากระบบ Firebase แล้ว — จะไม่เชื่อมต่ออัตโนมัติจนกว่าจะเข้าสู่ระบบใหม่','info');
+}
+
+/* จำข้อมูลเข้าระบบของ อสม. ไว้ต่อคลาวด์อัตโนมัติ (ห่อฟังก์ชันเดิม) */
+async function mpFbSignIn(cid, pw, email){
+  const F=window.FBX;
+  if(!F || F.fatal) return null;
+  const tries = email ? [email] : [mpFbEmail(cid,0),mpFbEmail(cid,1),mpFbEmail(cid,2)];
+  let lastErr=null;
+  const done=(uid,em)=>{ try{ fbaSaveMember(cid, pw, em); }catch(e){} return uid; };
+  for(const em of tries){
+    try{
+      const cred=await F.signInWithEmailAndPassword(F.auth, em, mpFbPw(pw));
+      return done(cred.user?cred.user.uid:null, em);
+    }catch(e){ lastErr=e; }
+  }
+  for(const em of tries){
+    try{
+      const cred=await F.signInWithEmailAndPassword(F.auth, em, pw);
+      return done(cred.user?cred.user.uid:null, em);
+    }catch(e){ lastErr=e; }
+  }
+  if(lastErr) throw lastErr;
+  return null;
+}
+
+/* -------------------------------------------------------------- ปุ่มเมฆ: บอกสถานะให้ชัด */
+function fbPaint(){
+  const chip=document.getElementById('fb-chip'); if(!chip) return;
+  const F=window.FBX;
+  let ic='fa-cloud-slash', txt='ออฟไลน์', col='var(--text-faint)';
+  if(F && F.loading){ ic='fa-circle-notch fa-spin'; txt='กำลังโหลด'; col='var(--info)'; }
+  else if(!F || F.fatal){ ic='fa-triangle-exclamation'; txt='Firebase ผิดพลาด'; col='var(--danger)'; }
+  else if(fbaConnecting){ ic='fa-circle-notch fa-spin'; txt='กำลังเชื่อมต่อ'; col='var(--info)'; }
+  else if(fbBusy){ ic='fa-spinner fa-spin'; txt='กำลังซิงก์'; col='var(--info)'; }
+  else if(fbStatusMsg){ ic='fa-triangle-exclamation'; txt='ต้องตั้งค่า'; col='var(--warning)'; }
+  else if(fbNeedUp){ ic='fa-cloud-arrow-up'; txt='รออัปโหลด'; col='var(--warning)'; }
+  else if(fbStaff()){ ic='fa-cloud-check'; txt='ซิงก์แล้ว'; col='var(--success)'; }
+  else if(F && F.ready && !F.anon){ ic='fa-cloud-check'; txt='ซิงก์แล้ว'; col='var(--success)'; }
+  else if(fbOK()){ ic='fa-cloud'; txt='อ่านอย่างเดียว'; col='var(--info)'; }
+  else { ic='fa-cloud-slash'; txt='ยังไม่เชื่อมต่อ'; col='var(--text-faint)'; }
+  chip.innerHTML=`<i class="fa-solid ${ic}"></i><span class="fb-chip-t">${txt}</span>`;
+  chip.style.color=col;
+  chip.title=fbStatusMsg||`Firebase: ${txt}`+(fbLastSync?` • ล่าสุด ${fbLastSync.toLocaleTimeString('th-TH')}`:'');
+}
+
+/* -------------------------------------------------------------- ตั้งเวลาและเหตุการณ์ */
+(function fbaBoot(){
+  const kick=(force)=>{ try{ fbaConnect(force); }catch(e){} };
+
+  const go=()=>{
+    // 1) ทันทีที่ SDK พร้อม
+    if(window.FBX && !window.FBX.loading) kick();
+    window.addEventListener('fbx-loaded', ()=>setTimeout(()=>kick(), 120));
+
+    // 2) ทุกครั้งที่สถานะบัญชีเปลี่ยน — รวมถึงตอนค้างเป็นผู้เยี่ยมชม
+    window.addEventListener('fbx-state', ()=>{
+      const F=window.FBX;
+      if(!F || F.fatal || F.loading) return;
+      if(fbaNeedsConnect()){ fbaLastTry=0; setTimeout(()=>kick(), 150); }
+      else { fbaTries=0; try{ if(fbStaff()) fbSchedulePush(); }catch(e){} }
+    });
+
+    // 3) กลับมาออนไลน์ / กลับมาที่แท็บนี้
+    window.addEventListener('online', ()=>{ fbaTries=0; kick(); });
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) kick(); });
+
+    // 4) ตรวจซ้ำเป็นระยะ ตราบใดที่ยังไม่เชื่อมต่อ (เงียบ ๆ ไม่กินทรัพยากร)
+    setInterval(()=>{ if(fbaNeedsConnect() && !fbaBlocked) kick(); }, 45000);
+
+    // 5) จังหวะเริ่มต้น เผื่อ SDK โหลดช้า
+    [400, 1500, 4000, 9000].forEach(ms=>setTimeout(()=>kick(), ms));
+  };
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,260));
+  else setTimeout(go,260);
+})();
+
+
+/* -------------------------------------------------------------- ใช้ร่วมกับหน้าตั้งค่า */
+function fbaSetRemember(on){
+  fbSetCfg({remember:!!on});
+  if(!on){ fbaClearPw(); fbaClearMember(); }
+  else {
+    // ถ้ากำลังเข้าสู่ระบบอยู่แล้วแต่ยังไม่ได้เก็บรหัส จะขอให้เข้าสู่ระบบใหม่ครั้งเดียว
+    const pw=fbaReadPw();
+    if(!pw) toast('เปิดแล้ว — เข้าสู่ระบบอีกครั้งหนึ่ง จากนั้นจะเชื่อมต่อให้อัตโนมัติตลอด','info');
+    else toast('จะเชื่อมต่อให้อัตโนมัติทุกครั้งที่เปิดเว็บ','success');
+    return;
+  }
+  toast('ปิดแล้ว — ต้องเข้าสู่ระบบ Firebase ใหม่ทุกครั้งที่เปิดเว็บ','info');
+}
+function fbaAutoReady(){ return !!(fbCfg().email && fbaReadPw() && fbRemember()); }
+function fbaAutoLabel(){
+  if(!fbRemember()) return '<span style="color:var(--text-faint)">ปิดอยู่</span>';
+  if(fbaBlocked==='bad') return '<span style="color:var(--danger)">รหัสที่จำไว้ใช้ไม่ได้ — เข้าสู่ระบบใหม่</span>';
+  if(fbaBlocked==='manual') return '<span style="color:var(--text-faint)">หยุดชั่วคราว (เพิ่งกดออกจากระบบ)</span>';
+  if(fbaAutoReady()) return '<span style="color:var(--success)">เปิดอยู่ — ไม่ต้องกดเชื่อมอีก</span>';
+  return '<span style="color:var(--warning)">เปิดอยู่ แต่ยังไม่ได้จำรหัส — เข้าสู่ระบบอีกครั้งหนึ่ง</span>';
 }
 
 </script>
