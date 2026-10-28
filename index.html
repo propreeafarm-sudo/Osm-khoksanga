@@ -4423,6 +4423,21 @@ function schPrintWindow(title,html,landscape){
   padding:7px 0;cursor:pointer;color:var(--text-secondary)}
 .ln-chk input{width:17px;height:17px;margin-top:1px;flex:none;cursor:pointer;accent-color:var(--primary)}
 
+
+/* ------------------------------------------------- นำเข้าข้อสอบจากไฟล์ */
+.ln-drop{border:2px dashed var(--border);border-radius:16px;padding:30px 20px;text-align:center;
+  cursor:pointer;transition:.15s;background:var(--bg-surface-2)}
+.ln-drop:hover,.ln-drop.on{border-color:var(--primary);background:rgba(33,33,98,.06)}
+.ln-drop i{font-size:34px;color:var(--primary);opacity:.65;display:block;margin-bottom:11px}
+.ln-drop b{display:block;font-size:14.5px;margin-bottom:5px}
+.ln-drop span{display:block;font-size:12px;color:var(--text-faint)}
+.ln-drop .ln-type{display:inline-flex;margin:0 3px}
+
+.ln-qrow.need{border-color:#f59e0b;background:rgba(245,158,11,.055)}
+.ln-qopt.pick{cursor:pointer;border-radius:9px;padding:6px 8px;margin:1px 0;transition:.12s}
+.ln-qopt.pick:hover{background:var(--bg-surface-2)}
+.ln-qopt.pick .ln-qk{transition:.12s}
+
 </style></head>
     <body><div class="toolbar"><b>${title}</b>
       <div><button onclick="window.print()">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
@@ -13938,6 +13953,723 @@ function renderCurrentView(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,520));
   else setTimeout(go,520);
 })();
+
+
+
+/* ============================================================================================
+   LEARNING MODULE — ส่วนที่ 5: นำเข้าข้อสอบจากไฟล์  (PDF / Word / Excel / CSV / ข้อความ)
+   อ่านไฟล์ในเครื่องผู้ใช้ทั้งหมด ไม่มีการอัปโหลดขึ้นเซิร์ฟเวอร์ใด ๆ
+   ============================================================================================ */
+
+const LN_ACCEPT = '.pdf,.docx,.doc,.xlsx,.xlsm,.xls,.csv,.txt,.md';
+// มีแหล่งสำรองหลายแห่ง เผื่อ CDN ใดเข้าไม่ได้
+const LN_CDN = {
+  pdf: [
+    ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'],
+    ['https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+     'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'],
+    ['https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
+     'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js']
+  ],
+  jszip: [
+    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+    'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+    'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'
+  ]
+};
+let lnImp = null;   // {cid, phase, fileName, raw, qs, mode}
+
+/* -------------------------------------------------------------- โหลดสคริปต์ตามต้องการ */
+function lnLoadScript(src){
+  return new Promise((res,rej)=>{
+    if([...document.scripts].some(s=>s.src===src)) return res();
+    const s=document.createElement('script');
+    let done=false;
+    const fin=(fn,arg)=>{ if(done) return; done=true; clearTimeout(t); fn(arg); };
+    const t=setTimeout(()=>fin(rej,new Error('โหลดไลบรารีไม่สำเร็จ — เชื่อมต่ออินเทอร์เน็ตไม่ได้ หรือใช้เวลานานเกินไป')),20000);
+    s.src=src; s.async=true;
+    s.onload=()=>fin(res);
+    s.onerror=()=>fin(rej,new Error('โหลดไลบรารีไม่สำเร็จ — ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต'));
+    document.head.appendChild(s);
+  });
+}
+
+/* -------------------------------------------------------------- ตัวช่วยข้อความ */
+function lnDecodeEnt(s){
+  return String(s||'')
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')
+    .replace(/&apos;/g,"'").replace(/&#(\d+);/g,(m,d)=>String.fromCharCode(+d))
+    .replace(/&amp;/g,'&');
+}
+function lnTidy(t){
+  return String(t||'')
+    .replace(/\r\n?/g,'\n')
+    .replace(/[ ​﻿]/g,' ')
+    .split('\n').map(l=>l.replace(/[ \t]+/g,' ').trim()).join('\n')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+}
+
+/* ============================================================================================
+   ตัวอ่านไฟล์แต่ละชนิด
+   ============================================================================================ */
+
+/* ---- ข้อความธรรมดา ---- */
+function lnReadText(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(lnTidy(String(r.result||'')));
+    r.onerror=()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    r.readAsText(file,'utf-8');
+  });
+}
+function lnReadBuf(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+/* ---- ZIP (ใช้กับ .docx) — ใช้ DecompressionStream ของเบราว์เซอร์ ไม่ต้องพึ่งไลบรารี ---- */
+async function lnZipEntry(ab, wantName){
+  const dv=new DataView(ab), u8=new Uint8Array(ab);
+  // หา End Of Central Directory
+  let eo=-1;
+  for(let i=u8.length-22; i>=Math.max(0,u8.length-66000); i--){
+    if(dv.getUint32(i,true)===0x06054b50){ eo=i; break; }
+  }
+  if(eo<0) throw new Error('ไฟล์ Word เสียหาย หรือไม่ใช่ไฟล์ .docx');
+  const count=dv.getUint16(eo+10,true);
+  let p=dv.getUint32(eo+16,true);
+  const dec=new TextDecoder('utf-8');
+  for(let k=0;k<count;k++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true);
+    const csize =dv.getUint32(p+20,true);
+    const nlen  =dv.getUint16(p+28,true);
+    const elen  =dv.getUint16(p+30,true);
+    const clen  =dv.getUint16(p+32,true);
+    const lho   =dv.getUint32(p+42,true);
+    const name  =dec.decode(u8.subarray(p+46,p+46+nlen));
+    if(name===wantName){
+      if(dv.getUint32(lho,true)!==0x04034b50) throw new Error('ไฟล์ Word เสียหาย');
+      const lnlen=dv.getUint16(lho+26,true), lelen=dv.getUint16(lho+28,true);
+      const start=lho+30+lnlen+lelen;
+      const data=u8.subarray(start,start+csize);
+      if(method===0) return dec.decode(data);
+      if(method!==8) throw new Error('ไฟล์ Word ใช้การบีบอัดที่ระบบยังไม่รองรับ');
+      if(typeof DecompressionStream==='undefined') throw new Error('__NEEDJSZIP__');
+      const ds=new DecompressionStream('deflate-raw');
+      const buf=await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+      return dec.decode(buf);
+    }
+    p += 46+nlen+elen+clen;
+  }
+  throw new Error('ไม่พบเนื้อหาในไฟล์ Word');
+}
+
+async function lnReadDocx(file){
+  const ab=await lnReadBuf(file);
+  let xml;
+  try{
+    xml=await lnZipEntry(ab,'word/document.xml');
+  }catch(e){
+    if(String(e.message).includes('__NEEDJSZIP__')){
+      let zipErr=null;
+      for(const u of LN_CDN.jszip){
+        try{ await lnLoadScript(u); if(window.JSZip) break; }catch(e2){ zipErr=e2; }
+      }
+      if(!window.JSZip) throw new Error('เบราว์เซอร์นี้เก่าเกินไปสำหรับการอ่านไฟล์ Word และโหลดตัวช่วยไม่ได้ — ' +
+        ((zipErr&&zipErr.message)||'ตรวจสอบอินเทอร์เน็ต'));
+      const zip=await window.JSZip.loadAsync(ab);
+      const f=zip.file('word/document.xml');
+      if(!f) throw new Error('ไม่พบเนื้อหาในไฟล์ Word');
+      xml=await f.async('string');
+    } else throw e;
+  }
+  const txt = xml
+    .replace(/<w:tab\b[^>]*\/?>/g,'\t')
+    .replace(/<w:br\b[^>]*\/?>/g,'\n')
+    .replace(/<\/w:p>/g,'\n')
+    .replace(/<\/w:tc>/g,'\t')
+    .replace(/<\/w:tr>/g,'\n')
+    .replace(/<[^>]+>/g,'');
+  return lnTidy(lnDecodeEnt(txt));
+}
+
+/* ---- PDF ---- */
+async function lnPdfLib(){
+  if(window.pdfjsLib) return window.pdfjsLib;
+  let last=null;
+  for(const [js,worker] of LN_CDN.pdf){
+    try{
+      await lnLoadScript(js);
+      if(window.pdfjsLib){
+        try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=worker; }catch(e){}
+        return window.pdfjsLib;
+      }
+    }catch(e){ last=e; }
+  }
+  throw new Error('โหลดตัวอ่าน PDF ไม่สำเร็จ — ' + ((last&&last.message)||'เชื่อมต่ออินเทอร์เน็ตไม่ได้') +
+    '\nถ้าใช้งานแบบออฟไลน์ กรุณาใช้ไฟล์ Word หรือ Excel แทน');
+}
+async function lnReadPdf(file){
+  const lib=await lnPdfLib();
+  const ab=await lnReadBuf(file);
+  const doc=await lib.getDocument({data:ab}).promise;
+  const pages=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p);
+    const tc=await page.getTextContent();
+    // จัดกลุ่มตามตำแหน่งแนวตั้ง เพื่อประกอบกลับเป็นบรรทัด
+    const lines=new Map();
+    tc.items.forEach(it=>{
+      if(!it.str) return;
+      const y=Math.round((it.transform&&it.transform[5]||0)*2)/2;
+      if(!lines.has(y)) lines.set(y,[]);
+      lines.get(y).push({x:(it.transform&&it.transform[4])||0, s:it.str});
+    });
+    const ys=[...lines.keys()].sort((a,b)=>b-a);
+    pages.push(ys.map(y=>lines.get(y).sort((a,b)=>a.x-b.x).map(o=>o.s).join('')).join('\n'));
+  }
+  const out=lnTidy(pages.join('\n'));
+  if(!out.replace(/\s/g,'').length)
+    throw new Error('ไฟล์ PDF นี้เป็นรูปภาพสแกน ไม่มีข้อความให้ดึง — กรุณาใช้ไฟล์ Word/Excel หรือพิมพ์ข้อความแทน');
+  return out;
+}
+
+/* ---- Excel / CSV → แปลงเป็นข้อสอบโดยตรง ---- */
+const LN_COL = {
+  q:       ['โจทย์','คำถาม','ข้อคำถาม','คำถามข้อสอบ','question','q'],
+  ans:     ['เฉลย','คำตอบ','ข้อที่ถูก','ตอบ','answer','key','correct'],
+  ex:      ['คำอธิบาย','เฉลยอธิบาย','อธิบาย','เหตุผล','explain','explanation','note'],
+  choice:  ['ตัวเลือก','choice','option']
+};
+function lnHeaderKind(h){
+  const s=String(h||'').trim().toLowerCase();
+  if(!s) return '';
+  if(LN_COL.q  .some(k=>s===k||s.startsWith(k))) return 'q';
+  if(LN_COL.ans.some(k=>s===k||s.startsWith(k))) return 'ans';
+  if(LN_COL.ex .some(k=>s===k||s.startsWith(k))) return 'ex';
+  if(/^[กขคงจฉ]\.?$/.test(s)) return 'c';
+  if(/^(ตัวเลือก|choice|option)\s*\d*$/.test(s)) return 'c';
+  if(/^[a-f]\.?$/.test(s)) return 'c';
+  return '';
+}
+function lnAnsIndex(val, choices){
+  const s=String(val==null?'':val).trim();
+  if(!s) return -1;
+  const th='กขคงจฉ'.indexOf(s[0]);
+  if(th>=0 && s.length<=2) return th;
+  const en='abcdef'.indexOf(s[0].toLowerCase());
+  if(en>=0 && s.length<=2) return en;
+  const n=parseInt(s,10);
+  if(!isNaN(n) && n>=1 && n<=choices.length) return n-1;
+  const i=choices.findIndex(c=>String(c).trim()===s);
+  if(i>=0) return i;
+  const j=choices.findIndex(c=>String(c).trim().replace(/\s/g,'')===s.replace(/\s/g,''));
+  return j;
+}
+function lnReadTextRaw(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result||'').replace(/^\ufeff/,''));
+    r.onerror=()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    r.readAsText(file,'utf-8');
+  });
+}
+async function lnReadSheet(file){
+  if(typeof XLSX==='undefined') throw new Error('ไลบรารี Excel ยังโหลดไม่เสร็จ กรุณาลองใหม่');
+  // ไฟล์ข้อความ (CSV/TSV) ต้องอ่านเป็น UTF-8 ก่อน ไม่งั้นภาษาไทยจะเพี้ยน
+  const asText = /\.(csv|tsv|txt)$/i.test(file.name||'');
+  const wb = asText
+    ? XLSX.read(await lnReadTextRaw(file), {type:'string'})
+    : XLSX.read(new Uint8Array(await lnReadBuf(file)), {type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  if(!ws) throw new Error('ไม่พบข้อมูลในไฟล์');
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:false})
+    .map(r=>r.map(c=>String(c==null?'':c).trim()));
+  if(!rows.length) throw new Error('ไฟล์ว่างเปล่า');
+
+  // หาแถวหัวตาราง
+  let hi=-1, map=null;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const kinds=rows[i].map(lnHeaderKind);
+    if(kinds.includes('q') && kinds.filter(k=>k==='c').length>=2){ hi=i; map=kinds; break; }
+  }
+  const qs=[];
+  const mk=(q,ch,ans,ex)=>{
+    const choices=ch.map(x=>String(x||'').trim()).filter(x=>x);
+    if(!q || choices.length<2) return;
+    let a=lnAnsIndex(ans,choices);
+    const need = a<0;
+    if(a<0) a=0;
+    qs.push({id:uid('q'), q:String(q).trim(), choices, answer:a, explain:String(ex||'').trim(), __need:need});
+  };
+
+  if(hi>=0){
+    const iQ=map.indexOf('q'), iA=map.indexOf('ans'), iE=map.indexOf('ex');
+    const iC=map.map((k,i)=>k==='c'?i:-1).filter(i=>i>=0);
+    for(let r=hi+1;r<rows.length;r++){
+      const row=rows[r];
+      if(!row.some(x=>x)) continue;
+      mk(row[iQ], iC.map(i=>row[i]), iA>=0?row[iA]:'', iE>=0?row[iE]:'');
+    }
+  } else {
+    // ไม่มีหัวตาราง — เดาจากลำดับคอลัมน์: โจทย์ | ตัวเลือก… | เฉลย | คำอธิบาย
+    for(const row of rows){
+      if(!row.some(x=>x)) continue;
+      if(row.length<3) continue;
+      let cells=row.slice();
+      let ex='', ans='';
+      // คอลัมน์สุดท้ายที่เป็นตัวอักษรเฉลยสั้น ๆ ถือเป็นเฉลย
+      for(let k=cells.length-1;k>=2;k--){
+        const v=cells[k];
+        if(/^([กขคงจฉ]|[a-fA-F]|[1-6])\.?$/.test(v)){ ans=v; ex=cells.slice(k+1).join(' ').trim(); cells=cells.slice(0,k); break; }
+      }
+      mk(cells[0], cells.slice(1), ans, ex);
+    }
+  }
+  if(!qs.length) throw new Error('อ่านข้อสอบจากไฟล์นี้ไม่ได้ — กดปุ่ม “ดาวน์โหลดแบบฟอร์ม Excel” เพื่อดูรูปแบบที่ระบบรองรับ');
+  return qs;
+}
+
+/* ============================================================================================
+   ตัวแยกข้อสอบจากข้อความแบบฉลาด — รองรับเฉลยท้ายไฟล์และเครื่องหมายหลายแบบ
+   ============================================================================================ */
+const LN_THAI = '฀-๿';
+const LN_KEYPAIR = new RegExp('(\\d+)\\s*[.)\\-–:]?\\s*([กขคงจฉ]|[a-fA-F])(?![' + LN_THAI + 'A-Za-z0-9])','g');
+const LN_RE_EXP  = /^[ \t]*(?:#+|เฉลยอธิบาย|คำอธิบาย|เหตุผล|อธิบาย|explanation|explain)[ \t]*[:：]?[ \t]*(.*)$/i;
+const LN_RE_ANS  = new RegExp('^[ \t]*(?:เฉลยคำตอบ|เฉลย|คำตอบ|ตอบ|answer|ans)[ \t]*[:：.\\-–]?[ \t]*(?:ข้อ[ \t]*)?([กขคงจฉ]|[a-fA-F]|[1-9])(?![' + LN_THAI + 'A-Za-z0-9])','i');
+const LN_RE_Q    = /^[ \t]*(?:ข้อ[ \t]*)?(\d+)[ \t]*[.)、:：][ \t]*(\S.*)$/;
+const LN_RE_KEYHEAD = /^(เฉลย|เฉลยคำตอบ|เฉลยข้อสอบ|คำตอบ|answer\s*keys?|answers?)\s*[:：]?\s*$/i;
+const LN_RE_OPT_A = /^[ \t]*([*✓✔√►▶●]?)[ \t]*([กขคงจฉ]|[a-fA-F])[ \t]*[.)、][ \t]*(\S.*)$/;
+const LN_RE_OPT_N = /^[ \t]*([*✓✔√►▶●]?)[ \t]*([1-9])[ \t]*[.)、][ \t]*(\S.*)$/;
+
+function lnLetterIdx(ch){
+  let i='กขคงจฉ'.indexOf(ch);
+  if(i<0) i='abcdef'.indexOf(String(ch).toLowerCase());
+  if(i<0){ const n=parseInt(ch,10); if(!isNaN(n)&&n>=1) i=n-1; }
+  return i;
+}
+
+function lnParseSmart(text){
+  const all=String(text||'').replace(/\r/g,'').split('\n');
+
+  /* 1) แยกส่วน "เฉลย" ท้ายเอกสารออกมาก่อน */
+  let body=all, keyLines=[];
+  for(let i=0;i<all.length;i++){
+    if(LN_RE_KEYHEAD.test(all[i].trim())){
+      const rest=all.slice(i+1);
+      LN_KEYPAIR.lastIndex=0;
+      const m=rest.join(' ').match(LN_KEYPAIR)||[];
+      if(m.length>=2){ body=all.slice(0,i); keyLines=rest; break; }
+    }
+  }
+  const keyMap={};
+  if(keyLines.length){
+    const blob=keyLines.join(' '); let m; LN_KEYPAIR.lastIndex=0;
+    while((m=LN_KEYPAIR.exec(blob))){
+      const idx=lnLetterIdx(m[2]);
+      if(idx>=0) keyMap[parseInt(m[1],10)]=idx;
+    }
+  }
+
+  /* 2) ตรวจว่าเอกสารใช้ตัวอักษร (ก.ข.ค. / a.b.c.) หรือตัวเลขเป็นตัวเลือก
+        ถ้าใช้ตัวอักษร เลขนำหน้าบรรทัดจะถือเป็น "เลขข้อ" เสมอ */
+  const bodyTxt=body.join('\n');
+  const nAlpha=(bodyTxt.match(/^[ \t]*[*✓✔√►▶●]?[ \t]*(?:[กขคงจฉ]|[a-fA-F])[ \t]*[.)、][ \t]*\S/gm)||[]).length;
+  const alphaStyle = nAlpha>=2;
+  const OPT = alphaStyle ? LN_RE_OPT_A : LN_RE_OPT_N;
+
+  /* 3) เดินอ่านทีละบรรทัด */
+  const out=[]; let cur=null, blank=true;
+  const close=()=>{
+    if(cur && cur.q && cur.choices.length>=2){
+      if(cur.answer<0){ cur.answer=0; cur.__need=true; }
+      out.push(cur);
+    }
+    cur=null;   // ถ้าไม่ครบ ถือเป็นหัวเรื่อง/ข้อความทั่วไป ทิ้งไป
+  };
+
+  for(const raw of body){
+    const s=raw.trim();
+    if(!s){ blank=true; continue; }
+
+    const em=LN_RE_EXP.exec(s);
+    if(em){ if(cur && em[1]) cur.explain=(cur.explain?cur.explain+' ':'')+em[1].trim(); blank=false; continue; }
+
+    if(cur){
+      const am=LN_RE_ANS.exec(s);
+      if(am){
+        const idx=lnLetterIdx(am[1]);
+        if(idx>=0 && idx<6) cur.answer=idx;
+        blank=false; continue;
+      }
+    }
+
+    const qm=LN_RE_Q.exec(s);
+    const om=OPT.exec(s);
+    let asQ=false;
+    if(qm && !(alphaStyle && om)){
+      asQ = alphaStyle ? true : (!cur || blank || cur.choices.length>=2);
+    }
+    if(asQ){
+      close();
+      cur={id:uid('q'), no:parseInt(qm[1],10), q:qm[2].trim(), choices:[], answer:-1, explain:'', __need:false};
+      blank=false; continue;
+    }
+    if(cur && om){
+      const txt=om[3].trim();
+      if(txt){ if(om[1]) cur.answer=cur.choices.length; cur.choices.push(txt); }
+      blank=false; continue;
+    }
+    if(cur){
+      if(cur.choices.length) cur.choices[cur.choices.length-1]+=' '+s;
+      else cur.q+=' '+s;
+    } else {
+      cur={id:uid('q'), no:0, q:s, choices:[], answer:-1, explain:'', __need:false};
+    }
+    blank=false;
+  }
+  close();
+
+  /* 4) ใช้เฉลยท้ายเอกสาร */
+  if(Object.keys(keyMap).length){
+    out.forEach((q,i)=>{
+      const k = (q.no && keyMap[q.no]!==undefined) ? keyMap[q.no] : keyMap[i+1];
+      if(k!==undefined && k<q.choices.length){ q.answer=k; q.__need=false; }
+    });
+  }
+  out.forEach(q=>{ delete q.no; });
+  return out;
+}
+
+/* ใช้ตัวแยกแบบฉลาดกับปุ่ม "วางข้อสอบทีละหลายข้อ" ด้วย */
+function lnParseQuestions(text){ return lnParseSmart(text); }
+
+/* ============================================================================================
+   หน้าต่างนำเข้า
+   ============================================================================================ */
+function lnImportDialog(cid, phase){
+  const c=lnCourseById(cid); if(!c) return;
+  lnImp={cid, phase, fileName:'', raw:'', qs:[]};
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-file-import"></i> นำเข้าข้อสอบจากไฟล์ — ${phase==='pre'?'ก่อนเรียน':'หลังเรียน'}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div class="ln-note">
+      <b>รองรับไฟล์</b> &nbsp;
+      <span class="ln-type"><i class="fa-solid fa-file-pdf"></i> PDF</span>
+      <span class="ln-type"><i class="fa-solid fa-file-word"></i> Word (.docx)</span>
+      <span class="ln-type"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx .xls .csv)</span>
+      <span class="ln-type"><i class="fa-solid fa-file-lines"></i> ข้อความ (.txt)</span>
+      <br><br>
+      ระบบอ่านไฟล์ในเครื่องของท่านโดยตรง <b>ไม่มีการส่งไฟล์ขึ้นอินเทอร์เน็ต</b>
+      หลังอ่านเสร็จจะให้ตรวจและแก้เฉลยได้ก่อนบันทึกเสมอ
+    </div>
+
+    <div id="ln-drop" class="ln-drop">
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+      <b>ลากไฟล์มาวางที่นี่ หรือกดเพื่อเลือกไฟล์</b>
+      <span>PDF • Word • Excel • CSV • ข้อความ</span>
+      <input type="file" id="ln-file" accept="${LN_ACCEPT}" style="display:none">
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:13px 0">
+      <button class="btn btn-outline btn-sm" onclick="lnXlsxTemplate()"><i class="fa-solid fa-file-excel"></i> ดาวน์โหลดแบบฟอร์ม Excel</button>
+      <button class="btn btn-outline btn-sm" onclick="lnImpShowFormat()"><i class="fa-solid fa-circle-question"></i> รูปแบบไฟล์ที่ระบบอ่านได้</button>
+    </div>
+
+    <div id="ln-imp-status"></div>
+    <div id="ln-imp-prev"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-outline" id="ln-imp-add" disabled onclick="lnImpSave(false)"><i class="fa-solid fa-plus"></i> เพิ่มต่อท้าย</button>
+    <button class="btn btn-primary" id="ln-imp-rep" disabled onclick="lnImpSave(true)"><i class="fa-solid fa-floppy-disk"></i> บันทึกแทนที่ทั้งหมด</button>
+  </div>`,{size:'lg'});
+
+  const drop=document.getElementById('ln-drop'), inp=document.getElementById('ln-file');
+  drop.addEventListener('click',()=>inp.click());
+  inp.addEventListener('change',()=>{ if(inp.files&&inp.files[0]) lnImpFile(inp.files[0]); });
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('on');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('on');}));
+  drop.addEventListener('drop',e=>{
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(f) lnImpFile(f);
+  });
+}
+
+function lnImpStatus(html){ const b=document.getElementById('ln-imp-status'); if(b) b.innerHTML=html; }
+
+async function lnImpFile(file){
+  const name=file.name||'', ext=(name.split('.').pop()||'').toLowerCase();
+  lnImp.fileName=name;
+  lnImpStatus(`<div class="ln-note"><i class="fa-solid fa-spinner fa-spin"></i> กำลังอ่าน <b>${escapeHtml(name)}</b> …
+    ${ext==='pdf'?'(ไฟล์ PDF ใช้เวลาสักครู่ ต้องโหลดตัวอ่านครั้งแรก)':''}</div>`);
+  const prev=document.getElementById('ln-imp-prev'); if(prev) prev.innerHTML='';
+  try{
+    let qs=null, raw='';
+    if(['xlsx','xlsm','xls','csv'].includes(ext)){
+      qs=await lnReadSheet(file);
+      raw='';
+    } else if(ext==='docx'){
+      raw=await lnReadDocx(file);
+    } else if(ext==='pdf'){
+      raw=await lnReadPdf(file);
+    } else if(ext==='doc'){
+      throw new Error('ไฟล์ .doc รุ่นเก่าอ่านไม่ได้ — กรุณาเปิดใน Word แล้ว “บันทึกเป็น” .docx ก่อน');
+    } else {
+      raw=await lnReadText(file);
+    }
+    if(!qs) qs=lnParseSmart(raw);
+    lnImp.raw=raw; lnImp.qs=qs;
+    if(!qs.length){
+      lnImpStatus(`<div class="ln-note" style="border-right-color:var(--danger)">
+        <b>อ่านข้อสอบจากไฟล์นี้ไม่ได้</b><br>
+        ระบบดึงข้อความออกมาได้ แต่จัดรูปแบบเป็นข้อสอบไม่สำเร็จ
+        ลองกดดู “รูปแบบไฟล์ที่ระบบอ่านได้” แล้วปรับไฟล์ หรือแก้ข้อความด้านล่างแล้วกด “อ่านใหม่”</div>`);
+    } else {
+      const need=qs.filter(q=>q.__need).length;
+      lnImpStatus(`<div class="ln-note" style="border-right-color:#22c55e">
+        <b>อ่านได้ ${qs.length} ข้อ</b> จาก ${escapeHtml(name)}
+        ${need?`<br><b style="color:#b45309">มี ${need} ข้อที่ยังไม่พบเฉลยในไฟล์</b> — ระบบตั้งตัวเลือกแรกไว้ก่อน กรุณากดเลือกข้อที่ถูกในรายการด้านล่าง (ข้อที่ต้องตรวจมีกรอบสีส้ม)`:''}
+        </div>`);
+    }
+    lnImpPreview();
+  }catch(e){
+    lnImpStatus(`<div class="ln-note" style="border-right-color:var(--danger)">
+      <b>อ่านไฟล์ไม่สำเร็จ</b><br>${escapeHtml(e.message||String(e))}</div>`);
+    lnImp.qs=[]; lnImpPreview();
+  }
+}
+
+function lnImpPreview(){
+  const box=document.getElementById('ln-imp-prev'); if(!box) return;
+  const qs=lnImp.qs||[];
+  const canSave=qs.length>0;
+  const a=document.getElementById('ln-imp-add'), r=document.getElementById('ln-imp-rep');
+  if(a) a.disabled=!canSave;
+  if(r) r.disabled=!canSave;
+
+  const rawBox = lnImp.raw ? `
+    <details style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;padding:8px 0">
+        <i class="fa-solid fa-align-right"></i> ข้อความที่ดึงออกจากไฟล์ (แก้ไขแล้วกด “อ่านใหม่” ได้)</summary>
+      <textarea class="input" id="ln-imp-raw" rows="9" style="margin-top:8px">${escapeHtml(lnImp.raw)}</textarea>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="lnImpReparse()">
+        <i class="fa-solid fa-rotate"></i> อ่านใหม่จากข้อความนี้</button>
+    </details>` : '';
+
+  if(!qs.length){ box.innerHTML=rawBox; return; }
+
+  box.innerHTML = rawBox + `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <b style="font-size:14px">ตรวจสอบก่อนบันทึก — ${qs.length} ข้อ</b>
+      <span style="font-size:12px;color:var(--text-faint)">กดที่ตัวเลือกเพื่อตั้งเป็นคำตอบที่ถูก</span>
+    </div>
+    ${qs.map((q,i)=>`
+      <div class="ln-qrow ${q.__need?'need':''}">
+        <div class="ln-qh">
+          <div class="ln-qt">${i+1}. ${escapeHtml(q.q)}</div>
+          <button class="btn btn-ghost btn-sm" onclick="lnImpDrop(${i})" title="ไม่เอาข้อนี้">
+            <i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+        </div>
+        ${q.__need?`<div style="font-size:11.8px;color:#b45309;font-weight:700;margin:4px 0 2px">
+          <i class="fa-solid fa-triangle-exclamation"></i> ไม่พบเฉลยในไฟล์ — กรุณาเลือกคำตอบที่ถูก</div>`:''}
+        <div style="margin-top:8px">
+          ${q.choices.map((ch,ci)=>`
+            <div class="ln-qopt pick ${ci===q.answer?'right':''}" onclick="lnImpAns(${i},${ci})">
+              <span class="ln-qk">${LN_KEYS[ci]||ci+1}</span><span>${escapeHtml(ch)}</span></div>`).join('')}
+        </div>
+        ${q.explain?`<div style="margin-top:8px;font-size:12.2px;color:var(--text-faint);line-height:1.7">
+          <i class="fa-solid fa-lightbulb"></i> ${escapeHtml(q.explain)}</div>`:''}
+      </div>`).join('')}`;
+}
+function lnImpAns(i,ci){
+  if(!lnImp||!lnImp.qs[i]) return;
+  lnImp.qs[i].answer=ci; lnImp.qs[i].__need=false;
+  lnImpPreview();
+}
+function lnImpDrop(i){
+  if(!lnImp) return;
+  lnImp.qs.splice(i,1);
+  const need=lnImp.qs.filter(q=>q.__need).length;
+  lnImpStatus(`<div class="ln-note" style="border-right-color:#22c55e"><b>เหลือ ${lnImp.qs.length} ข้อ</b>
+    ${need?` • ยังต้องตรวจเฉลย ${need} ข้อ`:''}</div>`);
+  lnImpPreview();
+}
+function lnImpReparse(){
+  const t=document.getElementById('ln-imp-raw'); if(!t) return;
+  lnImp.raw=t.value;
+  lnImp.qs=lnParseSmart(lnImp.raw);
+  const need=lnImp.qs.filter(q=>q.__need).length;
+  lnImpStatus(lnImp.qs.length
+    ? `<div class="ln-note" style="border-right-color:#22c55e"><b>อ่านได้ ${lnImp.qs.length} ข้อ</b>${need?` • ยังไม่พบเฉลย ${need} ข้อ`:''}</div>`
+    : `<div class="ln-note" style="border-right-color:var(--danger)"><b>ยังอ่านข้อสอบไม่ได้</b> — ตรวจรูปแบบอีกครั้ง</div>`);
+  lnImpPreview();
+}
+function lnImpSave(replace){
+  if(!lnImp || !lnImp.qs.length) return;
+  const c=lnCourseById(lnImp.cid); if(!c) return;
+  const phase=lnImp.phase;
+  const clean=lnImp.qs.map(q=>({id:q.id||uid('q'), q:q.q, choices:q.choices.slice(),
+    answer:Math.max(0,Math.min(q.answer,q.choices.length-1)), explain:q.explain||''}));
+  const cur = phase==='pre' ? (c.preTest=c.preTest||[]) : (c.postTest=c.postTest||[]);
+  if(replace){ if(phase==='pre') c.preTest=clean; else c.postTest=clean; }
+  else clean.forEach(q=>cur.push(q));
+  lnTouch(c);
+  if(typeof schLog==='function') schLog('นำเข้าข้อสอบจากไฟล์', `${c.title} • ${clean.length} ข้อ • ${lnImp.fileName||'ข้อความ'}`);
+  persistState(); closeModal(); renderCurrentView();
+  toast(`นำเข้าข้อสอบ ${clean.length} ข้อเรียบร้อยแล้ว`,'success');
+}
+
+/* -------------------------------------------------------------- คำอธิบายรูปแบบไฟล์ */
+function lnImpShowFormat(){
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-circle-question"></i> รูปแบบไฟล์ที่ระบบอ่านได้</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <h4 style="margin:0 0 8px;font-size:15px"><i class="fa-solid fa-file-excel" style="color:#15803d"></i> Excel / CSV — แม่นยำที่สุด</h4>
+    <p style="font-size:13px;line-height:1.8;color:var(--text-secondary);margin:0 0 10px">
+      ใส่หัวตารางแถวแรก แล้วกรอกข้อละ 1 แถว ช่องเฉลยใส่ ก/ข/ค/ง หรือเลข 1–6 ก็ได้</p>
+    <div class="table-wrap" style="margin-bottom:18px"><table class="ln-tbl">
+      <thead><tr><th>โจทย์</th><th>ก</th><th>ข</th><th>ค</th><th>ง</th><th>เฉลย</th><th>คำอธิบาย</th></tr></thead>
+      <tbody><tr><td>ยุงลายวางไข่ในน้ำแบบใด</td><td>น้ำขุ่น</td><td>น้ำใสนิ่ง</td><td>น้ำไหล</td><td>น้ำเค็ม</td><td class="num">ข</td><td>ยุงลายชอบน้ำใสนิ่ง</td></tr></tbody>
+    </table></div>
+
+    <h4 style="margin:0 0 8px;font-size:15px"><i class="fa-solid fa-file-word" style="color:#1d4ed8"></i> Word / PDF / ข้อความ</h4>
+    <p style="font-size:13px;line-height:1.8;color:var(--text-secondary);margin:0 0 10px">
+      พิมพ์ตามรูปแบบข้อสอบปกติ ระบุเฉลยได้ 3 วิธี — ใส่ <code>*</code> หรือ <code>✓</code> หน้าข้อที่ถูก,
+      เขียนบรรทัด <code>เฉลย: ข</code> ใต้ข้อนั้น, หรือรวมเฉลยไว้ท้ายเอกสาร</p>
+    <pre style="background:var(--bg-surface-2);border:1px solid var(--border);border-radius:11px;padding:13px 15px;
+      font-size:12.5px;line-height:1.85;overflow:auto;white-space:pre-wrap">1. ยุงลายวางไข่ในน้ำแบบใด
+ก. น้ำขุ่น
+ข. น้ำใสนิ่ง
+ค. น้ำไหล
+ง. น้ำเค็ม
+เฉลย: ข
+คำอธิบาย: ยุงลายชอบวางไข่ในน้ำใสนิ่ง
+
+2. ควรเปลี่ยนน้ำในแจกันทุกกี่วัน
+ก. 3 วัน
+*ข. 7 วัน
+ค. 15 วัน
+
+─ หรือรวมเฉลยไว้ท้ายเอกสาร ─
+
+เฉลย
+1. ข
+2. ข</pre>
+    <div class="ln-note" style="margin-top:14px">
+      <b>ข้อควรทราบเรื่อง PDF</b> — ถ้า PDF เป็นภาพสแกน (ถ่ายเอกสาร) จะไม่มีข้อความให้ดึง
+      ระบบจะแจ้งเตือน กรุณาใช้ไฟล์ Word หรือ Excel แทน
+      <br><b>ไฟล์ .doc รุ่นเก่า</b> ต้องเปิดใน Word แล้วบันทึกเป็น .docx ก่อน
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">เข้าใจแล้ว</button></div>`,{size:'md'});
+}
+
+/* -------------------------------------------------------------- แบบฟอร์ม Excel */
+function lnXlsxTemplate(){
+  if(typeof XLSX==='undefined'){ toast('ไลบรารี Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง','error'); return; }
+  const aoa=[
+    ['โจทย์','ก','ข','ค','ง','จ','เฉลย','คำอธิบาย'],
+    ['แหล่งเพาะพันธุ์ยุงลายที่พบบ่อยที่สุดในบ้านคือข้อใด','ตุ่มน้ำในห้องน้ำ','จานรองกระถางต้นไม้','บ่อน้ำหลังบ้าน','ท่อระบายน้ำ','','ข','ยุงลายวางไข่ในน้ำใสนิ่ง'],
+    ['ควรเปลี่ยนน้ำในแจกันทุกกี่วัน','3 วัน','7 วัน','15 วัน','30 วัน','','ข','วงจรไข่ถึงตัวเต็มวัยราว 7–10 วัน'],
+    ['','','','','','','',''],
+    ['วิธีใช้: กรอกข้อละ 1 แถว • ช่องเฉลยใส่ ก ข ค ง จ ฉ หรือเลข 1–6 • ช่องตัวเลือกที่ไม่ใช้ปล่อยว่าง','','','','','','','']
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:46},{wch:20},{wch:20},{wch:20},{wch:20},{wch:14},{wch:8},{wch:34}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'ข้อสอบ');
+  XLSX.writeFile(wb,'แบบฟอร์มนำเข้าข้อสอบ-อสม.xlsx');
+  toast('ดาวน์โหลดแบบฟอร์มแล้ว กรอกข้อสอบแล้วนำกลับมานำเข้าได้เลย','success');
+}
+
+/* ============================================================================================
+   เพิ่มปุ่มเข้าไปในแท็บข้อสอบ (ประกาศทับของเดิม)
+   ============================================================================================ */
+function lnQPanel(c, phase){
+  const qs=lnTest(c,phase);
+  const lab = phase==='pre' ? 'ก่อนเรียน (Pre-test)' : 'หลังเรียน (Post-test)';
+  const other = phase==='pre' ? 'post' : 'pre';
+  return `
+  <div class="ln-note"><b>แบบทดสอบ${lab}</b> — เป็นข้อสอบปรนัยเลือกตอบ ใส่ได้ 2–6 ตัวเลือกต่อข้อ
+    ${phase==='pre'
+      ? 'ให้ อสม. ทำก่อนเข้าเรียน เพื่อวัดความรู้เดิม'
+      : 'ให้ อสม. ทำหลังเรียนจบ ระบบจะเทียบกับคะแนนก่อนเรียนเพื่อแสดงพัฒนาการ'}
+    <br>เคล็ดลับ: ควรใช้ข้อสอบชุดเดียวกันทั้งก่อนและหลัง เพื่อให้เปรียบเทียบได้ตรง — กดปุ่ม “คัดลอกจาก${phase==='pre'?'หลังเรียน':'ก่อนเรียน'}” ได้</div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
+    <button class="btn btn-primary btn-sm" onclick="lnImportDialog('${c.id}','${phase}')">
+      <i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ข้อสอบ (PDF / Word / Excel)</button>
+    <button class="btn btn-outline btn-sm" onclick="lnQForm('${c.id}','${phase}')"><i class="fa-solid fa-plus"></i> เพิ่มทีละข้อ</button>
+    <button class="btn btn-outline btn-sm" onclick="lnQBulk('${c.id}','${phase}')"><i class="fa-solid fa-paste"></i> วางข้อความทีละหลายข้อ</button>
+    <button class="btn btn-outline btn-sm" onclick="lnQCopy('${c.id}','${other}','${phase}')" ${lnTest(c,other).length?'':'disabled'}>
+      <i class="fa-solid fa-copy"></i> คัดลอกจาก${phase==='pre'?'หลังเรียน':'ก่อนเรียน'} (${lnTest(c,other).length} ข้อ)</button>
+    ${qs.length?`<button class="btn btn-ghost btn-sm" onclick="lnQClear('${c.id}','${phase}')"><i class="fa-solid fa-eraser"></i> ล้างทั้งหมด</button>`:''}
+  </div>
+
+  ${qs.length? qs.map((q,i)=>`
+    <div class="ln-qrow">
+      <div class="ln-qh">
+        <div class="ln-qt">${i+1}. ${escapeHtml(q.q||'')}</div>
+        <div style="display:flex;gap:5px;flex:none">
+          <button class="btn btn-ghost btn-sm" onclick="lnMoveQ('${c.id}','${phase}','${q.id}',-1)" ${i===0?'disabled':''}><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="lnMoveQ('${c.id}','${phase}','${q.id}',1)" ${i===qs.length-1?'disabled':''}><i class="fa-solid fa-chevron-down"></i></button>
+          <button class="btn btn-outline btn-sm" onclick="lnQForm('${c.id}','${phase}','${q.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="lnDelQ('${c.id}','${phase}','${q.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+        </div>
+      </div>
+      <div style="margin-top:9px">
+        ${(q.choices||[]).map((ch,ci)=>`<div class="ln-qopt ${ci===q.answer?'right':''}">
+          <span class="ln-qk">${LN_KEYS[ci]||ci+1}</span>
+          <span>${escapeHtml(ch)}</span></div>`).join('')}
+      </div>
+      ${q.explain?`<div style="margin-top:9px;font-size:12.3px;color:var(--text-faint);line-height:1.7">
+        <i class="fa-solid fa-lightbulb"></i> เฉลยอธิบาย: ${escapeHtml(q.explain)}</div>`:''}
+    </div>`).join('')
+  : `<div class="ln-empty"><i class="fa-solid fa-circle-question big"></i><h3>ยังไม่มีข้อสอบ${lab}</h3>
+      <p>มีไฟล์ข้อสอบอยู่แล้ว? นำเข้าจาก PDF, Word หรือ Excel ได้เลย<br>หรือจะพิมพ์เองทีละข้อก็ได้</p>
+      <button class="btn btn-primary" onclick="lnImportDialog('${c.id}','${phase}')"><i class="fa-solid fa-file-import"></i> นำเข้าไฟล์ข้อสอบ</button>
+      <button class="btn btn-outline" onclick="lnQForm('${c.id}','${phase}')" style="margin-right:8px"><i class="fa-solid fa-plus"></i> เพิ่มทีละข้อ</button></div>`}`;
+}
+
+/* แก้ป้ายสรุปของหน้าวางข้อความให้ตรงกับตัวแยกแบบใหม่ */
+function lnQBulkPreview(){
+  const box=document.getElementById('qb-prev'); if(!box) return;
+  const qs=lnParseSmart(document.getElementById('qb-text').value);
+  if(!qs.length){ box.innerHTML='<p style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:14px 0">ยังอ่านข้อสอบไม่ได้ — ตรวจรูปแบบตามคำแนะนำด้านบน</p>'; return; }
+  const need=qs.filter(q=>q.__need).length;
+  box.innerHTML=`<div class="ln-note" style="border-right-color:${need?'#f59e0b':'#22c55e'}"><b>อ่านได้ ${qs.length} ข้อ</b>
+      ${need?` • <b style="color:#b45309">${need} ข้อยังไม่พบเฉลย</b> ระบบตั้งตัวเลือกแรกไว้ก่อน กรุณาตรวจอีกครั้งหลังบันทึก`:' • พบเฉลยครบทุกข้อ'}</div>
+    ${qs.map((q,i)=>`<div class="ln-qrow ${q.__need?'need':''}"><div class="ln-qt">${i+1}. ${escapeHtml(q.q)}</div>
+      <div style="margin-top:7px">${q.choices.map((ch,ci)=>`<div class="ln-qopt ${ci===q.answer?'right':''}">
+        <span class="ln-qk">${LN_KEYS[ci]||ci+1}</span><span>${escapeHtml(ch)}</span></div>`).join('')}</div>
+      ${q.explain?`<div style="margin-top:7px;font-size:12.2px;color:var(--text-faint)"><i class="fa-solid fa-lightbulb"></i> ${escapeHtml(q.explain)}</div>`:''}
+      </div>`).join('')}`;
+}
+
+/* ล้างธงภายใน (__need) ก่อนบันทึกจากหน้า "วางข้อความ" */
+function lnQBulkSave(cid, phase, replace){
+  const c=lnCourseById(cid); if(!c) return;
+  const parsed=lnParseSmart(document.getElementById('qb-text').value);
+  if(!parsed.length){ toast('ยังอ่านข้อสอบไม่ได้ ตรวจรูปแบบอีกครั้ง','error'); return; }
+  const qs=parsed.map(q=>({id:q.id||uid('q'), q:q.q, choices:q.choices.slice(),
+    answer:Math.max(0,Math.min(q.answer,q.choices.length-1)), explain:q.explain||''}));
+  const cur = phase==='pre' ? (c.preTest=c.preTest||[]) : (c.postTest=c.postTest||[]);
+  if(replace){ if(phase==='pre') c.preTest=qs; else c.postTest=qs; }
+  else qs.forEach(q=>cur.push(q));
+  lnTouch(c); persistState(); closeModal(); renderCurrentView();
+  const need=parsed.filter(q=>q.__need).length;
+  toast(`${replace?'บันทึก':'เพิ่ม'}ข้อสอบ ${qs.length} ข้อแล้ว`+(need?` (${need} ข้อยังไม่พบเฉลย กรุณาตรวจ)`:''),'success');
+}
 
 </script>
 <script type="module">
