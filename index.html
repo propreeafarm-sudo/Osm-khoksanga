@@ -4254,7 +4254,176 @@ function schPrintWindow(title,html,landscape){
   w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
     <title>${title}</title>
     <style>${SCH_PRINT_CSS}${landscape?'@media print{@page{size:A4 landscape;margin:0}}':''}
-    ${lg?`.logo-img{background-image:url("${lg}")}`:''}</style></head>
+    ${lg?`.logo-img{background-image:url("${lg}")}`:''}
+/* ===== LEARNING MODULE ===== */
+/* ============================================================================================
+   LEARNING / LMS MODULE  v1.0  — โรงเรียน อสม. ออนไลน์
+   หลักสูตร → คลังความรู้ → ทดสอบก่อนเรียน → เรียน → ทดสอบหลังเรียน → วัดพัฒนาการ
+   ============================================================================================ */
+
+.ln-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px}
+
+.ln-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;
+  padding:0;overflow:hidden;display:flex;flex-direction:column;transition:.16s;position:relative}
+.ln-card:hover{border-color:var(--primary);box-shadow:0 8px 24px rgba(0,0,0,.08);transform:translateY(-2px)}
+.ln-card-top{padding:16px 18px 13px;display:flex;gap:13px;align-items:flex-start;
+  background:linear-gradient(135deg,rgba(33,33,98,.055),rgba(33,33,98,0))}
+.ln-ic{width:46px;height:46px;flex:none;border-radius:13px;display:grid;place-items:center;
+  font-size:19px;color:#fff;background:linear-gradient(135deg,#212162,#3a3a8f)}
+.ln-ic.c1{background:linear-gradient(135deg,#0f766e,#14b8a6)}
+.ln-ic.c2{background:linear-gradient(135deg,#b45309,#f59e0b)}
+.ln-ic.c3{background:linear-gradient(135deg,#9d174d,#ec4899)}
+.ln-ic.c4{background:linear-gradient(135deg,#1e40af,#3b82f6)}
+.ln-ic.c5{background:linear-gradient(135deg,#4c1d95,#8b5cf6)}
+.ln-card-top h4{margin:0 0 4px;font-size:15.5px;line-height:1.4;font-weight:800}
+.ln-card-top .ln-cat{font-size:11.5px;color:var(--text-faint);font-weight:700;letter-spacing:.2px}
+.ln-card-body{padding:0 18px 14px;font-size:12.8px;color:var(--text-secondary);line-height:1.7;flex:1}
+.ln-card-foot{padding:11px 18px;border-top:1px solid var(--border);display:flex;gap:8px;
+  align-items:center;flex-wrap:wrap;background:var(--bg-surface-2)}
+
+.ln-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:11.8px;color:var(--text-faint);
+  padding:0 18px 12px;font-weight:600}
+.ln-meta i{width:13px;text-align:center;margin-left:3px}
+
+.ln-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+  font-size:11.3px;font-weight:800;border:1px solid transparent;white-space:nowrap}
+.ln-chip.pub{background:#dcfce7;color:#14532d;border-color:#86efac}
+.ln-chip.draft{background:#f1f5f9;color:#475569;border-color:#cbd5e1}
+.ln-chip.ok{background:#dcfce7;color:#14532d;border-color:#86efac}
+.ln-chip.no{background:#fee2e2;color:#7f1d1d;border-color:#fca5a5}
+.ln-chip.wait{background:#fef3c7;color:#78350f;border-color:#fcd34d}
+.ln-chip.info{background:#dbeafe;color:#1e3a8a;border-color:#93c5fd}
+.ln-chip.up{background:#ecfdf5;color:#065f46;border-color:#6ee7b7}
+[data-theme="dark"] .ln-chip.pub,[data-theme="dark"] .ln-chip.ok,[data-theme="dark"] .ln-chip.up{background:rgba(34,197,94,.17);color:#6ee7b7;border-color:rgba(34,197,94,.35)}
+[data-theme="dark"] .ln-chip.no{background:rgba(239,68,68,.17);color:#fca5a5;border-color:rgba(239,68,68,.35)}
+[data-theme="dark"] .ln-chip.wait{background:rgba(245,158,11,.17);color:#fcd34d;border-color:rgba(245,158,11,.35)}
+[data-theme="dark"] .ln-chip.info{background:rgba(59,130,246,.17);color:#93c5fd;border-color:rgba(59,130,246,.35)}
+[data-theme="dark"] .ln-chip.draft{background:rgba(148,163,184,.17);color:#cbd5e1;border-color:rgba(148,163,184,.3)}
+
+/* ------------------------------------------------- บทเรียน / คลังความรู้ */
+.ln-lesson{display:flex;gap:13px;align-items:flex-start;padding:13px 15px;border:1px solid var(--border);
+  border-radius:13px;background:var(--bg-surface);margin-bottom:9px;transition:.14s}
+.ln-lesson:hover{border-color:var(--primary)}
+.ln-lesson.done{border-color:#86efac;background:rgba(34,197,94,.055)}
+.ln-lnum{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;
+  background:var(--bg-surface-2);border:1px solid var(--border);font-weight:800;font-size:12.5px;color:var(--text-secondary)}
+.ln-lesson.done .ln-lnum{background:#22c55e;border-color:#22c55e;color:#fff}
+.ln-lbody{flex:1;min-width:0}
+.ln-lbody b{display:block;font-size:14px;line-height:1.5}
+.ln-lbody .ln-lsub{font-size:12px;color:var(--text-faint);margin-top:3px}
+.ln-lact{display:flex;gap:6px;align-items:center;flex:none}
+
+.ln-type{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;
+  padding:2px 8px;border-radius:7px;background:var(--bg-surface-2);border:1px solid var(--border);color:var(--text-secondary)}
+
+/* ------------------------------------------------- แบบทดสอบ */
+.ln-qrow{border:1px solid var(--border);border-radius:13px;padding:14px 16px;margin-bottom:10px;background:var(--bg-surface)}
+.ln-qrow .ln-qh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.ln-qrow .ln-qt{font-size:14px;font-weight:700;line-height:1.6;flex:1;min-width:0}
+.ln-qopt{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:5px 0;color:var(--text-secondary)}
+.ln-qopt .ln-qk{width:21px;height:21px;flex:none;border-radius:50%;border:1.5px solid var(--border);
+  display:grid;place-items:center;font-size:10.5px;font-weight:800}
+.ln-qopt.right{color:var(--success,#15803d);font-weight:700}
+.ln-qopt.right .ln-qk{background:#22c55e;border-color:#22c55e;color:#fff}
+
+/* ------------------------------------------------- ห้องสอบ (member) */
+.ln-exam{max-width:720px;margin:0 auto}
+.ln-exam-head{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;
+  padding:15px 18px;margin-bottom:14px;position:sticky;top:0;z-index:5}
+.ln-bar{height:8px;border-radius:999px;background:var(--bg-surface-2);overflow:hidden;margin-top:11px}
+.ln-bar>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#212162,#4f46e5);transition:width .3s}
+.ln-bar.g>i{background:linear-gradient(90deg,#15803d,#22c55e)}
+.ln-bar.r>i{background:linear-gradient(90deg,#b91c1c,#ef4444)}
+
+.ln-qbox{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:20px 20px 16px}
+.ln-qbox .ln-qnum{font-size:11.5px;font-weight:800;color:var(--primary);letter-spacing:.4px}
+.ln-qbox h3{margin:7px 0 17px;font-size:17px;line-height:1.65;font-weight:800}
+
+.ln-choice{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:right;
+  border:1.5px solid var(--border);background:var(--bg-surface);border-radius:13px;
+  padding:13px 15px;margin-bottom:9px;cursor:pointer;transition:.13s;font-size:14.5px;line-height:1.6;
+  font-family:inherit;color:var(--text-primary)}
+.ln-choice:hover{border-color:var(--primary);background:var(--bg-surface-2)}
+.ln-choice .ln-ck{width:27px;height:27px;flex:none;border-radius:50%;border:1.8px solid var(--border);
+  display:grid;place-items:center;font-size:12.5px;font-weight:800;color:var(--text-secondary);transition:.13s}
+.ln-choice.sel{border-color:var(--primary);background:rgba(33,33,98,.07)}
+.ln-choice.sel .ln-ck{background:var(--primary);border-color:var(--primary);color:#fff}
+.ln-choice.right{border-color:#22c55e;background:rgba(34,197,94,.09)}
+.ln-choice.right .ln-ck{background:#22c55e;border-color:#22c55e;color:#fff}
+.ln-choice.wrong{border-color:#ef4444;background:rgba(239,68,68,.09)}
+.ln-choice.wrong .ln-ck{background:#ef4444;border-color:#ef4444;color:#fff}
+.ln-choice[disabled]{cursor:default}
+
+.ln-pager{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+.ln-pg{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-surface);
+  font-weight:800;font-size:12.5px;cursor:pointer;color:var(--text-secondary);transition:.13s;font-family:inherit}
+.ln-pg.ans{background:var(--primary);border-color:var(--primary);color:#fff}
+.ln-pg.cur{outline:2.5px solid var(--primary);outline-offset:2px}
+
+/* ------------------------------------------------- ผลคะแนน */
+.ln-score{text-align:center;padding:26px 20px}
+.ln-dial{width:150px;height:150px;margin:0 auto 16px;border-radius:50%;display:grid;place-items:center;
+  position:relative;background:conic-gradient(var(--primary) var(--p,0%),var(--bg-surface-2) 0)}
+.ln-dial::after{content:'';position:absolute;inset:13px;border-radius:50%;background:var(--bg-surface)}
+.ln-dial b{position:relative;z-index:1;font-size:34px;font-weight:900;line-height:1}
+.ln-dial small{position:relative;z-index:1;display:block;font-size:11.5px;color:var(--text-faint);margin-top:3px;font-weight:700}
+.ln-dial.pass{background:conic-gradient(#22c55e var(--p,0%),var(--bg-surface-2) 0)}
+.ln-dial.fail{background:conic-gradient(#ef4444 var(--p,0%),var(--bg-surface-2) 0)}
+
+.ln-delta{display:inline-flex;align-items:center;gap:8px;padding:9px 17px;border-radius:999px;
+  font-weight:800;font-size:14.5px;background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7}
+.ln-delta.down{background:#fef2f2;color:#991b1b;border-color:#fca5a5}
+.ln-delta.flat{background:var(--bg-surface-2);color:var(--text-secondary);border-color:var(--border)}
+[data-theme="dark"] .ln-delta{background:rgba(34,197,94,.15);color:#6ee7b7;border-color:rgba(34,197,94,.35)}
+[data-theme="dark"] .ln-delta.down{background:rgba(239,68,68,.15);color:#fca5a5;border-color:rgba(239,68,68,.35)}
+
+/* ------------------------------------------------- สถิติ */
+.ln-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.ln-stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:15px 17px}
+.ln-stat b{display:block;font-size:25px;font-weight:900;line-height:1.1}
+.ln-stat span{display:block;font-size:11.8px;color:var(--text-faint);margin-top:5px;font-weight:600}
+.ln-stat.g b{color:#15803d}.ln-stat.r b{color:#b91c1c}.ln-stat.b b{color:#1d4ed8}.ln-stat.o b{color:#b45309}
+
+.ln-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.ln-tbl th{background:var(--bg-surface-2);padding:10px 11px;text-align:right;font-weight:800;
+  font-size:12px;border-bottom:1.5px solid var(--border);white-space:nowrap}
+.ln-tbl td{padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ln-tbl tbody tr:hover{background:var(--bg-surface-2)}
+.ln-tbl .num{text-align:center;font-variant-numeric:tabular-nums;font-weight:700}
+
+.ln-mini{height:6px;border-radius:999px;background:var(--bg-surface-2);overflow:hidden;min-width:68px}
+.ln-mini>i{display:block;height:100%;border-radius:999px;background:var(--primary)}
+.ln-mini.g>i{background:#22c55e}.ln-mini.r>i{background:#ef4444}.ln-mini.o>i{background:#f59e0b}
+
+.ln-empty{text-align:center;padding:50px 24px;color:var(--text-faint)}
+.ln-empty .big{font-size:46px;opacity:.26;display:block;margin-bottom:14px}
+.ln-empty h3{margin:0 0 7px;font-size:17px;color:var(--text-secondary)}
+.ln-empty p{margin:0 0 16px;font-size:13px;line-height:1.75}
+
+.ln-tabs{display:flex;gap:6px;border-bottom:2px solid var(--border);margin-bottom:17px;overflow-x:auto;padding-bottom:0}
+.ln-tab{padding:10px 16px;border:0;background:transparent;font-family:inherit;font-size:13.5px;font-weight:700;
+  color:var(--text-faint);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.ln-tab.on{color:var(--primary);border-bottom-color:var(--primary)}
+
+.ln-note{background:var(--bg-surface-2);border:1px solid var(--border);border-right:3px solid var(--primary);
+  border-radius:11px;padding:12px 15px;font-size:12.8px;line-height:1.8;color:var(--text-secondary);margin-bottom:15px}
+
+.ln-rich{font-size:14.5px;line-height:1.95;white-space:pre-wrap;word-break:break-word}
+.ln-rich a{color:var(--primary);text-decoration:underline}
+
+@media(max-width:640px){
+  .ln-grid{grid-template-columns:1fr}
+  .ln-dial{width:128px;height:128px}
+  .ln-dial b{font-size:29px}
+  .ln-exam-head{position:static}
+}
+@media print{ .ln-tabs,.page-head-actions{display:none!important} }
+
+.ln-chk{display:flex;gap:9px;align-items:flex-start;font-size:13.2px;line-height:1.65;
+  padding:7px 0;cursor:pointer;color:var(--text-secondary)}
+.ln-chk input{width:17px;height:17px;margin-top:1px;flex:none;cursor:pointer;accent-color:var(--primary)}
+
+</style></head>
     <body><div class="toolbar"><b>${title}</b>
       <div><button onclick="window.print()">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
       <button onclick="window.close()" style="background:transparent;color:#fff;border:1px solid #fff">ปิด</button></div></div>
@@ -11985,6 +12154,1790 @@ async function mpSyncMyAccount(acc, pw){
   }catch(e){ console.warn('[FBX my account]', e && (e.code||e.message)); }
   return acc;
 }
+
+
+
+/* ============================================================================================
+   LEARNING / LMS MODULE  v1.0  — ส่วนที่ 1: ชั้นข้อมูล + หน้าจัดการหลักสูตร (เจ้าหน้าที่)
+   ออกแบบตามข้อเสนอแนะ: "ต้องมีช่องทางการเรียนรู้ของ อสม. และวัดผลได้"
+   วงจร: หลักสูตร → คลังความรู้ → ทดสอบก่อนเรียน → เรียน → ทดสอบหลังเรียน → วัดพัฒนาการ
+   ============================================================================================ */
+
+const LN_CATS = ['โรคติดต่อและการป้องกัน','โรคไม่ติดต่อเรื้อรัง (NCDs)','อนามัยแม่และเด็ก',
+  'สุขภาพจิตชุมชน','การปฐมพยาบาลเบื้องต้น','อาหารปลอดภัยและโภชนาการ','อนามัยสิ่งแวดล้อม',
+  'การคุ้มครองผู้บริโภค','บทบาทหน้าที่ อสม.','เทคโนโลยีและการรายงานข้อมูล','อื่น ๆ'];
+
+const LN_ICONS = ['fa-virus-covid','fa-heart-pulse','fa-baby','fa-brain','fa-kit-medical',
+  'fa-utensils','fa-leaf','fa-shield-halved','fa-user-nurse','fa-mobile-screen','fa-book-open-reader'];
+
+const LN_LTYPE = {
+  link:  {lab:'ลิงก์ความรู้', ic:'fa-link'},
+  video: {lab:'วิดีโอ',       ic:'fa-circle-play'},
+  doc:   {lab:'เอกสาร/PDF',   ic:'fa-file-pdf'},
+  text:  {lab:'เนื้อหาในระบบ', ic:'fa-align-right'}
+};
+
+/* ตัวแปรสถานะของโมดูล */
+let lnAdmTab   = 'all';      // ตัวกรองหน้ารายการหลักสูตร
+let lnAdmQ     = '';         // คำค้น
+let lnOpenCid  = '';         // หลักสูตรที่เปิดอยู่ในหน้าจัดการ
+let lnOpenTab  = 'lessons';  // แท็บภายในหลักสูตร
+let lnMemCid   = '';         // หลักสูตรที่ อสม. เปิดอยู่
+let lnMemMode  = 'list';     // list | course | exam | result
+let lnExam     = null;       // ห้องสอบที่กำลังทำอยู่
+let lnLastRes  = null;       // ผลสอบล่าสุดที่เพิ่งส่ง
+let lnRepCid   = '';         // หลักสูตรในหน้ารายงาน
+
+/* -------------------------------------------------------------- ชั้นข้อมูล */
+function lnInit(){
+  state.courses       = Array.isArray(state.courses)       ? state.courses       : [];
+  state.learnResults  = Array.isArray(state.learnResults)  ? state.learnResults  : [];
+  state.learnProgress = Array.isArray(state.learnProgress) ? state.learnProgress : [];
+}
+function lnCourses(){ lnInit(); return state.courses; }
+function lnCourseById(id){ return lnCourses().find(c=>c.id===id) || null; }
+function lnPublished(){
+  return lnCourses().filter(c=>c.published)
+    .sort((a,b)=>(a.order||0)-(b.order||0) || String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+function lnSorted(){
+  return lnCourses().slice().sort((a,b)=>
+    (b.published?1:0)-(a.published?1:0) || String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)));
+}
+function lnTest(c,phase){ return ((phase==='pre'? c.preTest : c.postTest) || []); }
+function lnLessons(c){ return (c && c.lessons) || []; }
+
+function lnNewCourse(){
+  const y = (typeof schYearOfDate==='function') ? schYearOfDate(new Date()) : new Date().getFullYear();
+  return {
+    id: uid('cr'), code:'', title:'', category: LN_CATS[0], description:'',
+    icon:'fa-book-open-reader', iconColor:'c1', hours:1, year:y,
+    lessons:[], preTest:[], postTest:[],
+    passScore:60, shuffle:true, requirePre:true, showAnswer:true, retake:true,
+    linkedSessionId:'', published:false, order:(lnCourses().length+1)*10,
+    createdAt:new Date().toISOString(), createdBy:currentUserFullName(), updatedAt:new Date().toISOString()
+  };
+}
+function lnTouch(c){ if(c) c.updatedAt=new Date().toISOString(); }
+
+/* -------------------------------------------------------------- ผลการเรียน */
+function lnAttempts(cid, oid, phase){
+  lnInit();
+  return state.learnResults
+    .filter(r=>r.courseId===cid && r.osmId===oid && r.phase===phase)
+    .sort((a,b)=>String(a.submittedAt).localeCompare(String(b.submittedAt)));
+}
+function lnLatest(cid, oid, phase){ const a=lnAttempts(cid,oid,phase); return a.length?a[a.length-1]:null; }
+function lnBest(cid, oid, phase){
+  const a=lnAttempts(cid,oid,phase);
+  return a.length ? a.reduce((x,y)=>(y.percent>=x.percent?y:x)) : null;
+}
+function lnDoneLessons(cid, oid){
+  lnInit();
+  return new Set(state.learnProgress.filter(p=>p.courseId===cid&&p.osmId===oid).map(p=>p.lessonId));
+}
+function lnMarkLesson(cid, oid, lid){
+  lnInit();
+  if(state.learnProgress.some(p=>p.courseId===cid&&p.osmId===oid&&p.lessonId===lid)) return false;
+  state.learnProgress.push({id:uid('lp'), courseId:cid, osmId:oid, lessonId:lid, doneAt:new Date().toISOString()});
+  persistState(); return true;
+}
+function lnUnmarkLesson(cid, oid, lid){
+  lnInit();
+  const i=state.learnProgress.findIndex(p=>p.courseId===cid&&p.osmId===oid&&p.lessonId===lid);
+  if(i>=0){ state.learnProgress.splice(i,1); persistState(); }
+}
+
+/* สถานะของ อสม. หนึ่งคนในหลักสูตรหนึ่ง — ใช้ร่วมกันทั้งหน้าเรียนและหน้ารายงาน */
+function lnStatus(cid, oid){
+  const c = lnCourseById(cid);
+  const out = {pre:null, post:null, lessons:0, lessonTotal:0, lessonPct:0,
+               delta:null, stage:'new', stageLabel:'ยังไม่เริ่ม', passed:false};
+  if(!c) return out;
+  out.pre  = lnBest(cid, oid, 'pre');
+  out.post = lnBest(cid, oid, 'post');
+  const done = lnDoneLessons(cid, oid);
+  const ls = lnLessons(c);
+  out.lessonTotal = ls.length;
+  out.lessons = ls.filter(l=>done.has(l.id)).length;
+  out.lessonPct = ls.length ? Math.round(out.lessons*100/ls.length) : 100;
+  if(out.pre && out.post) out.delta = out.post.percent - out.pre.percent;
+  out.passed = !!(out.post && out.post.percent >= (c.passScore||60));
+
+  if(out.post)                         { out.stage='post'; out.stageLabel = out.passed?'ผ่านการอบรม':'ยังไม่ผ่านเกณฑ์'; }
+  else if(out.lessons>0)               { out.stage='learn'; out.stageLabel='กำลังเรียน'; }
+  else if(out.pre)                     { out.stage='pre';  out.stageLabel='ทำข้อสอบก่อนเรียนแล้ว'; }
+  else                                 { out.stage='new';  out.stageLabel='ยังไม่เริ่ม'; }
+  return out;
+}
+
+/* สรุปภาพรวมของหลักสูตร (ใช้ในการ์ดและรายงาน) */
+function lnSummary(cid){
+  const c = lnCourseById(cid);
+  const mems = (typeof schMembers==='function') ? schMembers() : (state.osmMembers||[]);
+  const rows = mems.map(m=>({m, s:lnStatus(cid, m.id)}));
+  const pre  = rows.filter(r=>r.s.pre),  post = rows.filter(r=>r.s.post);
+  const avg  = arr => arr.length ? Math.round(arr.reduce((t,x)=>t+x,0)/arr.length) : 0;
+  const avgPre  = avg(pre .map(r=>r.s.pre.percent));
+  const avgPost = avg(post.map(r=>r.s.post.percent));
+  return {
+    course:c, rows, total:mems.length,
+    preN:pre.length, postN:post.length,
+    avgPre, avgPost, delta:avgPost-avgPre,
+    passN: rows.filter(r=>r.s.passed).length,
+    passPct: post.length ? Math.round(rows.filter(r=>r.s.passed).length*100/post.length) : 0,
+    improvedN: rows.filter(r=>r.s.delta!==null && r.s.delta>0).length,
+    startedN: rows.filter(r=>r.s.stage!=='new').length
+  };
+}
+
+/* -------------------------------------------------------------- หน้าจัดการหลักสูตร (เจ้าหน้าที่) */
+function renderLearnCoursesView(){
+  lnInit();
+  const el=document.getElementById('view-learn-courses'); if(!el) return;
+  if(lnOpenCid && lnCourseById(lnOpenCid)){ lnRenderCourseWorkspace(el); return; }
+  lnOpenCid='';
+
+  const all=lnSorted();
+  const q=lnAdmQ.trim().toLowerCase();
+  let list=all;
+  if(lnAdmTab==='pub')   list=all.filter(c=>c.published);
+  if(lnAdmTab==='draft') list=all.filter(c=>!c.published);
+  if(q) list=list.filter(c=>`${c.title} ${c.category} ${c.code} ${c.description}`.toLowerCase().includes(q));
+
+  const nQ = all.reduce((t,c)=>t+lnTest(c,'pre').length+lnTest(c,'post').length,0);
+  const nL = all.reduce((t,c)=>t+lnLessons(c).length,0);
+
+  el.innerHTML=`
+  <div class="page-head"><div><h2>หลักสูตรและคลังความรู้</h2>
+    <p>แอดมินกำหนดเนื้อหา หลักสูตร และออกข้อสอบก่อนเรียน–หลังเรียน ให้ อสม. เข้าเรียนและทำแบบทดสอบได้ด้วยตนเอง</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-outline" onclick="lnSeedLibrary()"><i class="fa-solid fa-wand-magic-sparkles"></i> หลักสูตรตัวอย่าง</button>
+      <button class="btn btn-primary" onclick="lnCourseForm()"><i class="fa-solid fa-plus"></i> สร้างหลักสูตรใหม่</button>
+    </div></div>
+
+  <div class="ln-stats">
+    <div class="ln-stat b"><b>${all.length}</b><span>หลักสูตรทั้งหมด</span></div>
+    <div class="ln-stat g"><b>${all.filter(c=>c.published).length}</b><span>เผยแพร่ให้ อสม. แล้ว</span></div>
+    <div class="ln-stat o"><b>${nL}</b><span>บทเรียน / แหล่งความรู้</span></div>
+    <div class="ln-stat"><b>${nQ}</b><span>ข้อสอบทั้งหมด</span></div>
+  </div>
+
+  <div class="ln-tabs">
+    <button class="ln-tab ${lnAdmTab==='all'?'on':''}"   onclick="lnSetTab('all')">ทั้งหมด (${all.length})</button>
+    <button class="ln-tab ${lnAdmTab==='pub'?'on':''}"   onclick="lnSetTab('pub')">เผยแพร่แล้ว (${all.filter(c=>c.published).length})</button>
+    <button class="ln-tab ${lnAdmTab==='draft'?'on':''}" onclick="lnSetTab('draft')">ฉบับร่าง (${all.filter(c=>!c.published).length})</button>
+  </div>
+
+  <div class="form-group" style="max-width:380px;margin-bottom:16px">
+    <input class="input" id="ln-q" placeholder="ค้นหาชื่อหลักสูตร / หมวดหมู่" value="${escapeHtml(lnAdmQ)}" autocomplete="off">
+  </div>
+
+  <div id="ln-course-list">${lnCourseCards(list)}</div>`;
+
+  const qi=document.getElementById('ln-q');
+  if(qi) qi.addEventListener('input',()=>{
+    lnAdmQ=qi.value;
+    const t=lnAdmQ.trim().toLowerCase();
+    let L = lnAdmTab==='pub'?all.filter(c=>c.published):lnAdmTab==='draft'?all.filter(c=>!c.published):all;
+    if(t) L=L.filter(c=>`${c.title} ${c.category} ${c.code} ${c.description}`.toLowerCase().includes(t));
+    const box=document.getElementById('ln-course-list'); if(box) box.innerHTML=lnCourseCards(L);
+  });
+}
+function lnSetTab(t){ lnAdmTab=t; renderLearnCoursesView(); }
+
+function lnCourseCards(list){
+  if(!list.length) return `<div class="ln-empty"><i class="fa-solid fa-graduation-cap big"></i>
+    <h3>ยังไม่มีหลักสูตรในกลุ่มนี้</h3>
+    <p>เริ่มจากสร้างหลักสูตร → ใส่คลังความรู้ (ลิงก์/วิดีโอ/เอกสาร) → ออกข้อสอบก่อนเรียนและหลังเรียน → กดเผยแพร่</p>
+    <button class="btn btn-primary" onclick="lnCourseForm()"><i class="fa-solid fa-plus"></i> สร้างหลักสูตรใหม่</button></div>`;
+
+  return `<div class="ln-grid">${list.map(c=>{
+    const s=lnSummary(c.id);
+    return `<div class="ln-card">
+      <div class="ln-card-top">
+        <div class="ln-ic ${c.iconColor||'c1'}"><i class="fa-solid ${c.icon||'fa-book-open-reader'}"></i></div>
+        <div style="flex:1;min-width:0">
+          <div class="ln-cat">${escapeHtml(c.category||'')}${c.code?' • '+escapeHtml(c.code):''}</div>
+          <h4>${escapeHtml(c.title||'(ยังไม่ตั้งชื่อ)')}</h4>
+          <span class="ln-chip ${c.published?'pub':'draft'}">${c.published?'เผยแพร่แล้ว':'ฉบับร่าง'}</span>
+        </div>
+      </div>
+      <div class="ln-card-body">${escapeHtml((c.description||'ยังไม่มีคำอธิบาย').slice(0,130))}${(c.description||'').length>130?'…':''}</div>
+      <div class="ln-meta">
+        <span><i class="fa-solid fa-layer-group"></i> ${lnLessons(c).length} บทเรียน</span>
+        <span><i class="fa-solid fa-circle-question"></i> ก่อน ${lnTest(c,'pre').length} / หลัง ${lnTest(c,'post').length} ข้อ</span>
+        <span><i class="fa-solid fa-user-check"></i> เรียนแล้ว ${s.startedN}/${s.total} คน</span>
+      </div>
+      <div class="ln-card-foot">
+        <button class="btn btn-primary btn-sm" onclick="lnOpenCourse('${c.id}')"><i class="fa-solid fa-pen-to-square"></i> จัดการเนื้อหา</button>
+        <button class="btn btn-outline btn-sm" onclick="lnCourseForm('${c.id}')" title="แก้ไขรายละเอียด"><i class="fa-solid fa-sliders"></i></button>
+        <button class="btn btn-outline btn-sm" onclick="lnTogglePublish('${c.id}')" title="${c.published?'ยกเลิกการเผยแพร่':'เผยแพร่ให้ อสม.'}">
+          <i class="fa-solid ${c.published?'fa-eye-slash':'fa-paper-plane'}"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="lnDupCourse('${c.id}')" title="ทำสำเนา"><i class="fa-solid fa-copy"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="lnDelCourse('${c.id}')" title="ลบ"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+      </div>
+    </div>`;}).join('')}</div>`;
+}
+
+/* -------------------------------------------------------------- ฟอร์มรายละเอียดหลักสูตร */
+function lnCourseForm(id){
+  lnInit();
+  const isNew=!id;
+  const c = isNew ? lnNewCourse() : lnCourseById(id);
+  if(!c){ toast('ไม่พบหลักสูตร','error'); return; }
+  const sess=(state.schoolSessions||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-graduation-cap"></i> ${isNew?'สร้างหลักสูตรใหม่':'แก้ไขรายละเอียดหลักสูตร'}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="ln-cf"><div class="modal-body">
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>ชื่อหลักสูตร <span class="req">*</span></label>
+        <input class="input" id="cf-title" value="${escapeHtml(c.title)}" placeholder="เช่น การป้องกันและควบคุมโรคไข้เลือดออกในชุมชน"></div>
+      <div class="form-group" style="flex:1"><label>รหัสหลักสูตร</label>
+        <input class="input" id="cf-code" value="${escapeHtml(c.code||'')}" placeholder="เช่น OSM-01"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:2"><label>หมวดหมู่</label>
+        <select class="input" id="cf-cat">${LN_CATS.map(x=>`<option ${x===c.category?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="form-group" style="flex:1"><label>จำนวนชั่วโมง</label>
+        <input class="input" id="cf-hours" type="number" min="0" step="0.5" value="${c.hours||1}"></div>
+    </div>
+    <div class="form-group"><label>คำอธิบายหลักสูตร / วัตถุประสงค์การเรียนรู้</label>
+      <textarea class="input" id="cf-desc" rows="3" placeholder="เมื่อเรียนจบแล้ว อสม. สามารถ…">${escapeHtml(c.description||'')}</textarea></div>
+
+    <div class="form-group"><label>ไอคอนและสี</label>
+      <div style="display:flex;gap:7px;flex-wrap:wrap" id="cf-icons">
+        ${LN_ICONS.map(ic=>`<button type="button" class="btn ${ic===c.icon?'btn-primary':'btn-outline'} btn-sm" data-ic="${ic}" onclick="lnPickIcon('${ic}')"><i class="fa-solid ${ic}"></i></button>`).join('')}
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px" id="cf-cols">
+        ${['c1','c2','c3','c4','c5'].map(cc=>`<button type="button" class="ln-ic ${cc}" data-cc="${cc}" onclick="lnPickColor('${cc}')"
+          style="width:34px;height:34px;border:${cc===(c.iconColor||'c1')?'3px solid var(--primary)':'0'};cursor:pointer;font-size:13px"><i class="fa-solid fa-check" style="opacity:${cc===(c.iconColor||'c1')?1:0}"></i></button>`).join('')}
+      </div>
+      <input type="hidden" id="cf-icon" value="${c.icon||'fa-book-open-reader'}">
+      <input type="hidden" id="cf-color" value="${c.iconColor||'c1'}">
+    </div>
+
+    <div class="ln-note"><b>เกณฑ์การวัดผล</b> — ระบบจะเทียบคะแนน “ก่อนเรียน” กับ “หลังเรียน” ของ อสม. แต่ละคน
+      เพื่อแสดงพัฒนาการเป็นร้อยละ และสรุปผู้ผ่านเกณฑ์ให้อัตโนมัติ</div>
+
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>เกณฑ์ผ่าน (ร้อยละของข้อสอบหลังเรียน)</label>
+        <input class="input" id="cf-pass" type="number" min="0" max="100" value="${c.passScore||60}"></div>
+      <div class="form-group" style="flex:1"><label>ผูกกับรอบเรียนโรงเรียน อสม.</label>
+        <select class="input" id="cf-sess"><option value="">— ไม่ผูก —</option>
+          ${sess.map(s=>`<option value="${s.id}" ${s.id===c.linkedSessionId?'selected':''}>${formatThaiDateShort(s.date)} — ${escapeHtml(s.title||'')}</option>`).join('')}
+        </select></div>
+    </div>
+
+    <div class="form-group"><label>ตัวเลือกการสอบ</label>
+      <label class="ln-chk"><input type="checkbox" id="cf-shuffle" ${c.shuffle!==false?'checked':''}> สลับลำดับข้อสอบและตัวเลือกทุกครั้ง</label>
+      <label class="ln-chk"><input type="checkbox" id="cf-reqpre" ${c.requirePre!==false?'checked':''}> ต้องทำข้อสอบก่อนเรียนให้เสร็จก่อนจึงเข้าเรียนได้</label>
+      <label class="ln-chk"><input type="checkbox" id="cf-showans" ${c.showAnswer!==false?'checked':''}> เฉลยคำตอบให้ อสม. ดูหลังส่งข้อสอบ</label>
+      <label class="ln-chk"><input type="checkbox" id="cf-retake" ${c.retake!==false?'checked':''}> อนุญาตให้สอบซ้ำได้ (ใช้คะแนนสูงสุด)</label>
+    </div>
+    <div class="field-error" id="cf-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+  </div></form>`,{size:'md'});
+
+  document.getElementById('ln-cf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const er=document.getElementById('cf-err');
+    const title=document.getElementById('cf-title').value.trim();
+    if(!title){ er.textContent='กรุณาระบุชื่อหลักสูตร'; er.style.display='block'; return; }
+    c.title=title;
+    c.code=document.getElementById('cf-code').value.trim();
+    c.category=document.getElementById('cf-cat').value;
+    c.hours=parseFloat(document.getElementById('cf-hours').value)||0;
+    c.description=document.getElementById('cf-desc').value.trim();
+    c.icon=document.getElementById('cf-icon').value;
+    c.iconColor=document.getElementById('cf-color').value;
+    c.passScore=Math.max(0,Math.min(100,parseInt(document.getElementById('cf-pass').value,10)||60));
+    c.linkedSessionId=document.getElementById('cf-sess').value;
+    c.shuffle=document.getElementById('cf-shuffle').checked;
+    c.requirePre=document.getElementById('cf-reqpre').checked;
+    c.showAnswer=document.getElementById('cf-showans').checked;
+    c.retake=document.getElementById('cf-retake').checked;
+    lnTouch(c);
+    if(isNew){ lnCourses().push(c); lnOpenCid=c.id; }
+    if(typeof schLog==='function') schLog(isNew?'สร้างหลักสูตร':'แก้ไขหลักสูตร', c.title);
+    persistState(); closeModal(); renderCurrentView();
+    toast(isNew?'สร้างหลักสูตรแล้ว — ขั้นต่อไปใส่คลังความรู้และข้อสอบ':'บันทึกแล้ว','success');
+  });
+}
+function lnPickIcon(ic){
+  const h=document.getElementById('cf-icon'); if(h) h.value=ic;
+  document.querySelectorAll('#cf-icons [data-ic]').forEach(b=>{
+    b.classList.toggle('btn-primary', b.dataset.ic===ic);
+    b.classList.toggle('btn-outline', b.dataset.ic!==ic);
+  });
+}
+function lnPickColor(cc){
+  const h=document.getElementById('cf-color'); if(h) h.value=cc;
+  document.querySelectorAll('#cf-cols [data-cc]').forEach(b=>{
+    b.style.border = b.dataset.cc===cc ? '3px solid var(--primary)' : '0';
+    const i=b.querySelector('i'); if(i) i.style.opacity = b.dataset.cc===cc ? 1 : 0;
+  });
+}
+
+function lnTogglePublish(id){
+  const c=lnCourseById(id); if(!c) return;
+  if(!c.published){
+    const problems=[];
+    if(!lnLessons(c).length) problems.push('ยังไม่มีบทเรียนหรือแหล่งความรู้');
+    if(!lnTest(c,'pre').length)  problems.push('ยังไม่มีข้อสอบก่อนเรียน');
+    if(!lnTest(c,'post').length) problems.push('ยังไม่มีข้อสอบหลังเรียน');
+    if(problems.length){
+      confirmDialog(`หลักสูตรนี้ยังไม่สมบูรณ์ (${problems.join(' / ')}) ต้องการเผยแพร่ให้ อสม. เห็นเลยหรือไม่`,
+        ()=>{ c.published=true; lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast('เผยแพร่หลักสูตรแล้ว','success'); },
+        {confirmLabel:'เผยแพร่เลย'});
+      return;
+    }
+  }
+  c.published=!c.published; lnTouch(c);
+  if(typeof schLog==='function') schLog(c.published?'เผยแพร่หลักสูตร':'ยกเลิกเผยแพร่หลักสูตร', c.title);
+  persistState(); renderCurrentView();
+  toast(c.published?'เผยแพร่แล้ว อสม. เห็นหลักสูตรนี้ทันที':'ยกเลิกการเผยแพร่แล้ว','success');
+}
+function lnDupCourse(id){
+  const c=lnCourseById(id); if(!c) return;
+  const n=JSON.parse(JSON.stringify(c));
+  n.id=uid('cr'); n.title=c.title+' (สำเนา)'; n.published=false;
+  n.createdAt=new Date().toISOString(); n.updatedAt=n.createdAt; n.createdBy=currentUserFullName();
+  (n.lessons||[]).forEach(l=>l.id=uid('ls'));
+  (n.preTest||[]).forEach(q=>q.id=uid('q'));
+  (n.postTest||[]).forEach(q=>q.id=uid('q'));
+  lnCourses().push(n); persistState(); renderCurrentView(); toast('ทำสำเนาหลักสูตรแล้ว','success');
+}
+function lnDelCourse(id){
+  const c=lnCourseById(id); if(!c) return;
+  const n=(state.learnResults||[]).filter(r=>r.courseId===id).length;
+  confirmDialog(`ลบหลักสูตร “${c.title}” ใช่หรือไม่`+
+    (n?` มีผลสอบของ อสม. อยู่ ${n} รายการ จะถูกลบไปด้วย`:''),()=>{
+    state.courses=lnCourses().filter(x=>x.id!==id);
+    state.learnResults=(state.learnResults||[]).filter(r=>r.courseId!==id);
+    state.learnProgress=(state.learnProgress||[]).filter(p=>p.courseId!==id);
+    if(lnOpenCid===id) lnOpenCid='';
+    if(typeof schLog==='function') schLog('ลบหลักสูตร', c.title);
+    persistState(); closeModal(); renderCurrentView(); toast('ลบหลักสูตรแล้ว','success');
+  },{confirmLabel:'ลบหลักสูตร'});
+}
+
+
+/* ============================================================================================
+   LEARNING MODULE — ส่วนที่ 2: ห้องทำงานของหลักสูตร
+   คลังความรู้ (ลิงก์ / วิดีโอ / เอกสาร / เนื้อหาในระบบ) + ออกข้อสอบก่อนเรียน–หลังเรียน
+   ============================================================================================ */
+
+function lnOpenCourse(id){ lnOpenCid=id; lnOpenTab='lessons'; renderCurrentView(); window.scrollTo(0,0); }
+function lnBackToList(){ lnOpenCid=''; renderCurrentView(); window.scrollTo(0,0); }
+function lnWsTab(t){ lnOpenTab=t; renderCurrentView(); }
+
+function lnRenderCourseWorkspace(el){
+  const c=lnCourseById(lnOpenCid); if(!c){ lnOpenCid=''; renderLearnCoursesView(); return; }
+  const s=lnSummary(c.id);
+  el.innerHTML=`
+  <div class="page-head"><div>
+      <button class="btn btn-ghost btn-sm" onclick="lnBackToList()" style="margin-bottom:8px">
+        <i class="fa-solid fa-arrow-right"></i> กลับไปรายการหลักสูตร</button>
+      <h2 style="display:flex;align-items:center;gap:11px">
+        <span class="ln-ic ${c.iconColor||'c1'}" style="width:38px;height:38px;font-size:16px"><i class="fa-solid ${c.icon||'fa-book-open-reader'}"></i></span>
+        ${escapeHtml(c.title)}</h2>
+      <p>${escapeHtml(c.category||'')}${c.code?' • '+escapeHtml(c.code):''} • ${c.hours||0} ชั่วโมง • เกณฑ์ผ่าน ${c.passScore||60}%
+        <span class="ln-chip ${c.published?'pub':'draft'}" style="margin-right:8px">${c.published?'เผยแพร่แล้ว':'ฉบับร่าง'}</span></p>
+    </div>
+    <div class="page-head-actions">
+      <button class="btn btn-outline" onclick="lnCourseForm('${c.id}')"><i class="fa-solid fa-sliders"></i> ตั้งค่า</button>
+      <button class="btn ${c.published?'btn-outline':'btn-primary'}" onclick="lnTogglePublish('${c.id}')">
+        <i class="fa-solid ${c.published?'fa-eye-slash':'fa-paper-plane'}"></i> ${c.published?'ยกเลิกเผยแพร่':'เผยแพร่ให้ อสม.'}</button>
+    </div></div>
+
+  <div class="ln-stats">
+    <div class="ln-stat b"><b>${lnLessons(c).length}</b><span>บทเรียน / แหล่งความรู้</span></div>
+    <div class="ln-stat o"><b>${lnTest(c,'pre').length}</b><span>ข้อสอบก่อนเรียน</span></div>
+    <div class="ln-stat g"><b>${lnTest(c,'post').length}</b><span>ข้อสอบหลังเรียน</span></div>
+    <div class="ln-stat"><b>${s.startedN}/${s.total}</b><span>อสม. ที่เริ่มเรียนแล้ว</span></div>
+  </div>
+
+  <div class="ln-tabs">
+    <button class="ln-tab ${lnOpenTab==='lessons'?'on':''}" onclick="lnWsTab('lessons')">
+      <i class="fa-solid fa-layer-group"></i> คลังความรู้ (${lnLessons(c).length})</button>
+    <button class="ln-tab ${lnOpenTab==='pre'?'on':''}" onclick="lnWsTab('pre')">
+      <i class="fa-solid fa-file-circle-question"></i> ข้อสอบก่อนเรียน (${lnTest(c,'pre').length})</button>
+    <button class="ln-tab ${lnOpenTab==='post'?'on':''}" onclick="lnWsTab('post')">
+      <i class="fa-solid fa-file-circle-check"></i> ข้อสอบหลังเรียน (${lnTest(c,'post').length})</button>
+    <button class="ln-tab ${lnOpenTab==='who'?'on':''}" onclick="lnWsTab('who')">
+      <i class="fa-solid fa-chart-simple"></i> ความคืบหน้ารายคน</button>
+  </div>
+  <div id="ln-ws"></div>`;
+  lnRenderWsBody();
+}
+
+function lnRenderWsBody(){
+  const box=document.getElementById('ln-ws'); if(!box) return;
+  const c=lnCourseById(lnOpenCid); if(!c) return;
+  if(lnOpenTab==='lessons') box.innerHTML=lnLessonsPanel(c);
+  else if(lnOpenTab==='who') box.innerHTML=lnWhoPanel(c);
+  else box.innerHTML=lnQPanel(c, lnOpenTab);
+}
+
+/* -------------------------------------------------------------- คลังความรู้ */
+function lnLessonsPanel(c){
+  const ls=lnLessons(c);
+  return `
+  <div class="ln-note"><b>คลังความรู้</b> — ใส่ได้ทั้งลิงก์เว็บไซต์ (เช่น กรมควบคุมโรค / กองสนับสนุนสุขภาพภาคประชาชน),
+    ลิงก์วิดีโอ YouTube, ไฟล์เอกสาร/PDF และเนื้อหาที่พิมพ์ไว้ในระบบเอง — อสม. จะเห็นเรียงตามลำดับนี้</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
+    <button class="btn btn-primary btn-sm" onclick="lnLessonForm('${c.id}')"><i class="fa-solid fa-plus"></i> เพิ่มบทเรียน / แหล่งความรู้</button>
+  </div>
+  ${ls.length? ls.map((l,i)=>{
+    const t=LN_LTYPE[l.type]||LN_LTYPE.link;
+    const n=(state.learnProgress||[]).filter(p=>p.courseId===c.id&&p.lessonId===l.id).length;
+    return `<div class="ln-lesson">
+      <div class="ln-lnum">${i+1}</div>
+      <div class="ln-lbody">
+        <b>${escapeHtml(l.title||'(ไม่มีชื่อ)')}</b>
+        <div class="ln-lsub">
+          <span class="ln-type"><i class="fa-solid ${t.ic}"></i> ${t.lab}</span>
+          ${l.minutes?` • ${l.minutes} นาที`:''}
+          ${l.url?` • <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" style="color:var(--primary)">${escapeHtml(l.url.slice(0,52))}${l.url.length>52?'…':''}</a>`:''}
+          ${n?` • <b>${n}</b> คนเรียนแล้ว`:''}
+        </div>
+      </div>
+      <div class="ln-lact">
+        <button class="btn btn-ghost btn-sm" onclick="lnMoveLesson('${c.id}','${l.id}',-1)" ${i===0?'disabled':''} title="เลื่อนขึ้น"><i class="fa-solid fa-chevron-up"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="lnMoveLesson('${c.id}','${l.id}',1)" ${i===ls.length-1?'disabled':''} title="เลื่อนลง"><i class="fa-solid fa-chevron-down"></i></button>
+        <button class="btn btn-outline btn-sm" onclick="lnLessonForm('${c.id}','${l.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="lnDelLesson('${c.id}','${l.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+      </div></div>`;}).join('')
+  : `<div class="ln-empty"><i class="fa-solid fa-book-open big"></i><h3>ยังไม่มีเนื้อหาในคลังความรู้</h3>
+      <p>เพิ่มลิงก์บทความ วิดีโอ หรือพิมพ์เนื้อหาเองก็ได้ — อสม. จะเข้ามาเรียนจากตรงนี้</p>
+      <button class="btn btn-primary" onclick="lnLessonForm('${c.id}')"><i class="fa-solid fa-plus"></i> เพิ่มบทเรียนแรก</button></div>`}`;
+}
+
+function lnLessonForm(cid, lid){
+  const c=lnCourseById(cid); if(!c) return;
+  c.lessons=c.lessons||[];
+  const isNew=!lid;
+  const l=isNew? {id:uid('ls'),title:'',type:'link',url:'',body:'',minutes:10,note:''} : c.lessons.find(x=>x.id===lid);
+  if(!l) return;
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-layer-group"></i> ${isNew?'เพิ่มบทเรียน / แหล่งความรู้':'แก้ไขบทเรียน'}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="ln-lf"><div class="modal-body">
+    <div class="form-group"><label>ชื่อบทเรียน <span class="req">*</span></label>
+      <input class="input" id="lf2-title" value="${escapeHtml(l.title||'')}" placeholder="เช่น วงจรชีวิตยุงลายและการกำจัดแหล่งเพาะพันธุ์"></div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>ประเภท</label>
+        <select class="input" id="lf2-type" onchange="lnLTypeSwap()">
+          ${Object.entries(LN_LTYPE).map(([k,v])=>`<option value="${k}" ${k===l.type?'selected':''}>${v.lab}</option>`).join('')}
+        </select></div>
+      <div class="form-group" style="flex:1"><label>เวลาที่ใช้เรียน (นาที)</label>
+        <input class="input" id="lf2-min" type="number" min="0" value="${l.minutes||0}"></div>
+    </div>
+    <div class="form-group" id="lf2-urlbox"><label>ลิงก์ (URL)</label>
+      <input class="input" id="lf2-url" value="${escapeHtml(l.url||'')}" placeholder="https://ddc.moph.go.th/..." dir="ltr" style="text-align:left"></div>
+    <div class="form-group" id="lf2-bodybox"><label>เนื้อหา</label>
+      <textarea class="input" id="lf2-body" rows="8" placeholder="พิมพ์เนื้อหาบทเรียนที่ต้องการให้ อสม. อ่านในระบบ">${escapeHtml(l.body||'')}</textarea></div>
+    <div class="form-group"><label>หมายเหตุถึง อสม. (ถ้ามี)</label>
+      <input class="input" id="lf2-note" value="${escapeHtml(l.note||'')}" placeholder="เช่น ให้ดูวิดีโอก่อนทำข้อสอบหลังเรียน"></div>
+    <div class="field-error" id="lf2-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+  </div></form>`,{size:'md'});
+  lnLTypeSwap();
+  document.getElementById('ln-lf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const er=document.getElementById('lf2-err');
+    const title=document.getElementById('lf2-title').value.trim();
+    const type=document.getElementById('lf2-type').value;
+    const url=document.getElementById('lf2-url').value.trim();
+    const body=document.getElementById('lf2-body').value.trim();
+    if(!title){ er.textContent='กรุณาระบุชื่อบทเรียน'; er.style.display='block'; return; }
+    if(type!=='text' && !url){ er.textContent='กรุณาใส่ลิงก์ของแหล่งความรู้'; er.style.display='block'; return; }
+    if(type==='text' && !body){ er.textContent='กรุณาพิมพ์เนื้อหาบทเรียน'; er.style.display='block'; return; }
+    if(url && !/^https?:\/\//i.test(url)){ er.textContent='ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://'; er.style.display='block'; return; }
+    Object.assign(l,{title,type,url,body,minutes:parseInt(document.getElementById('lf2-min').value,10)||0,
+      note:document.getElementById('lf2-note').value.trim()});
+    if(isNew) c.lessons.push(l);
+    lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast('บันทึกบทเรียนแล้ว','success');
+  });
+}
+function lnLTypeSwap(){
+  const t=document.getElementById('lf2-type'); if(!t) return;
+  const isText=t.value==='text';
+  const u=document.getElementById('lf2-urlbox'), b=document.getElementById('lf2-bodybox');
+  if(u) u.style.display=isText?'none':'';
+  if(b) b.style.display=isText?'':'none';
+}
+function lnMoveLesson(cid,lid,d){
+  const c=lnCourseById(cid); if(!c) return;
+  const i=(c.lessons||[]).findIndex(x=>x.id===lid); const j=i+d;
+  if(i<0||j<0||j>=c.lessons.length) return;
+  const t=c.lessons[i]; c.lessons[i]=c.lessons[j]; c.lessons[j]=t;
+  lnTouch(c); persistState(); lnRenderWsBody();
+}
+function lnDelLesson(cid,lid){
+  const c=lnCourseById(cid); if(!c) return;
+  const l=(c.lessons||[]).find(x=>x.id===lid); if(!l) return;
+  confirmDialog(`ลบบทเรียน “${l.title}” ใช่หรือไม่`,()=>{
+    c.lessons=c.lessons.filter(x=>x.id!==lid);
+    state.learnProgress=(state.learnProgress||[]).filter(p=>p.lessonId!==lid);
+    lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast('ลบบทเรียนแล้ว','success');
+  },{confirmLabel:'ลบบทเรียน'});
+}
+
+/* -------------------------------------------------------------- ข้อสอบ */
+function lnQPanel(c, phase){
+  const qs=lnTest(c,phase);
+  const lab = phase==='pre' ? 'ก่อนเรียน (Pre-test)' : 'หลังเรียน (Post-test)';
+  const other = phase==='pre' ? 'post' : 'pre';
+  return `
+  <div class="ln-note"><b>แบบทดสอบ${lab}</b> — เป็นข้อสอบปรนัยเลือกตอบ ใส่ได้ 2–6 ตัวเลือกต่อข้อ
+    ${phase==='pre'
+      ? 'ให้ อสม. ทำก่อนเข้าเรียน เพื่อวัดความรู้เดิม'
+      : 'ให้ อสม. ทำหลังเรียนจบ ระบบจะเทียบกับคะแนนก่อนเรียนเพื่อแสดงพัฒนาการ'}
+    <br>เคล็ดลับ: ควรใช้ข้อสอบชุดเดียวกันทั้งก่อนและหลัง เพื่อให้เปรียบเทียบได้ตรง — กดปุ่ม “คัดลอกจาก${phase==='pre'?'หลังเรียน':'ก่อนเรียน'}” ได้</div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
+    <button class="btn btn-primary btn-sm" onclick="lnQForm('${c.id}','${phase}')"><i class="fa-solid fa-plus"></i> เพิ่มข้อสอบ</button>
+    <button class="btn btn-outline btn-sm" onclick="lnQBulk('${c.id}','${phase}')"><i class="fa-solid fa-paste"></i> วางข้อสอบทีละหลายข้อ</button>
+    <button class="btn btn-outline btn-sm" onclick="lnQCopy('${c.id}','${other}','${phase}')" ${lnTest(c,other).length?'':'disabled'}>
+      <i class="fa-solid fa-copy"></i> คัดลอกจาก${phase==='pre'?'หลังเรียน':'ก่อนเรียน'} (${lnTest(c,other).length} ข้อ)</button>
+    ${qs.length?`<button class="btn btn-ghost btn-sm" onclick="lnQClear('${c.id}','${phase}')"><i class="fa-solid fa-eraser"></i> ล้างทั้งหมด</button>`:''}
+  </div>
+
+  ${qs.length? qs.map((q,i)=>`
+    <div class="ln-qrow">
+      <div class="ln-qh">
+        <div class="ln-qt">${i+1}. ${escapeHtml(q.q||'')}</div>
+        <div style="display:flex;gap:5px;flex:none">
+          <button class="btn btn-ghost btn-sm" onclick="lnMoveQ('${c.id}','${phase}','${q.id}',-1)" ${i===0?'disabled':''}><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="lnMoveQ('${c.id}','${phase}','${q.id}',1)" ${i===qs.length-1?'disabled':''}><i class="fa-solid fa-chevron-down"></i></button>
+          <button class="btn btn-outline btn-sm" onclick="lnQForm('${c.id}','${phase}','${q.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="lnDelQ('${c.id}','${phase}','${q.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
+        </div>
+      </div>
+      <div style="margin-top:9px">
+        ${(q.choices||[]).map((ch,ci)=>`<div class="ln-qopt ${ci===q.answer?'right':''}">
+          <span class="ln-qk">${LN_KEYS[ci]||ci+1}</span>
+          <span>${escapeHtml(ch)}</span></div>`).join('')}
+      </div>
+      ${q.explain?`<div style="margin-top:9px;font-size:12.3px;color:var(--text-faint);line-height:1.7">
+        <i class="fa-solid fa-lightbulb"></i> เฉลยอธิบาย: ${escapeHtml(q.explain)}</div>`:''}
+    </div>`).join('')
+  : `<div class="ln-empty"><i class="fa-solid fa-circle-question big"></i><h3>ยังไม่มีข้อสอบ${lab}</h3>
+      <p>เพิ่มทีละข้อ หรือวางข้อความทีละหลายข้อในครั้งเดียวก็ได้</p>
+      <button class="btn btn-primary" onclick="lnQForm('${c.id}','${phase}')"><i class="fa-solid fa-plus"></i> เพิ่มข้อสอบข้อแรก</button></div>`}`;
+}
+
+const LN_KEYS=['ก','ข','ค','ง','จ','ฉ'];
+
+function lnQForm(cid, phase, qid){
+  const c=lnCourseById(cid); if(!c) return;
+  const arr = phase==='pre' ? (c.preTest=c.preTest||[]) : (c.postTest=c.postTest||[]);
+  const isNew=!qid;
+  const q = isNew ? {id:uid('q'), q:'', choices:['','',''], answer:0, explain:''} : arr.find(x=>x.id===qid);
+  if(!q) return;
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-circle-question"></i> ${isNew?'เพิ่มข้อสอบ':'แก้ไขข้อสอบ'} — ${phase==='pre'?'ก่อนเรียน':'หลังเรียน'}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <form id="ln-qf"><div class="modal-body">
+    <div class="form-group"><label>โจทย์คำถาม <span class="req">*</span></label>
+      <textarea class="input" id="qf-q" rows="3" placeholder="เช่น ข้อใดคือแหล่งเพาะพันธุ์ยุงลายที่พบบ่อยที่สุดในบ้าน">${escapeHtml(q.q||'')}</textarea></div>
+    <div class="form-group"><label>ตัวเลือก — กดวงกลมหน้าข้อที่เป็นคำตอบที่ถูก <span class="req">*</span></label>
+      <div id="qf-choices"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="lnQAddChoice()" style="margin-top:8px">
+        <i class="fa-solid fa-plus"></i> เพิ่มตัวเลือก</button></div>
+    <div class="form-group"><label>คำอธิบายเฉลย (ไม่บังคับ)</label>
+      <textarea class="input" id="qf-ex" rows="2" placeholder="อธิบายว่าทำไมข้อนี้จึงถูก">${escapeHtml(q.explain||'')}</textarea></div>
+    <div class="field-error" id="qf-err" style="display:none"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึกข้อสอบ</button>
+  </div></form>`,{size:'md'});
+
+  window.__lnQDraft={choices:(q.choices||['','','']).slice(), answer:q.answer||0};
+  lnQPaintChoices();
+
+  document.getElementById('ln-qf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const er=document.getElementById('qf-err');
+    const text=document.getElementById('qf-q').value.trim();
+    lnQReadChoices();
+    const d=window.__lnQDraft;
+    const ch=d.choices.map(x=>String(x||'').trim()).filter(x=>x);
+    if(!text){ er.textContent='กรุณาพิมพ์โจทย์คำถาม'; er.style.display='block'; return; }
+    if(ch.length<2){ er.textContent='ต้องมีตัวเลือกอย่างน้อย 2 ข้อ'; er.style.display='block'; return; }
+    // คำนวณตำแหน่งคำตอบใหม่หลังตัดตัวเลือกว่างทิ้ง
+    let ans=0, seen=-1;
+    d.choices.forEach((x,i)=>{ if(String(x||'').trim()){ seen++; if(i===d.answer) ans=seen; } });
+    if(!String(d.choices[d.answer]||'').trim()){ er.textContent='ตัวเลือกที่เลือกเป็นคำตอบยังว่างอยู่'; er.style.display='block'; return; }
+    q.q=text; q.choices=ch; q.answer=ans; q.explain=document.getElementById('qf-ex').value.trim();
+    if(isNew) arr.push(q);
+    lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast('บันทึกข้อสอบแล้ว','success');
+  });
+}
+function lnQPaintChoices(){
+  const box=document.getElementById('qf-choices'); if(!box) return;
+  const d=window.__lnQDraft;
+  box.innerHTML=d.choices.map((v,i)=>`
+    <div style="display:flex;gap:9px;align-items:center;margin-bottom:8px">
+      <button type="button" class="ln-qk" onclick="lnQSetAns(${i})" title="ตั้งเป็นคำตอบที่ถูก"
+        style="width:30px;height:30px;flex:none;cursor:pointer;font-size:12px;
+        ${i===d.answer?'background:#22c55e;border-color:#22c55e;color:#fff':'background:var(--bg-surface);color:var(--text-secondary)'}">
+        ${LN_KEYS[i]||i+1}</button>
+      <input class="input qf-ch" data-i="${i}" value="${escapeHtml(v||'')}" placeholder="ตัวเลือก ${LN_KEYS[i]||i+1}">
+      ${d.choices.length>2?`<button type="button" class="btn btn-ghost btn-sm" onclick="lnQDelChoice(${i})"><i class="fa-solid fa-xmark"></i></button>`:''}
+    </div>`).join('');
+}
+function lnQReadChoices(){
+  const d=window.__lnQDraft; if(!d) return;
+  document.querySelectorAll('.qf-ch').forEach(inp=>{ d.choices[parseInt(inp.dataset.i,10)]=inp.value; });
+}
+function lnQSetAns(i){ lnQReadChoices(); window.__lnQDraft.answer=i; lnQPaintChoices(); }
+function lnQAddChoice(){
+  lnQReadChoices(); const d=window.__lnQDraft;
+  if(d.choices.length>=6){ toast('ใส่ได้สูงสุด 6 ตัวเลือก','info'); return; }
+  d.choices.push(''); lnQPaintChoices();
+}
+function lnQDelChoice(i){
+  lnQReadChoices(); const d=window.__lnQDraft;
+  d.choices.splice(i,1);
+  if(d.answer>=d.choices.length) d.answer=d.choices.length-1;
+  else if(d.answer>i) d.answer--;
+  lnQPaintChoices();
+}
+function lnMoveQ(cid,phase,qid,dir){
+  const c=lnCourseById(cid); if(!c) return;
+  const arr=lnTest(c,phase);
+  const i=arr.findIndex(x=>x.id===qid), j=i+dir;
+  if(i<0||j<0||j>=arr.length) return;
+  const t=arr[i]; arr[i]=arr[j]; arr[j]=t;
+  lnTouch(c); persistState(); lnRenderWsBody();
+}
+function lnDelQ(cid,phase,qid){
+  const c=lnCourseById(cid); if(!c) return;
+  const arr=lnTest(c,phase);
+  const i=arr.findIndex(x=>x.id===qid); if(i<0) return;
+  confirmDialog('ลบข้อสอบข้อนี้ใช่หรือไม่',()=>{
+    arr.splice(i,1); lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast('ลบข้อสอบแล้ว','success');
+  },{confirmLabel:'ลบข้อสอบ'});
+}
+function lnQClear(cid,phase){
+  const c=lnCourseById(cid); if(!c) return;
+  confirmDialog(`ล้างข้อสอบ${phase==='pre'?'ก่อนเรียน':'หลังเรียน'}ทั้งหมดใช่หรือไม่`,()=>{
+    if(phase==='pre') c.preTest=[]; else c.postTest=[];
+    lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast('ล้างข้อสอบแล้ว','success');
+  },{confirmLabel:'ล้างทั้งหมด'});
+}
+function lnQCopy(cid, from, to){
+  const c=lnCourseById(cid); if(!c) return;
+  const src=lnTest(c,from); if(!src.length) return;
+  confirmDialog(`คัดลอกข้อสอบ ${src.length} ข้อ จาก${from==='pre'?'ก่อนเรียน':'หลังเรียน'} มาเป็นข้อสอบ${to==='pre'?'ก่อนเรียน':'หลังเรียน'} (ของเดิมจะถูกแทนที่)`,()=>{
+    const cp=JSON.parse(JSON.stringify(src)); cp.forEach(q=>q.id=uid('q'));
+    if(to==='pre') c.preTest=cp; else c.postTest=cp;
+    lnTouch(c); persistState(); closeModal(); renderCurrentView(); toast(`คัดลอกแล้ว ${cp.length} ข้อ`,'success');
+  },{confirmLabel:'คัดลอก'});
+}
+
+/* -------------------------------------------------------------- วางข้อสอบทีละหลายข้อ */
+function lnQBulk(cid, phase){
+  const c=lnCourseById(cid); if(!c) return;
+  const sample =
+`1. แหล่งเพาะพันธุ์ยุงลายที่พบบ่อยที่สุดในบ้านคือข้อใด
+ก. ตุ่มน้ำใช้ในห้องน้ำ
+*ข. จานรองกระถางต้นไม้
+ค. บ่อน้ำหลังบ้าน
+ง. ท่อระบายน้ำ
+# ยุงลายวางไข่ในน้ำใสนิ่ง จานรองกระถางจึงเป็นแหล่งที่พบมากที่สุด
+
+2. การสำรวจลูกน้ำยุงลายควรทำบ่อยเพียงใด
+ก. ปีละ 1 ครั้ง
+ข. 6 เดือนครั้ง
+*ค. ทุกเดือน
+ง. เมื่อมีผู้ป่วยเท่านั้น`;
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-paste"></i> วางข้อสอบทีละหลายข้อ — ${phase==='pre'?'ก่อนเรียน':'หลังเรียน'}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div class="ln-note"><b>รูปแบบที่ระบบอ่านได้</b><br>
+      • บรรทัดโจทย์ขึ้นต้นด้วยเลขข้อ เช่น <code>1.</code> หรือ <code>1)</code><br>
+      • บรรทัดตัวเลือกขึ้นต้นด้วย ก. ข. ค. ง. (หรือ a. b. c. d. / 1) 2) 3))<br>
+      • ใส่เครื่องหมาย <code>*</code> หน้าตัวเลือกที่เป็น<b>คำตอบที่ถูก</b><br>
+      • บรรทัดที่ขึ้นต้นด้วย <code>#</code> จะเก็บเป็นคำอธิบายเฉลยของข้อนั้น<br>
+      • เว้นบรรทัดว่างระหว่างข้อ</div>
+    <div class="form-group"><label>วางข้อความที่นี่</label>
+      <textarea class="input" id="qb-text" rows="13" dir="auto" placeholder="${escapeHtml(sample)}"></textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('qb-text').value=${JSON.stringify(sample)};lnQBulkPreview()">
+        <i class="fa-solid fa-flask"></i> ใส่ตัวอย่างให้ดู</button>
+      <button class="btn btn-outline btn-sm" onclick="lnQBulkPreview()"><i class="fa-solid fa-eye"></i> ตรวจสอบก่อนบันทึก</button>
+    </div>
+    <div id="qb-prev"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-outline" id="qb-add" onclick="lnQBulkSave('${cid}','${phase}',false)"><i class="fa-solid fa-plus"></i> เพิ่มต่อท้าย</button>
+    <button class="btn btn-primary" onclick="lnQBulkSave('${cid}','${phase}',true)"><i class="fa-solid fa-floppy-disk"></i> แทนที่ทั้งหมด</button>
+  </div>`,{size:'lg'});
+  const t=document.getElementById('qb-text');
+  t.addEventListener('input',()=>lnQBulkPreview());
+}
+
+function lnParseQuestions(text){
+  const lines=String(text||'').replace(/\r/g,'').split('\n');
+  const out=[]; let cur=null;
+  const isQ   = s=>/^\s*\d+\s*[.)、]\s*\S/.test(s);
+  const isOpt = s=>/^\s*\*?\s*(?:[กขคงจฉ]|[a-fA-F]|\d)\s*[.)、]\s+\S/.test(s);
+  const push  = ()=>{ if(cur && cur.q && cur.choices.length>=2){ if(cur.answer<0) cur.answer=0; out.push(cur); } cur=null; };
+
+  for(let raw of lines){
+    const s=raw.trim();
+    if(!s){ continue; }
+    if(s.startsWith('#')){ if(cur) cur.explain=(cur.explain?cur.explain+' ':'')+s.replace(/^#+\s*/,''); continue; }
+    if(isQ(s) && !(cur && cur.choices.length===0 && cur.q)){
+      // เลขข้อ = โจทย์ใหม่ (เว้นแต่ยังไม่มีตัวเลือกเลยและเพิ่งเริ่มโจทย์)
+      if(cur && cur.choices.length>=2) push();
+      else if(cur && cur.choices.length>0) push();
+      cur={id:uid('q'), q:s.replace(/^\s*\d+\s*[.)、]\s*/,'').trim(), choices:[], answer:-1, explain:''};
+      continue;
+    }
+    if(cur && isOpt(s)){
+      const right=/^\s*\*/.test(s);
+      const txt=s.replace(/^\s*\*?\s*(?:[กขคงจฉ]|[a-fA-F]|\d)\s*[.)、]\s+/,'').trim();
+      if(txt){ if(right) cur.answer=cur.choices.length; cur.choices.push(txt); }
+      continue;
+    }
+    if(cur){
+      if(cur.choices.length) cur.choices[cur.choices.length-1]+=' '+s;
+      else cur.q+=' '+s;
+    } else {
+      cur={id:uid('q'), q:s, choices:[], answer:-1, explain:''};
+    }
+  }
+  push();
+  return out;
+}
+function lnQBulkPreview(){
+  const box=document.getElementById('qb-prev'); if(!box) return;
+  const qs=lnParseQuestions(document.getElementById('qb-text').value);
+  if(!qs.length){ box.innerHTML='<p style="font-size:12.5px;color:var(--text-faint);text-align:center;padding:14px 0">ยังอ่านข้อสอบไม่ได้ — ตรวจรูปแบบตามคำแนะนำด้านบน</p>'; return; }
+  const noAns=qs.filter(q=>!q.__hasStar && q.answer===0).length;
+  box.innerHTML=`<div class="ln-note" style="border-right-color:#22c55e"><b>อ่านได้ ${qs.length} ข้อ</b>
+      ${noAns?' • ข้อที่ไม่ได้ใส่ * ระบบจะตั้งตัวเลือกแรกเป็นคำตอบไว้ก่อน กรุณาตรวจอีกครั้ง':''}</div>
+    ${qs.map((q,i)=>`<div class="ln-qrow"><div class="ln-qt">${i+1}. ${escapeHtml(q.q)}</div>
+      <div style="margin-top:7px">${q.choices.map((ch,ci)=>`<div class="ln-qopt ${ci===q.answer?'right':''}">
+        <span class="ln-qk">${LN_KEYS[ci]||ci+1}</span><span>${escapeHtml(ch)}</span></div>`).join('')}</div>
+      ${q.explain?`<div style="margin-top:7px;font-size:12.2px;color:var(--text-faint)"><i class="fa-solid fa-lightbulb"></i> ${escapeHtml(q.explain)}</div>`:''}
+      </div>`).join('')}`;
+}
+function lnQBulkSave(cid, phase, replace){
+  const c=lnCourseById(cid); if(!c) return;
+  const qs=lnParseQuestions(document.getElementById('qb-text').value);
+  if(!qs.length){ toast('ยังอ่านข้อสอบไม่ได้ ตรวจรูปแบบอีกครั้ง','error'); return; }
+  const cur = phase==='pre' ? (c.preTest=c.preTest||[]) : (c.postTest=c.postTest||[]);
+  if(replace){ if(phase==='pre') c.preTest=qs; else c.postTest=qs; }
+  else qs.forEach(q=>cur.push(q));
+  lnTouch(c); persistState(); closeModal(); renderCurrentView();
+  toast(`${replace?'บันทึก':'เพิ่ม'}ข้อสอบ ${qs.length} ข้อแล้ว`,'success');
+}
+
+/* -------------------------------------------------------------- ความคืบหน้ารายคน (ในห้องทำงาน) */
+function lnWhoPanel(c){
+  const s=lnSummary(c.id);
+  const rows=s.rows.slice().sort((a,b)=>{
+    const rank=x=>x.s.stage==='post'?0:x.s.stage==='learn'?1:x.s.stage==='pre'?2:3;
+    return rank(a)-rank(b) || String(a.m.firstName).localeCompare(String(b.m.firstName),'th');
+  });
+  return `
+  <div class="ln-stats">
+    <div class="ln-stat b"><b>${s.preN}</b><span>ทำข้อสอบก่อนเรียนแล้ว</span></div>
+    <div class="ln-stat o"><b>${s.postN}</b><span>ทำข้อสอบหลังเรียนแล้ว</span></div>
+    <div class="ln-stat g"><b>${s.passN}</b><span>ผ่านเกณฑ์ ${c.passScore||60}%</span></div>
+    <div class="ln-stat ${s.delta>=0?'g':'r'}"><b>${s.delta>=0?'+':''}${s.delta}%</b><span>พัฒนาการเฉลี่ย</span></div>
+  </div>
+  <div class="table-wrap"><table class="ln-tbl">
+    <thead><tr><th>อสม.</th><th>หมู่</th><th class="num">ก่อนเรียน</th><th class="num">หลังเรียน</th>
+      <th class="num">พัฒนาการ</th><th class="num">บทเรียน</th><th>สถานะ</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const d=r.s.delta;
+      return `<tr>
+        <td><b>${escapeHtml(r.m.firstName+' '+r.m.lastName)}</b></td>
+        <td class="num">${escapeHtml(String(r.m.moo||'-'))}</td>
+        <td class="num">${r.s.pre?r.s.pre.percent+'%':'—'}</td>
+        <td class="num">${r.s.post?r.s.post.percent+'%':'—'}</td>
+        <td class="num">${d===null?'—':`<span class="ln-chip ${d>0?'up':d<0?'no':'draft'}">${d>0?'+':''}${d}%</span>`}</td>
+        <td class="num">${r.s.lessons}/${r.s.lessonTotal}</td>
+        <td><span class="ln-chip ${r.s.stage==='post'?(r.s.passed?'ok':'no'):r.s.stage==='new'?'draft':'wait'}">${r.s.stageLabel}</span></td>
+      </tr>`;}).join('')}</tbody>
+  </table></div>`;
+}
+
+
+/* ============================================================================================
+   LEARNING MODULE — ส่วนที่ 3: ห้องเรียนของ อสม.
+   รายการหลักสูตร → ทดสอบก่อนเรียน → เรียนจากคลังความรู้ → ทดสอบหลังเรียน → ดูพัฒนาการ
+   ============================================================================================ */
+
+function lnMyOsmId(){
+  const m = (typeof mpMyMember==='function') ? mpMyMember() : null;
+  return m ? m.id : '';
+}
+
+/* -------------------------------------------------------------- หน้าหลักของผู้เรียน */
+function renderMemberLearn(){
+  lnInit();
+  const el=document.getElementById('view-member-learn'); if(!el) return;
+  const oid=lnMyOsmId();
+  if(!oid){ el.innerHTML='<div class="ln-empty"><i class="fa-solid fa-user-slash big"></i><h3>ไม่พบข้อมูลทะเบียนของท่าน</h3><p>กรุณาติดต่อเจ้าหน้าที่</p></div>'; return; }
+
+  if(lnMemMode==='exam'  && lnExam)   { lnRenderExam(el);   return; }
+  if(lnMemMode==='result'&& lnLastRes){ lnRenderResult(el); return; }
+  if(lnMemMode==='course'&& lnCourseById(lnMemCid)){ lnRenderMemberCourse(el, oid); return; }
+  lnMemMode='list';
+
+  const list=lnPublished();
+  const sts=list.map(c=>({c, s:lnStatus(c.id, oid)}));
+  const doneN=sts.filter(x=>x.s.stage==='post').length;
+  const passN=sts.filter(x=>x.s.passed).length;
+  const deltas=sts.filter(x=>x.s.delta!==null).map(x=>x.s.delta);
+  const avgD=deltas.length?Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length):0;
+
+  el.innerHTML=`
+  <div class="page-head"><div><h2>ห้องเรียนของฉัน</h2>
+    <p>เรียนรู้จากคลังความรู้ที่เจ้าหน้าที่จัดไว้ ทำแบบทดสอบก่อน–หลังเรียน แล้วดูพัฒนาการของตัวเอง</p></div></div>
+
+  ${list.length?`<div class="ln-stats">
+    <div class="ln-stat b"><b>${list.length}</b><span>หลักสูตรที่เปิดให้เรียน</span></div>
+    <div class="ln-stat o"><b>${doneN}</b><span>เรียนจบแล้ว</span></div>
+    <div class="ln-stat g"><b>${passN}</b><span>ผ่านเกณฑ์</span></div>
+    <div class="ln-stat ${avgD>=0?'g':'r'}"><b>${avgD>=0?'+':''}${avgD}%</b><span>พัฒนาการเฉลี่ยของฉัน</span></div>
+  </div>`:''}
+
+  ${list.length? `<div class="ln-grid">${sts.map(({c,s})=>lnMemberCard(c,s)).join('')}</div>`
+  : `<div class="ln-empty"><i class="fa-solid fa-graduation-cap big"></i><h3>ยังไม่มีหลักสูตรเปิดให้เรียน</h3>
+      <p>เมื่อเจ้าหน้าที่เผยแพร่หลักสูตร ท่านจะเห็นที่หน้านี้ทันที</p></div>`}`;
+}
+
+function lnMemberCard(c, s){
+  const pct = s.lessonTotal ? s.lessonPct : 0;
+  let cta, chip;
+  if(s.stage==='post'){
+    chip=`<span class="ln-chip ${s.passed?'ok':'no'}">${s.passed?'ผ่านการอบรม':'ยังไม่ผ่านเกณฑ์'}</span>`;
+    cta=`<button class="btn btn-outline btn-sm" onclick="lnMemberOpen('${c.id}')"><i class="fa-solid fa-chart-line"></i> ดูผลและทบทวน</button>`;
+  }else if(s.stage==='learn'){
+    chip=`<span class="ln-chip wait">กำลังเรียน ${s.lessons}/${s.lessonTotal}</span>`;
+    cta=`<button class="btn btn-primary btn-sm" onclick="lnMemberOpen('${c.id}')"><i class="fa-solid fa-play"></i> เรียนต่อ</button>`;
+  }else if(s.stage==='pre'){
+    chip=`<span class="ln-chip info">ทำข้อสอบก่อนเรียนแล้ว ${s.pre.percent}%</span>`;
+    cta=`<button class="btn btn-primary btn-sm" onclick="lnMemberOpen('${c.id}')"><i class="fa-solid fa-book-open"></i> เริ่มเรียน</button>`;
+  }else{
+    chip=`<span class="ln-chip draft">ยังไม่เริ่ม</span>`;
+    cta=`<button class="btn btn-primary btn-sm" onclick="lnMemberOpen('${c.id}')"><i class="fa-solid fa-flag-checkered"></i> เริ่มหลักสูตรนี้</button>`;
+  }
+  return `<div class="ln-card">
+    <div class="ln-card-top">
+      <div class="ln-ic ${c.iconColor||'c1'}"><i class="fa-solid ${c.icon||'fa-book-open-reader'}"></i></div>
+      <div style="flex:1;min-width:0">
+        <div class="ln-cat">${escapeHtml(c.category||'')}</div>
+        <h4>${escapeHtml(c.title)}</h4>${chip}
+      </div></div>
+    <div class="ln-card-body">${escapeHtml((c.description||'').slice(0,120))}${(c.description||'').length>120?'…':''}</div>
+    <div class="ln-meta">
+      <span><i class="fa-solid fa-layer-group"></i> ${lnLessons(c).length} บทเรียน</span>
+      <span><i class="fa-solid fa-clock"></i> ${c.hours||0} ชม.</span>
+      ${s.delta!==null?`<span><i class="fa-solid fa-arrow-trend-up"></i> พัฒนาการ ${s.delta>0?'+':''}${s.delta}%</span>`:''}
+    </div>
+    ${s.lessonTotal?`<div style="padding:0 18px 12px"><div class="ln-mini ${pct>=100?'g':''}"><i style="width:${pct}%"></i></div></div>`:''}
+    <div class="ln-card-foot">${cta}</div>
+  </div>`;
+}
+
+function lnMemberOpen(cid){ lnMemCid=cid; lnMemMode='course'; renderCurrentView(); window.scrollTo(0,0); }
+function lnMemberBack(){ lnMemMode='list'; lnExam=null; lnLastRes=null; renderCurrentView(); window.scrollTo(0,0); }
+
+/* -------------------------------------------------------------- หน้าหลักสูตรของผู้เรียน */
+function lnRenderMemberCourse(el, oid){
+  const c=lnCourseById(lnMemCid); const s=lnStatus(c.id, oid);
+  const done=lnDoneLessons(c.id, oid);
+  const ls=lnLessons(c);
+  const preQ=lnTest(c,'pre').length, postQ=lnTest(c,'post').length;
+  const preDone=!!s.pre;
+  const lockLearn = c.requirePre!==false && preQ>0 && !preDone;
+  const allRead   = ls.length ? ls.every(l=>done.has(l.id)) : true;
+  const lockPost  = !allRead;
+
+  el.innerHTML=`
+  <div class="page-head"><div>
+    <button class="btn btn-ghost btn-sm" onclick="lnMemberBack()" style="margin-bottom:8px">
+      <i class="fa-solid fa-arrow-right"></i> กลับห้องเรียน</button>
+    <h2 style="display:flex;align-items:center;gap:11px">
+      <span class="ln-ic ${c.iconColor||'c1'}" style="width:38px;height:38px;font-size:16px"><i class="fa-solid ${c.icon||'fa-book-open-reader'}"></i></span>
+      ${escapeHtml(c.title)}</h2>
+    <p>${escapeHtml(c.category||'')} • ${c.hours||0} ชั่วโมง • เกณฑ์ผ่าน ${c.passScore||60}%</p>
+  </div></div>
+
+  ${c.description?`<div class="ln-note"><b>วัตถุประสงค์</b><br>${escapeHtml(c.description)}</div>`:''}
+
+  <!-- ขั้นที่ 1 -->
+  <div class="ln-lesson ${preDone?'done':''}" style="align-items:center">
+    <div class="ln-lnum"><i class="fa-solid ${preDone?'fa-check':'fa-1'}"></i></div>
+    <div class="ln-lbody"><b>ขั้นที่ 1 — ทดสอบก่อนเรียน</b>
+      <div class="ln-lsub">${preQ?`${preQ} ข้อ`:'ยังไม่มีข้อสอบ'}${preDone?` • ทำแล้ว ได้ ${s.pre.percent}% (${s.pre.score}/${s.pre.total} ข้อ)`:''}</div></div>
+    <div class="ln-lact">${
+      !preQ ? '<span class="ln-chip draft">ไม่มี</span>'
+      : preDone ? `<span class="ln-chip ok">${s.pre.percent}%</span>${c.retake!==false?`<button class="btn btn-ghost btn-sm" onclick="lnStartExam('${c.id}','pre')" title="ทำใหม่"><i class="fa-solid fa-rotate"></i></button>`:''}`
+      : `<button class="btn btn-primary btn-sm" onclick="lnStartExam('${c.id}','pre')"><i class="fa-solid fa-pen-to-square"></i> เริ่มทำ</button>`}</div>
+  </div>
+
+  <!-- ขั้นที่ 2 -->
+  <div class="ln-lesson ${allRead&&ls.length?'done':''}" style="align-items:center;margin-top:14px">
+    <div class="ln-lnum"><i class="fa-solid ${allRead&&ls.length?'fa-check':'fa-2'}"></i></div>
+    <div class="ln-lbody"><b>ขั้นที่ 2 — เรียนจากคลังความรู้</b>
+      <div class="ln-lsub">${ls.length?`${s.lessons} จาก ${ls.length} บทเรียน`:'ยังไม่มีบทเรียน'}
+        ${lockLearn?' • <b style="color:var(--danger)">ต้องทำข้อสอบก่อนเรียนก่อน</b>':''}</div>
+      ${ls.length?`<div class="ln-mini ${s.lessonPct>=100?'g':''}" style="margin-top:8px"><i style="width:${s.lessonPct}%"></i></div>`:''}
+    </div></div>
+
+  <div style="margin:11px 0 0;${lockLearn?'opacity:.45;pointer-events:none':''}">
+    ${ls.map((l,i)=>{
+      const t=LN_LTYPE[l.type]||LN_LTYPE.link, d=done.has(l.id);
+      return `<div class="ln-lesson ${d?'done':''}">
+        <div class="ln-lnum">${d?'<i class="fa-solid fa-check"></i>':i+1}</div>
+        <div class="ln-lbody">
+          <b>${escapeHtml(l.title)}</b>
+          <div class="ln-lsub"><span class="ln-type"><i class="fa-solid ${t.ic}"></i> ${t.lab}</span>${l.minutes?` • ${l.minutes} นาที`:''}</div>
+          ${l.note?`<div class="ln-lsub" style="margin-top:4px"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(l.note)}</div>`:''}
+        </div>
+        <div class="ln-lact">
+          <button class="btn ${d?'btn-outline':'btn-primary'} btn-sm" onclick="lnOpenLesson('${c.id}','${l.id}')">
+            <i class="fa-solid ${l.type==='text'?'fa-book-open':'fa-arrow-up-right-from-square'}"></i> ${d?'ทบทวน':'เรียน'}</button>
+        </div></div>`;}).join('')}
+  </div>
+
+  <!-- ขั้นที่ 3 -->
+  <div class="ln-lesson ${s.post?'done':''}" style="align-items:center;margin-top:14px">
+    <div class="ln-lnum"><i class="fa-solid ${s.post?'fa-check':'fa-3'}"></i></div>
+    <div class="ln-lbody"><b>ขั้นที่ 3 — ทดสอบหลังเรียน</b>
+      <div class="ln-lsub">${postQ?`${postQ} ข้อ`:'ยังไม่มีข้อสอบ'}${s.post?` • ได้ ${s.post.percent}% (${s.post.score}/${s.post.total} ข้อ)`:''}
+        ${lockPost&&postQ?' • <b style="color:var(--danger)">ต้องเรียนให้ครบทุกบทก่อน</b>':''}</div></div>
+    <div class="ln-lact">${
+      !postQ ? '<span class="ln-chip draft">ไม่มี</span>'
+      : s.post ? `<span class="ln-chip ${s.passed?'ok':'no'}">${s.post.percent}%</span>${c.retake!==false?`<button class="btn btn-ghost btn-sm" onclick="lnStartExam('${c.id}','post')" title="สอบใหม่"><i class="fa-solid fa-rotate"></i></button>`:''}`
+      : `<button class="btn btn-primary btn-sm" ${lockPost?'disabled':''} onclick="lnStartExam('${c.id}','post')"><i class="fa-solid fa-file-circle-check"></i> เริ่มสอบ</button>`}</div>
+  </div>
+
+  ${(s.pre&&s.post)?`
+  <div class="ln-card" style="margin-top:18px"><div style="padding:22px 20px;text-align:center">
+    <div style="font-size:12.5px;color:var(--text-faint);font-weight:700;margin-bottom:12px">ผลการวัดพัฒนาการของท่าน</div>
+    <div style="display:flex;gap:20px;justify-content:center;align-items:center;flex-wrap:wrap">
+      <div><div style="font-size:11.5px;color:var(--text-faint)">ก่อนเรียน</div><b style="font-size:27px">${s.pre.percent}%</b></div>
+      <i class="fa-solid fa-arrow-left" style="color:var(--text-faint)"></i>
+      <div><div style="font-size:11.5px;color:var(--text-faint)">หลังเรียน</div><b style="font-size:27px;color:${s.delta>=0?'#15803d':'#b91c1c'}">${s.post.percent}%</b></div>
+    </div>
+    <div style="margin-top:15px"><span class="ln-delta ${s.delta>0?'':s.delta<0?'down':'flat'}">
+      <i class="fa-solid ${s.delta>0?'fa-arrow-trend-up':s.delta<0?'fa-arrow-trend-down':'fa-equals'}"></i>
+      ${s.delta>0?'ความรู้เพิ่มขึ้น ':s.delta<0?'ลดลง ':'เท่าเดิม '}${s.delta>0?'+':''}${s.delta}%</span></div>
+    ${s.passed?`<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="lnCertificate('${c.id}','${oid}')">
+      <i class="fa-solid fa-award"></i> พิมพ์เกียรติบัตรผ่านการอบรม</button></div>`:''}
+  </div></div>`:''}`;
+}
+
+/* -------------------------------------------------------------- เปิดบทเรียน */
+function lnOpenLesson(cid, lid){
+  const c=lnCourseById(cid); if(!c) return;
+  const l=lnLessons(c).find(x=>x.id===lid); if(!l) return;
+  const oid=lnMyOsmId();
+  const t=LN_LTYPE[l.type]||LN_LTYPE.link;
+  const already=lnDoneLessons(cid,oid).has(lid);
+
+  const bodyHtml = l.type==='text'
+    ? `<div class="ln-rich">${escapeHtml(l.body||'')}</div>`
+    : `<div style="text-align:center;padding:16px 0">
+        <div class="ln-ic ${c.iconColor||'c1'}" style="width:62px;height:62px;font-size:25px;margin:0 auto 14px"><i class="fa-solid ${t.ic}"></i></div>
+        <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.8;margin-bottom:16px">
+          แหล่งความรู้นี้เป็น${t.lab} กดปุ่มด้านล่างเพื่อเปิดในแท็บใหม่<br>
+          เมื่ออ่าน/ดูจบแล้ว กลับมากด “เรียนจบบทนี้แล้ว”</p>
+        <a class="btn btn-primary" href="${escapeHtml(l.url||'#')}" target="_blank" rel="noopener">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิด${t.lab}</a>
+        <div style="margin-top:12px;font-size:11.5px;color:var(--text-faint);word-break:break-all;direction:ltr">${escapeHtml(l.url||'')}</div>
+      </div>`;
+
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid ${t.ic}"></i> ${escapeHtml(l.title)}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    ${l.note?`<div class="ln-note"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(l.note)}</div>`:''}
+    ${bodyHtml}
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ปิด</button>
+    ${already
+      ? `<button class="btn btn-outline" onclick="lnUndoLesson('${cid}','${lid}')"><i class="fa-solid fa-rotate-left"></i> ยังไม่จบ</button>`
+      : `<button class="btn btn-primary" onclick="lnDoneLesson('${cid}','${lid}')"><i class="fa-solid fa-circle-check"></i> เรียนจบบทนี้แล้ว</button>`}
+  </div>`,{size:'md'});
+}
+function lnDoneLesson(cid, lid){
+  const oid=lnMyOsmId(); if(!oid) return;
+  lnMarkLesson(cid, oid, lid);
+  closeModal(); renderCurrentView(); toast('บันทึกแล้ว — เรียนจบบทนี้','success');
+}
+function lnUndoLesson(cid, lid){
+  const oid=lnMyOsmId(); if(!oid) return;
+  lnUnmarkLesson(cid, oid, lid);
+  closeModal(); renderCurrentView();
+}
+
+/* -------------------------------------------------------------- ห้องสอบ */
+function lnShuffle(a){
+  const x=a.slice();
+  for(let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=x[i]; x[i]=x[j]; x[j]=t; }
+  return x;
+}
+function lnStartExam(cid, phase){
+  const c=lnCourseById(cid); if(!c) return;
+  const src=lnTest(c,phase);
+  if(!src.length){ toast('ยังไม่มีข้อสอบในชุดนี้','info'); return; }
+  const oid=lnMyOsmId(); if(!oid) return;
+  const prev=lnAttempts(cid,oid,phase);
+  if(prev.length && c.retake===false){ toast('หลักสูตรนี้ไม่อนุญาตให้สอบซ้ำ','info'); return; }
+
+  const build=()=>{
+    let qs=src.map(q=>{
+      const idx=q.choices.map((_,i)=>i);
+      const order = c.shuffle!==false ? lnShuffle(idx) : idx;
+      return { id:q.id, q:q.q, explain:q.explain||'',
+               choices: order.map(i=>q.choices[i]),
+               answer:  order.indexOf(q.answer) };
+    });
+    if(c.shuffle!==false) qs=lnShuffle(qs);
+    lnExam={ cid, phase, qs, answers:new Array(qs.length).fill(-1), idx:0,
+             startedAt:new Date().toISOString(), review:false };
+    lnMemMode='exam'; lnLastRes=null;
+    closeModal(); renderCurrentView(); window.scrollTo(0,0);
+  };
+
+  const label = phase==='pre'?'ทดสอบก่อนเรียน':'ทดสอบหลังเรียน';
+  openModal(`
+  <div class="modal-header"><h3><i class="fa-solid fa-file-circle-question"></i> ${label}</h3>
+    <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+  <div class="modal-body">
+    <div style="text-align:center;padding:8px 0 4px">
+      <div class="ln-ic ${c.iconColor||'c1'}" style="width:58px;height:58px;font-size:23px;margin:0 auto 14px"><i class="fa-solid fa-pen-to-square"></i></div>
+      <h3 style="margin:0 0 6px;font-size:17px">${escapeHtml(c.title)}</h3>
+      <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.85">
+        แบบทดสอบมี <b>${src.length} ข้อ</b> เป็นปรนัยเลือกตอบ<br>
+        ${phase==='pre'
+          ? 'ทำเพื่อวัดความรู้เดิมก่อนเข้าเรียน ตอบตามที่เข้าใจได้เลย ไม่มีผลต่อการประเมิน'
+          : `เกณฑ์ผ่าน <b>${c.passScore||60}%</b> ระบบจะเทียบกับคะแนนก่อนเรียนเพื่อแสดงพัฒนาการ`}
+        ${prev.length?`<br><span style="color:var(--text-faint);font-size:12.5px">ท่านเคยทำแล้ว ${prev.length} ครั้ง — ระบบจะใช้คะแนนที่ดีที่สุด</span>`:''}
+      </p>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" onclick="closeModal()">ยังไม่พร้อม</button>
+    <button class="btn btn-primary" id="ln-go"><i class="fa-solid fa-play"></i> เริ่มทำข้อสอบ</button>
+  </div>`,{size:'sm'});
+  document.getElementById('ln-go').addEventListener('click',build);
+}
+
+function lnRenderExam(el){
+  const E=lnExam; const c=lnCourseById(E.cid);
+  const n=E.qs.length, q=E.qs[E.idx], answered=E.answers.filter(x=>x>=0).length;
+  const pct=Math.round(answered*100/n);
+  el.innerHTML=`
+  <div class="ln-exam">
+    <div class="ln-exam-head">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <b style="font-size:14.5px">${escapeHtml(c?c.title:'')}</b>
+          <div style="font-size:12px;color:var(--text-faint);margin-top:2px">
+            ${E.phase==='pre'?'ทดสอบก่อนเรียน':'ทดสอบหลังเรียน'} • ตอบแล้ว ${answered}/${n} ข้อ</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="lnExamQuit()"><i class="fa-solid fa-xmark"></i> ออก</button>
+      </div>
+      <div class="ln-bar ${pct>=100?'g':''}"><i style="width:${pct}%"></i></div>
+    </div>
+
+    <div class="ln-qbox">
+      <div class="ln-qnum">ข้อ ${E.idx+1} จาก ${n}</div>
+      <h3>${escapeHtml(q.q)}</h3>
+      ${q.choices.map((ch,i)=>`<button type="button" class="ln-choice ${E.answers[E.idx]===i?'sel':''}" onclick="lnPick(${i})">
+        <span class="ln-ck">${LN_KEYS[i]||i+1}</span><span style="flex:1">${escapeHtml(ch)}</span></button>`).join('')}
+
+      <div style="display:flex;gap:9px;margin-top:17px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="lnGoQ(${E.idx-1})" ${E.idx===0?'disabled':''}>
+          <i class="fa-solid fa-chevron-right"></i> ข้อก่อนหน้า</button>
+        ${E.idx<n-1
+          ? `<button class="btn btn-primary" onclick="lnGoQ(${E.idx+1})">ข้อถัดไป <i class="fa-solid fa-chevron-left"></i></button>`
+          : `<button class="btn btn-primary" onclick="lnExamSubmit()"><i class="fa-solid fa-paper-plane"></i> ส่งคำตอบ</button>`}
+        ${answered===n&&E.idx<n-1?`<button class="btn btn-outline" onclick="lnExamSubmit()"><i class="fa-solid fa-paper-plane"></i> ส่งคำตอบเลย</button>`:''}
+      </div>
+
+      <div class="ln-pager">
+        ${E.qs.map((_,i)=>`<button class="ln-pg ${E.answers[i]>=0?'ans':''} ${i===E.idx?'cur':''}" onclick="lnGoQ(${i})">${i+1}</button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+function lnPick(i){
+  if(!lnExam) return;
+  lnExam.answers[lnExam.idx]=i;
+  const el=document.getElementById('view-member-learn');
+  if(lnExam.idx < lnExam.qs.length-1){ setTimeout(()=>{ if(lnExam){ lnExam.idx++; lnRenderExam(el); } },180); }
+  else lnRenderExam(el);
+}
+function lnGoQ(i){
+  if(!lnExam) return;
+  if(i<0||i>=lnExam.qs.length) return;
+  lnExam.idx=i; lnRenderExam(document.getElementById('view-member-learn'));
+}
+function lnExamQuit(){
+  confirmDialog('ออกจากห้องสอบ คำตอบที่ทำไว้จะไม่ถูกบันทึก',()=>{
+    lnExam=null; lnMemMode='course'; closeModal(); renderCurrentView();
+  },{confirmLabel:'ออกจากห้องสอบ'});
+}
+function lnExamSubmit(){
+  const E=lnExam; if(!E) return;
+  const blank=E.answers.filter(x=>x<0).length;
+  const go=()=>{
+    const c=lnCourseById(E.cid), oid=lnMyOsmId();
+    let score=0;
+    E.qs.forEach((q,i)=>{ if(E.answers[i]===q.answer) score++; });
+    const total=E.qs.length;
+    const percent=total?Math.round(score*100/total):0;
+    const rec={
+      id:uid('lr'), courseId:E.cid, osmId:oid, phase:E.phase,
+      score, total, percent, passed: E.phase==='post' ? percent>=(c.passScore||60) : null,
+      answers:E.answers.slice(), qids:E.qs.map(q=>q.id),
+      startedAt:E.startedAt, submittedAt:new Date().toISOString(),
+      durationSec: Math.max(0, Math.round((Date.now()-new Date(E.startedAt).getTime())/1000)),
+      attempt: lnAttempts(E.cid,oid,E.phase).length+1,
+      byName: currentUserFullName()
+    };
+    lnInit(); state.learnResults.push(rec);
+    persistState();
+    try{ if(typeof fbPushAccountNow==='function' && typeof fbOK==='function' && fbOK()){} }catch(e){}
+    lnLastRes={rec, exam:E}; lnExam=null; lnMemMode='result';
+    closeModal(); renderCurrentView(); window.scrollTo(0,0);
+  };
+  if(blank){
+    confirmDialog(`ยังไม่ได้ตอบ ${blank} ข้อ ข้อที่ไม่ตอบจะถือว่าผิด ต้องการส่งคำตอบเลยหรือไม่`, go, {confirmLabel:'ส่งคำตอบ'});
+  } else {
+    confirmDialog('ยืนยันส่งคำตอบ หลังส่งแล้วจะแก้ไขไม่ได้', go, {confirmLabel:'ส่งคำตอบ'});
+  }
+}
+
+/* -------------------------------------------------------------- หน้าแสดงผลสอบ */
+function lnRenderResult(el){
+  const {rec, exam}=lnLastRes;
+  const c=lnCourseById(rec.courseId); const oid=rec.osmId;
+  const s=lnStatus(rec.courseId, oid);
+  const pass = rec.phase==='post' ? rec.percent>=(c.passScore||60) : null;
+  const showAns = c.showAnswer!==false;
+
+  el.innerHTML=`
+  <div class="ln-exam">
+    <div class="ln-card"><div class="ln-score">
+      <div class="ln-dial ${rec.phase==='post'?(pass?'pass':'fail'):''}" style="--p:${rec.percent}%">
+        <div><b>${rec.percent}%</b><small>${rec.score} / ${rec.total} ข้อ</small></div></div>
+      <h3 style="margin:0 0 6px;font-size:19px">${rec.phase==='pre'?'ทดสอบก่อนเรียนเรียบร้อย':(pass?'ยินดีด้วย ท่านผ่านเกณฑ์':'ยังไม่ผ่านเกณฑ์')}</h3>
+      <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.8;margin:0 auto;max-width:430px">
+        ${escapeHtml(c?c.title:'')}<br>
+        ${rec.phase==='pre'
+          ? 'ขั้นต่อไปคือเข้าเรียนจากคลังความรู้ แล้วกลับมาทำข้อสอบหลังเรียนเพื่อวัดพัฒนาการ'
+          : (pass? `ผ่านเกณฑ์ ${c.passScore||60}% แล้ว` : `เกณฑ์ผ่านคือ ${c.passScore||60}% ท่านสามารถทบทวนบทเรียนแล้วสอบใหม่ได้`)}
+      </p>
+      ${(s.pre&&s.post)?`<div style="margin-top:17px"><span class="ln-delta ${s.delta>0?'':s.delta<0?'down':'flat'}">
+        <i class="fa-solid ${s.delta>0?'fa-arrow-trend-up':s.delta<0?'fa-arrow-trend-down':'fa-equals'}"></i>
+        พัฒนาการจากก่อนเรียน ${s.delta>0?'+':''}${s.delta}%</span></div>`:''}
+      <div style="margin-top:18px;display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="lnMemberOpen('${rec.courseId}')"><i class="fa-solid fa-arrow-right"></i> กลับหน้าหลักสูตร</button>
+        ${(rec.phase==='post'&&pass)?`<button class="btn btn-outline" onclick="lnCertificate('${rec.courseId}','${oid}')"><i class="fa-solid fa-award"></i> เกียรติบัตร</button>`:''}
+      </div>
+    </div></div>
+
+    ${showAns?`<h3 style="margin:22px 0 12px;font-size:16px"><i class="fa-solid fa-list-check"></i> เฉลยรายข้อ</h3>
+    ${exam.qs.map((q,i)=>{
+      const pick=exam.answers[i], ok=pick===q.answer;
+      return `<div class="ln-qbox" style="margin-bottom:11px">
+        <div class="ln-qnum" style="color:${ok?'#15803d':'#b91c1c'}">ข้อ ${i+1} • ${ok?'ตอบถูก':'ตอบผิด'}</div>
+        <h3 style="font-size:15.5px;margin:6px 0 13px">${escapeHtml(q.q)}</h3>
+        ${q.choices.map((ch,ci)=>{
+          let cls=''; if(ci===q.answer) cls='right'; else if(ci===pick) cls='wrong';
+          return `<div class="ln-choice ${cls}" style="cursor:default">
+            <span class="ln-ck">${LN_KEYS[ci]||ci+1}</span><span style="flex:1">${escapeHtml(ch)}</span>
+            ${ci===q.answer?'<i class="fa-solid fa-check" style="color:#22c55e"></i>':(ci===pick?'<i class="fa-solid fa-xmark" style="color:#ef4444"></i>':'')}</div>`;
+        }).join('')}
+        ${q.explain?`<div class="ln-note" style="margin:11px 0 0"><i class="fa-solid fa-lightbulb"></i> ${escapeHtml(q.explain)}</div>`:''}
+      </div>`;}).join('')}`:''}
+  </div>`;
+}
+
+
+/* ============================================================================================
+   LEARNING MODULE — ส่วนที่ 4: รายงานการวัดผล เอกสารราชการ และการเชื่อมต่อระบบ
+   ============================================================================================ */
+
+/* -------------------------------------------------------------- หน้ารายงานการวัดผล */
+function renderLearnReportView(){
+  lnInit();
+  const el=document.getElementById('view-learn-report'); if(!el) return;
+  const all=lnCourses();
+  if(!all.length){
+    el.innerHTML=`<div class="page-head"><div><h2>รายงานการวัดผลการเรียนรู้</h2>
+      <p>เปรียบเทียบคะแนนก่อนเรียนกับหลังเรียนของ อสม. รายคนและรายหลักสูตร</p></div></div>
+      <div class="ln-empty"><i class="fa-solid fa-chart-line big"></i><h3>ยังไม่มีหลักสูตรในระบบ</h3>
+      <p>สร้างหลักสูตรและออกข้อสอบก่อน จึงจะมีผลการวัดผลให้ดู</p>
+      <button class="btn btn-primary" onclick="switchView('learn-courses')"><i class="fa-solid fa-plus"></i> ไปสร้างหลักสูตร</button></div>`;
+    return;
+  }
+  if(!lnRepCid || !lnCourseById(lnRepCid)) lnRepCid = (lnPublished()[0]||all[0]).id;
+  const c=lnCourseById(lnRepCid);
+  const s=lnSummary(c.id);
+
+  el.innerHTML=`
+  <div class="page-head"><div><h2>รายงานการวัดผลการเรียนรู้</h2>
+    <p>เปรียบเทียบคะแนน “ก่อนเรียน” กับ “หลังเรียน” รายบุคคล พร้อมสรุปผู้ผ่านเกณฑ์เพื่อใช้รายงานอำเภอ</p></div>
+    <div class="page-head-actions">
+      <button class="btn btn-outline" onclick="lnReportExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+      <button class="btn btn-primary" onclick="lnReportPrint()"><i class="fa-solid fa-print"></i> พิมพ์รายงาน A4</button>
+    </div></div>
+
+  <div class="form-group" style="max-width:480px">
+    <label>เลือกหลักสูตร</label>
+    <select class="input" id="ln-rep-sel" onchange="lnRepCid=this.value;renderLearnReportView()">
+      ${lnSorted().map(x=>`<option value="${x.id}" ${x.id===lnRepCid?'selected':''}>
+        ${escapeHtml(x.title)}${x.published?'':' (ฉบับร่าง)'}</option>`).join('')}
+    </select>
+  </div>
+
+  <div class="ln-stats">
+    <div class="ln-stat b"><b>${s.avgPre}%</b><span>คะแนนเฉลี่ยก่อนเรียน (${s.preN} คน)</span></div>
+    <div class="ln-stat g"><b>${s.avgPost}%</b><span>คะแนนเฉลี่ยหลังเรียน (${s.postN} คน)</span></div>
+    <div class="ln-stat ${s.delta>=0?'g':'r'}"><b>${s.delta>=0?'+':''}${s.delta}%</b><span>พัฒนาการเฉลี่ย</span></div>
+    <div class="ln-stat o"><b>${s.passPct}%</b><span>ผ่านเกณฑ์ ${s.passN} จาก ${s.postN} คน</span></div>
+  </div>
+
+  <div class="ln-note">
+    <b>วิธีอ่านผล</b> — “พัฒนาการ” คือคะแนนหลังเรียนลบคะแนนก่อนเรียนของคนเดียวกัน
+    ค่าบวกหมายถึงความรู้เพิ่มขึ้นหลังผ่านหลักสูตรนี้ ซึ่งเป็นตัวชี้วัดที่ใช้รายงานผลการอบรมได้โดยตรง
+    • จำนวน อสม. ที่มีพัฒนาการเพิ่มขึ้น: <b>${s.improvedN}</b> คน
+  </div>
+
+  ${lnBarChart(s)}
+
+  <div class="table-wrap" style="margin-top:18px"><table class="ln-tbl">
+    <thead><tr><th>ลำดับ</th><th>ชื่อ–สกุล</th><th>หมู่</th>
+      <th class="num">ก่อนเรียน</th><th class="num">หลังเรียน</th><th class="num">พัฒนาการ</th>
+      <th class="num">บทเรียน</th><th>ผล</th></tr></thead>
+    <tbody>${s.rows.map((r,i)=>{
+      const d=r.s.delta;
+      return `<tr>
+        <td class="num">${i+1}</td>
+        <td><b>${escapeHtml(r.m.firstName+' '+r.m.lastName)}</b></td>
+        <td class="num">${escapeHtml(String(r.m.moo||'-'))}</td>
+        <td class="num">${r.s.pre?r.s.pre.percent+'%':'—'}</td>
+        <td class="num">${r.s.post?r.s.post.percent+'%':'—'}</td>
+        <td class="num">${d===null?'—':`<span class="ln-chip ${d>0?'up':d<0?'no':'draft'}">${d>0?'+':''}${d}%</span>`}</td>
+        <td class="num">${r.s.lessons}/${r.s.lessonTotal}</td>
+        <td>${r.s.post
+            ? `<span class="ln-chip ${r.s.passed?'ok':'no'}">${r.s.passed?'ผ่าน':'ไม่ผ่าน'}</span>
+               ${r.s.passed?`<button class="btn btn-ghost btn-sm" title="พิมพ์เกียรติบัตร" onclick="lnCertificate('${c.id}','${r.m.id}')"><i class="fa-solid fa-award"></i></button>`:''}`
+            : `<span class="ln-chip ${r.s.stage==='new'?'draft':'wait'}">${r.s.stageLabel}</span>`}</td>
+      </tr>`;}).join('')}</tbody>
+  </table></div>`;
+}
+
+/* กราฟแท่งเปรียบเทียบอย่างง่าย (ไม่พึ่ง Chart.js เพื่อให้พิมพ์ได้ด้วย) */
+function lnBarChart(s){
+  const rows=s.rows.filter(r=>r.s.pre||r.s.post).slice(0,24);
+  if(!rows.length) return '';
+  return `<div class="ln-card" style="margin-top:4px"><div style="padding:16px 18px">
+    <div style="font-size:13px;font-weight:800;margin-bottom:14px">
+      เปรียบเทียบรายบุคคล <span style="font-weight:600;color:var(--text-faint)">
+      • <span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:#94a3b8"></span> ก่อนเรียน
+      • <span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:#22c55e"></span> หลังเรียน</span></div>
+    ${rows.map(r=>`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <div style="width:125px;flex:none;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.m.firstName)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="ln-mini" style="margin-bottom:3px"><i style="width:${r.s.pre?r.s.pre.percent:0}%;background:#94a3b8"></i></div>
+          <div class="ln-mini"><i style="width:${r.s.post?r.s.post.percent:0}%;background:#22c55e"></i></div>
+        </div>
+        <div style="width:96px;flex:none;text-align:left;font-size:11.5px;font-variant-numeric:tabular-nums">
+          ${r.s.pre?r.s.pre.percent:'–'}% → ${r.s.post?r.s.post.percent:'–'}%</div>
+      </div>`).join('')}
+    ${s.rows.filter(r=>r.s.pre||r.s.post).length>24?`<div style="font-size:11.5px;color:var(--text-faint);margin-top:8px">แสดง 24 คนแรก — ดูครบทุกคนในตารางด้านล่างหรือในไฟล์ Excel</div>`:''}
+  </div></div>`;
+}
+
+/* -------------------------------------------------------------- เอกสาร: รายงานผลการอบรม A4 */
+function lnReportPrint(){
+  const c=lnCourseById(lnRepCid); if(!c){ toast('เลือกหลักสูตรก่อน','info'); return; }
+  const s=lnSummary(c.id);
+  const rows=s.rows.filter(r=>r.s.pre||r.s.post);
+  if(!rows.length){ toast('ยังไม่มีผลการทดสอบของหลักสูตรนี้','info'); return; }
+
+  const html=`<div class="pg">
+    ${schGovHead('รายงานผลการอบรมและการวัดผลการเรียนรู้ของ อสม.')}
+    <table style="width:100%;font-size:14px;margin-bottom:10px">
+      <tr><td style="width:22%"><b>หลักสูตร</b></td><td>${escapeHtml(c.title)}${c.code?` (${escapeHtml(c.code)})`:''}</td></tr>
+      <tr><td><b>หมวดหมู่</b></td><td>${escapeHtml(c.category||'-')} • จำนวน ${c.hours||0} ชั่วโมง</td></tr>
+      <tr><td><b>เกณฑ์การผ่าน</b></td><td>ทำข้อสอบหลังเรียนได้ไม่น้อยกว่าร้อยละ ${c.passScore||60}</td></tr>
+      <tr><td><b>วันที่พิมพ์รายงาน</b></td><td>${schThaiToday()}</td></tr>
+    </table>
+
+    <table class="tbl"><thead><tr>
+      <th style="width:6%">ที่</th><th>ชื่อ–สกุล</th><th style="width:8%">หมู่</th>
+      <th style="width:13%">ก่อนเรียน</th><th style="width:13%">หลังเรียน</th>
+      <th style="width:13%">พัฒนาการ</th><th style="width:11%">ผล</th>
+    </tr></thead><tbody>
+      ${rows.map((r,i)=>`<tr>
+        <td class="c">${i+1}</td>
+        <td>${escapeHtml(r.m.firstName+' '+r.m.lastName)}</td>
+        <td class="c">${escapeHtml(String(r.m.moo||'-'))}</td>
+        <td class="c">${r.s.pre?r.s.pre.percent+'%':'-'}</td>
+        <td class="c">${r.s.post?r.s.post.percent+'%':'-'}</td>
+        <td class="c">${r.s.delta===null?'-':(r.s.delta>0?'+':'')+r.s.delta+'%'}</td>
+        <td class="c">${r.s.post?(r.s.passed?'ผ่าน':'ไม่ผ่าน'):'ยังไม่สอบ'}</td>
+      </tr>`).join('')}
+    </tbody></table>
+
+    <table style="width:100%;font-size:14px;margin-top:14px">
+      <tr><td style="width:40%"><b>ผู้เข้ารับการอบรมทั้งหมด</b></td><td>${s.total} คน</td></tr>
+      <tr><td><b>ทำแบบทดสอบก่อนเรียน</b></td><td>${s.preN} คน • คะแนนเฉลี่ยร้อยละ ${s.avgPre}</td></tr>
+      <tr><td><b>ทำแบบทดสอบหลังเรียน</b></td><td>${s.postN} คน • คะแนนเฉลี่ยร้อยละ ${s.avgPost}</td></tr>
+      <tr><td><b>พัฒนาการเฉลี่ย</b></td><td>${s.delta>=0?'เพิ่มขึ้น':'ลดลง'}ร้อยละ ${Math.abs(s.delta)}</td></tr>
+      <tr><td><b>จำนวนผู้มีพัฒนาการเพิ่มขึ้น</b></td><td>${s.improvedN} คน</td></tr>
+      <tr><td><b>ผ่านเกณฑ์การประเมิน</b></td><td>${s.passN} คน คิดเป็นร้อยละ ${s.passPct} ของผู้เข้าสอบหลังเรียน</td></tr>
+    </table>
+    ${schSignBlock()}
+  </div>`;
+  schPrintWindow(`รายงานผลการอบรม — ${c.title}`, html, false);
+}
+
+/* -------------------------------------------------------------- เอกสาร: เกียรติบัตรรายบุคคล */
+function lnCertificate(cid, oid){
+  const c=lnCourseById(cid); const m=osmById(oid);
+  if(!c||!m){ toast('ไม่พบข้อมูล','error'); return; }
+  const s=lnStatus(cid, oid);
+  if(!s.post){ toast('ยังไม่มีผลสอบหลังเรียน','info'); return; }
+  const cfg=state.schoolCfg||{};
+  const html=`<div class="pg land"><div class="cert">
+    ${schLogoTag('cert-logo') || '<div style="font-size:40px">🏛️</div>'}
+    <h1>เกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า</h1>
+    <div class="nm">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</div>
+    <h2 style="margin-top:14px">อาสาสมัครสาธารณสุขประจำหมู่บ้าน หมู่ที่ ${escapeHtml(m.moo||'-')} บ้าน${escapeHtml(m.village||'')}</h2>
+    <p style="font-size:19px;line-height:1.8;margin:0 0 8px">
+      ได้ผ่านการอบรมหลักสูตร <b>${escapeHtml(c.title)}</b><br>
+      โรงเรียน อสม. ${SCH_ORG.name} จำนวน ${c.hours||0} ชั่วโมง<br>
+      ผลการทดสอบหลังเรียน ร้อยละ ${s.post.percent}
+      ${s.delta!==null?` • มีพัฒนาการเพิ่มขึ้นร้อยละ ${Math.max(0,s.delta)}`:''}</p>
+    <p style="font-size:17px;margin:14px 0 0">ให้ไว้ ณ วันที่ ${schThaiToday()}</p>
+    <div class="signrow" style="margin-top:26px">
+      <div style="flex:0 0 25%"></div>
+      <div><span class="dots" style="margin-top:26px"></span>( ${escapeHtml(cfg.principal||'............................')} )<br>
+        <span style="font-size:14px">${escapeHtml(cfg.principalPos||'')}</span></div>
+      <div style="flex:0 0 25%"></div>
+    </div>
+  </div></div>`;
+  schPrintWindow(`เกียรติบัตร — ${m.firstName} ${m.lastName}`, html, true);
+}
+
+/* -------------------------------------------------------------- Excel */
+function lnReportExcel(){
+  const c=lnCourseById(lnRepCid); if(!c){ toast('เลือกหลักสูตรก่อน','info'); return; }
+  if(typeof XLSX==='undefined'){ toast('ไลบรารี Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง','error'); return; }
+  const s=lnSummary(c.id);
+  const data=s.rows.map((r,i)=>({
+    'ลำดับ': i+1,
+    'ชื่อ–สกุล': `${r.m.firstName} ${r.m.lastName}`,
+    'หมู่ที่': r.m.moo||'',
+    'หมู่บ้าน': r.m.village||'',
+    'คะแนนก่อนเรียน (%)': r.s.pre? r.s.pre.percent : '',
+    'คะแนนหลังเรียน (%)': r.s.post? r.s.post.percent : '',
+    'พัฒนาการ (%)': r.s.delta===null?'':r.s.delta,
+    'บทเรียนที่เรียนจบ': `${r.s.lessons}/${r.s.lessonTotal}`,
+    'สถานะ': r.s.stageLabel,
+    'ผลการประเมิน': r.s.post ? (r.s.passed?'ผ่าน':'ไม่ผ่าน') : 'ยังไม่สอบ'
+  }));
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([
+    [`รายงานผลการอบรมและการวัดผลการเรียนรู้ของ อสม.`],
+    [`หลักสูตร: ${c.title}`],
+    [`เกณฑ์ผ่าน ${c.passScore||60}% • คะแนนเฉลี่ยก่อนเรียน ${s.avgPre}% • หลังเรียน ${s.avgPost}% • พัฒนาการ ${s.delta>=0?'+':''}${s.delta}%`],
+    [`ผ่านเกณฑ์ ${s.passN} จาก ${s.postN} คน (${s.passPct}%) • พิมพ์เมื่อ ${schThaiToday()}`],
+    []
+  ]);
+  XLSX.utils.sheet_add_json(ws, data.length?data:[{'หมายเหตุ':'ยังไม่มีข้อมูล'}], {origin:-1});
+  XLSX.utils.book_append_sheet(wb, ws, 'ผลการอบรม');
+  XLSX.writeFile(wb, `ผลการอบรม-${(c.code||c.title).replace(/[\\\/:*?"<>|]/g,'')}.xlsx`);
+  toast('ดาวน์โหลดไฟล์ Excel เรียบร้อยแล้ว','success');
+}
+
+/* -------------------------------------------------------------- หลักสูตรตัวอย่าง */
+function lnSeedLibrary(){
+  confirmDialog('เพิ่มหลักสูตรตัวอย่าง 2 หลักสูตร พร้อมคลังความรู้และข้อสอบก่อน–หลังเรียนอย่างละ 5 ข้อ เพื่อให้ทดลองใช้ได้ทันที (แก้ไขหรือลบได้ภายหลัง)',()=>{
+    lnInit();
+    LN_SEED.forEach(sd=>{
+      if(lnCourses().some(x=>x.title===sd.title)) return;
+      const c=lnNewCourse();
+      Object.assign(c,{ title:sd.title, code:sd.code, category:sd.category, description:sd.desc,
+        icon:sd.icon, iconColor:sd.color, hours:sd.hours, passScore:60, published:true });
+      c.lessons=sd.lessons.map(l=>Object.assign({id:uid('ls'),type:'link',url:'',body:'',minutes:10,note:''},l));
+      const qs=lnParseQuestions(sd.quiz);
+      c.preTest=qs;
+      c.postTest=JSON.parse(JSON.stringify(qs)).map(q=>(q.id=uid('q'),q));
+      lnCourses().push(c);
+    });
+    persistState(); closeModal(); renderCurrentView();
+    toast('เพิ่มหลักสูตรตัวอย่างแล้ว','success');
+  },{confirmLabel:'เพิ่มหลักสูตรตัวอย่าง'});
+}
+
+const LN_SEED=[
+{
+  title:'การป้องกันและควบคุมโรคไข้เลือดออกในชุมชน', code:'OSM-01',
+  category:'โรคติดต่อและการป้องกัน', icon:'fa-virus-covid', color:'c1', hours:3,
+  desc:'เมื่อเรียนจบแล้ว อสม. สามารถอธิบายวงจรชีวิตยุงลาย สำรวจและกำจัดแหล่งเพาะพันธุ์ คำนวณค่าดัชนีลูกน้ำ และให้คำแนะนำประชาชนในการป้องกันโรคไข้เลือดออกได้',
+  lessons:[
+    {title:'ความรู้พื้นฐานโรคไข้เลือดออก (กรมควบคุมโรค)', type:'link', url:'https://ddc.moph.go.th/disease_detail.php?d=44', minutes:20},
+    {title:'มาตรการ 5 ป. 1 ข. กำจัดแหล่งเพาะพันธุ์ยุงลาย', type:'text', minutes:15,
+     body:'มาตรการ 5 ป. 1 ข.\n\n1. ปิด — ปิดภาชนะเก็บน้ำให้มิดชิด ไม่ให้ยุงลายลงไปวางไข่\n2. เปลี่ยน — เปลี่ยนน้ำในแจกัน ถังเก็บน้ำ ทุก 7 วัน\n3. ปล่อย — ปล่อยปลากินลูกน้ำในภาชนะใส่น้ำถาวร\n4. ปรับปรุง — ปรับปรุงสิ่งแวดล้อมรอบบ้านไม่ให้มีน้ำขัง\n5. ปฏิบัติ — ปฏิบัติเป็นประจำจนเป็นนิสัย ทุก 7 วัน\n\nข. = ขัด — ขัดภาชนะที่เคยมีน้ำขัง เพื่อกำจัดไข่ยุงลายที่เกาะติดผนังภาชนะ\n\nค่าดัชนีลูกน้ำยุงลาย\n• HI (House Index) = ร้อยละของบ้านที่พบลูกน้ำ ควรน้อยกว่า 10\n• CI (Container Index) = ร้อยละของภาชนะที่พบลูกน้ำ ควรเท่ากับ 0 ในโรงเรียนและโรงพยาบาล\n\nบทบาท อสม.\n• สำรวจลูกน้ำในเขตรับผิดชอบทุกเดือน และบันทึกในระบบ\n• แจ้งเตือนเมื่อพบผู้ป่วยสงสัยในชุมชน ภายใน 24 ชั่วโมง\n• ให้ความรู้ครัวเรือนเรื่องอาการเตือนที่ต้องรีบไปโรงพยาบาล'},
+    {title:'อาการเตือนที่ต้องส่งต่อโรงพยาบาลทันที', type:'text', minutes:10,
+     body:'สัญญาณอันตรายของผู้ป่วยไข้เลือดออก (ต้องส่งต่อทันที)\n\n• ไข้ลดลงแต่อาการแย่ลง ซึม อ่อนเพลียมาก\n• ปวดท้องรุนแรง โดยเฉพาะใต้ชายโครงขวา\n• อาเจียนต่อเนื่อง กินอาหารหรือน้ำไม่ได้\n• เลือดออกผิดปกติ เช่น เลือดกำเดา เลือดออกตามไรฟัน อาเจียนเป็นเลือด ถ่ายดำ\n• มือเท้าเย็น ชีพจรเบาเร็ว กระสับกระส่าย\n• ไม่ปัสสาวะนานกว่า 6 ชั่วโมง\n\nข้อห้ามสำคัญ\nห้ามให้ยาแอสไพริน หรือ ไอบูโพรเฟน เพราะทำให้เลือดออกมากขึ้น ให้ใช้พาราเซตามอลเท่านั้น'}
+  ],
+  quiz:
+`1. มาตรการกำจัดแหล่งเพาะพันธุ์ยุงลายที่ใช้ในประเทศไทยคือข้อใด
+ก. 3 ก. 2 ข.
+*ข. 5 ป. 1 ข.
+ค. 4 ส. 1 ล.
+ง. 6 อ. 2 ป.
+# มาตรการ 5 ป. คือ ปิด เปลี่ยน ปล่อย ปรับปรุง ปฏิบัติ และ 1 ข. คือ ขัดภาชนะ
+
+2. ควรเปลี่ยนน้ำในแจกันหรือภาชนะเก็บน้ำทุกกี่วันเพื่อตัดวงจรลูกน้ำยุงลาย
+ก. ทุก 3 วัน
+*ข. ทุก 7 วัน
+ค. ทุก 15 วัน
+ง. ทุก 30 วัน
+# วงจรจากไข่ถึงยุงตัวเต็มวัยใช้เวลาประมาณ 7-10 วัน การเปลี่ยนน้ำทุก 7 วันจึงตัดวงจรได้
+
+3. ค่าดัชนีลูกน้ำยุงลายในบ้าน (HI) ควรมีค่าเท่าใดจึงถือว่าควบคุมได้
+*ก. น้อยกว่า 10
+ข. น้อยกว่า 30
+ค. น้อยกว่า 50
+ง. เท่าใดก็ได้
+# เกณฑ์ของกรมควบคุมโรคกำหนดให้ HI น้อยกว่า 10 ในชุมชน
+
+4. ยาชนิดใดห้ามใช้ลดไข้ในผู้ป่วยสงสัยไข้เลือดออก
+ก. พาราเซตามอล
+*ข. แอสไพริน
+ค. ผงเกลือแร่
+ง. วิตามินซี
+# แอสไพรินและยากลุ่ม NSAIDs ทำให้เลือดออกง่ายขึ้น
+
+5. ข้อใดเป็นสัญญาณอันตรายที่ต้องรีบส่งผู้ป่วยไปโรงพยาบาลทันที
+ก. มีไข้สูงวันแรก
+ข. เบื่ออาหารเล็กน้อย
+*ค. ไข้ลดแต่ซึมลง ปวดท้องรุนแรง มือเท้าเย็น
+ง. ปวดศีรษะเล็กน้อย
+# ระยะไข้ลดคือระยะวิกฤต หากซึมลงหรือมือเท้าเย็นแสดงถึงภาวะช็อก`
+},
+{
+  title:'การคัดกรองและดูแลผู้ป่วยเบาหวานและความดันโลหิตสูงในชุมชน', code:'OSM-02',
+  category:'โรคไม่ติดต่อเรื้อรัง (NCDs)', icon:'fa-heart-pulse', color:'c2', hours:3,
+  desc:'เมื่อเรียนจบแล้ว อสม. สามารถวัดความดันโลหิตและเจาะน้ำตาลปลายนิ้วได้ถูกวิธี แปลผลตามเกณฑ์ ส่งต่อผู้ที่มีความเสี่ยงสูง และติดตามเยี่ยมบ้านผู้ป่วยได้',
+  lessons:[
+    {title:'เกณฑ์การแปลผลความดันโลหิตและระดับน้ำตาล', type:'text', minutes:20,
+     body:'การวัดความดันโลหิต\n\nเตรียมตัวก่อนวัด: นั่งพัก 5 นาที ไม่ดื่มชา กาแฟ ไม่สูบบุหรี่ 30 นาทีก่อนวัด เท้าวางราบกับพื้น ไม่ไขว่ห้าง แขนวางระดับหัวใจ\n\nเกณฑ์การแปลผล (มิลลิเมตรปรอท)\n• ปกติ — น้อยกว่า 120/80\n• เริ่มสูง — 120-139 / 80-89 → ปรับพฤติกรรม นัดวัดซ้ำ\n• ความดันโลหิตสูงระดับ 1 — 140-159 / 90-99 → ส่งพบเจ้าหน้าที่\n• ความดันโลหิตสูงระดับ 2 — ตั้งแต่ 160/100 ขึ้นไป → ส่งต่อ\n• ภาวะฉุกเฉิน — ตั้งแต่ 180/110 ขึ้นไป หรือมีอาการปวดศีรษะรุนแรง เจ็บหน้าอก ตามัว แขนขาอ่อนแรง → ส่งโรงพยาบาลทันที\n\nระดับน้ำตาลในเลือดปลายนิ้ว (งดอาหาร 8 ชั่วโมง)\n• ปกติ — น้อยกว่า 100 มก./ดล.\n• เสี่ยงเบาหวาน — 100-125 มก./ดล.\n• สงสัยเบาหวาน — ตั้งแต่ 126 มก./ดล. ขึ้นไป → ส่งตรวจยืนยัน'},
+    {title:'คู่มือ อสม. กองสนับสนุนสุขภาพภาคประชาชน', type:'link', url:'https://phc.moph.go.th/', minutes:20},
+    {title:'หลัก 3 อ. 2 ส. ปรับพฤติกรรมลดเสี่ยง NCDs', type:'text', minutes:15,
+     body:'3 อ. 2 ส.\n\nอ.1 อาหาร — ลดหวาน มัน เค็ม กินผักผลไม้ให้ได้วันละ 400 กรัม ลดเกลือให้ไม่เกินวันละ 1 ช้อนชา (โซเดียม 2,000 มก.)\nอ.2 ออกกำลังกาย — อย่างน้อยสัปดาห์ละ 5 วัน วันละ 30 นาที ระดับปานกลาง เช่น เดินเร็ว ปั่นจักรยาน\nอ.3 อารมณ์ — จัดการความเครียด พักผ่อนให้เพียงพอ 7-8 ชั่วโมง\n\nส.1 ไม่สูบบุหรี่\nส.2 ไม่ดื่มสุรา\n\nการติดตามเยี่ยมบ้าน\n• ผู้ป่วยที่ควบคุมได้ดี — เยี่ยมทุก 3 เดือน\n• ผู้ป่วยที่ควบคุมไม่ได้ หรือมีภาวะแทรกซ้อน — เยี่ยมทุกเดือน\n• ตรวจเท้าผู้ป่วยเบาหวานทุกครั้งที่เยี่ยม ดูแผล รอยแตก ชา'}
+  ],
+  quiz:
+`1. ก่อนวัดความดันโลหิต ควรให้ผู้รับบริการนั่งพักอย่างน้อยกี่นาที
+ก. ไม่ต้องพัก
+*ข. 5 นาที
+ค. 20 นาที
+ง. 30 นาที
+# การนั่งพัก 5 นาทีช่วยให้ค่าที่วัดได้ใกล้เคียงความเป็นจริง
+
+2. ค่าความดันโลหิตเท่าใดจึงเข้าเกณฑ์ความดันโลหิตสูง
+ก. ตั้งแต่ 120/80 ขึ้นไป
+ข. ตั้งแต่ 130/85 ขึ้นไป
+*ค. ตั้งแต่ 140/90 ขึ้นไป
+ง. ตั้งแต่ 160/100 ขึ้นไป
+# เกณฑ์วินิจฉัยความดันโลหิตสูงคือ 140/90 มิลลิเมตรปรอทขึ้นไป
+
+3. ระดับน้ำตาลปลายนิ้วหลังงดอาหาร 8 ชั่วโมง เท่าใดจึงสงสัยเป็นเบาหวาน
+ก. ตั้งแต่ 100 มก./ดล.
+*ข. ตั้งแต่ 126 มก./ดล.
+ค. ตั้งแต่ 140 มก./ดล.
+ง. ตั้งแต่ 200 มก./ดล.
+# ค่า 100-125 คือกลุ่มเสี่ยง ส่วนตั้งแต่ 126 ขึ้นไปสงสัยเป็นเบาหวาน ต้องส่งตรวจยืนยัน
+
+4. หลัก 3 อ. 2 ส. ประกอบด้วยข้อใด
+*ก. อาหาร ออกกำลังกาย อารมณ์ ไม่สูบบุหรี่ ไม่ดื่มสุรา
+ข. อาหาร อากาศ อาชีพ สะอาด สงบ
+ค. อนามัย ออกกำลังกาย อาชีพ สุขภาพ สังคม
+ง. อาหาร อารมณ์ อนามัย สะอาด สุขภาพ
+
+5. อสม. ควรติดตามเยี่ยมบ้านผู้ป่วยเบาหวานที่ควบคุมระดับน้ำตาลไม่ได้บ่อยเพียงใด
+*ก. ทุกเดือน
+ข. ทุก 3 เดือน
+ค. ทุก 6 เดือน
+ง. ปีละครั้ง
+# ผู้ป่วยที่ควบคุมไม่ได้หรือมีภาวะแทรกซ้อนต้องติดตามถี่ขึ้นเป็นรายเดือน`
+}];
+
+/* ============================================================================================
+   การเชื่อมต่อกับระบบเดิม
+   ============================================================================================ */
+
+/* 1) ซิงก์ขึ้น Firestore */
+FB_MAP.courses       = 'courses';
+FB_MAP.learnResults  = 'learn_results';
+FB_MAP.learnProgress = 'learn_progress';
+
+/* 2) เก็บลงเครื่อง — ต้องประกาศทับของเดิมเพื่อเพิ่มคีย์ใหม่ */
+const LN_KEYS_STATE=['theme','users','osmMembers','households','attendance','meetings','schoolSessions',
+  'schoolAttendance','schoolCfg','schoolLog','osmAccounts','osmLeaves','courses','learnResults','learnProgress'];
+
+function persistState(){
+  try{
+    const payload={};
+    LN_KEYS_STATE.forEach(k=>{ payload[k] = (k==='schoolCfg') ? (state[k]||{}) : (state[k]!==undefined?state[k]:[]); });
+    localStorage.setItem(APP_STORAGE_KEY,JSON.stringify(payload));
+  }catch(e){ console.warn('persistState failed',e); }
+  try{ if(typeof mpInvalidateIdx==='function') mpInvalidateIdx(); }catch(e){}
+  if(!fbApplying) fbSchedulePush();
+}
+function hydrateState(){
+  try{
+    const raw=localStorage.getItem(APP_STORAGE_KEY); if(!raw) return;
+    const saved=JSON.parse(raw);
+    LN_KEYS_STATE.forEach(k=>{ if(saved[k]!==undefined) state[k]=saved[k]; });
+    state.schoolSessions   = Array.isArray(state.schoolSessions)?state.schoolSessions:[];
+    state.schoolAttendance = Array.isArray(state.schoolAttendance)?state.schoolAttendance:[];
+  }catch(e){ console.warn('hydrateState failed',e); }
+  lnInit();
+}
+
+/* 3) ฝั่ง อสม. — เขียนผลสอบของตัวเอง และรับหลักสูตรแบบเรียลไทม์ */
+async function fbPushMine(){
+  const F=window.FBX; if(!F||!F.ready||fbBusy) return;
+  const oid=fbMyOsmId(); if(!oid) return;
+  fbBusy=true;
+  try{
+    const put=async(col,obj)=>{
+      if(!obj||obj.id==null) return;
+      const id=fbSafeId(obj.id), key=col+'/'+id, ser=fbSer(obj);
+      if(fbLast.__mine && fbLast.__mine[key]===ser) return;
+      await F.setDoc(F.doc(F.db,col,id), JSON.parse(ser));
+      fbLast.__mine=fbLast.__mine||{}; fbLast.__mine[key]=ser;
+    };
+    const me=(state.osmMembers||[]).find(m=>m.id===oid);
+    if(me) await put('osm_members', me);
+    const acc=(state.osmAccounts||[]).find(a=>a.id===(state.currentUser&&state.currentUser.accountId));
+    if(acc) await put('osm_accounts', acc);
+    for(const h of (state.households||[]).filter(x=>x.osmId===oid)) await put('households', h);
+    for(const r of (state.schoolAttendance||[]).filter(x=>x.osmId===oid)) await put('school_attendance', r);
+    for(const r of (state.attendance||[]).filter(x=>x.osmId===oid))       await put('activity_attendance', r);
+    for(const l of (state.osmLeaves||[]).filter(x=>x.osmId===oid))        await put('osm_leaves', l);
+    for(const r of (state.learnResults||[]).filter(x=>x.osmId===oid))     await put('learn_results', r);
+    for(const p of (state.learnProgress||[]).filter(x=>x.osmId===oid))    await put('learn_progress', p);
+
+    const scopes=[
+      ['households/',         (state.households||[]).filter(x=>x.osmId===oid)],
+      ['activity_attendance/',(state.attendance||[]).filter(x=>x.osmId===oid)],
+      ['osm_leaves/',         (state.osmLeaves||[]).filter(x=>x.osmId===oid)],
+      ['learn_progress/',     (state.learnProgress||[]).filter(x=>x.osmId===oid)]
+    ];
+    for(const [prefix,arr] of scopes){
+      const keep=new Set(arr.map(x=>prefix+fbSafeId(x.id)));
+      for(const k of Object.keys(fbLast.__mine||{})){
+        if(k.startsWith(prefix) && !keep.has(k)){
+          try{ await F.deleteDoc(F.doc(F.db,prefix.slice(0,-1),k.split('/')[1])); }catch(e){}
+          delete fbLast.__mine[k];
+        }
+      }
+    }
+    fbLastSync=new Date(); fbStatusMsg='';
+  } finally { fbBusy=false; fbPaint(); }
+}
+
+function fbAttachMine(){
+  const F=window.FBX; if(!F||!F.ready||!F.query) return;
+  const oid=fbMyOsmId(); if(!oid) return;
+  fbDetach();
+  const apply=(key,arr,replaceScope)=>{
+    fbApplying=true;
+    if(replaceScope) state[key]=(state[key]||[]).filter(x=>x.osmId!==oid).concat(arr);
+    else state[key]=arr;
+    try{ persistState(); }catch(e){}
+    fbApplying=false; fbLastSync=new Date(); fbPaint(); fbRepaintView();
+  };
+  const sub=(col,scoped)=>{
+    try{
+      const q=F.query(F.collection(F.db,col), F.where('osmId','==',oid));
+      fbUnsub.push(F.onSnapshot(q, snap=>{
+        const arr=[]; snap.forEach(d=>{ const o=d.data()||{}; o.id=d.id; arr.push(o); });
+        apply(scoped,arr,true);
+      }, e=>console.warn('[FBX mine]',col,e)));
+    }catch(e){ console.warn(e); }
+  };
+  sub('households','households');
+  sub('school_attendance','schoolAttendance');
+  sub('activity_attendance','attendance');
+  sub('osm_leaves','osmLeaves');
+  sub('learn_results','learnResults');
+  sub('learn_progress','learnProgress');
+  const subAll=(col,key)=>{
+    try{
+      fbUnsub.push(F.onSnapshot(F.collection(F.db,col), snap=>{
+        const arr=[]; snap.forEach(d=>{ const o=d.data()||{}; o.id=d.id; arr.push(o); });
+        apply(key,arr,false);
+      }, e=>console.warn('[FBX mine]',col,e)));
+    }catch(e){}
+  };
+  subAll('school_sessions','schoolSessions');
+  subAll('courses','courses');
+  try{
+    fbUnsub.push(F.onSnapshot(F.doc(F.db,'osm_members',oid), d=>{
+      if(!d.exists()) return;
+      const o=d.data()||{}; o.id=d.id;
+      fbApplying=true;
+      const i=(state.osmMembers||[]).findIndex(x=>x.id===oid);
+      if(i>=0) state.osmMembers[i]=o; else state.osmMembers.push(o);
+      try{ persistState(); }catch(e){}
+      fbApplying=false; fbRepaintView();
+    }, e=>console.warn('[FBX mine] member',e)));
+  }catch(e){}
+}
+
+/* 4) การนำทาง — ประกาศทับของเดิมเป็นชุดสุดท้าย */
+VIEW_TITLES['learn-courses'] = ['โรงเรียน อสม. ออนไลน์','หลักสูตรและคลังความรู้ (แอดมินกำหนดเนื้อหา)'];
+VIEW_TITLES['learn-report']  = ['โรงเรียน อสม. ออนไลน์','รายงานการวัดผล ก่อนเรียน–หลังเรียน'];
+VIEW_TITLES['member-learn']  = ['พื้นที่ของฉัน','ห้องเรียนและแบบทดสอบของฉัน'];
+
+const MEMBER_VIEWS5 = ['member-home','member-history','member-leave','member-profile',
+                       'member-households','member-activity','member-minutes','member-learn'];
+const LEARN_VIEWS   = ['learn-courses','learn-report'];
+
+function switchView(viewName){
+  const member = isMember();
+  if(member && !MEMBER_VIEWS5.includes(viewName) && viewName!=='dashboard'){
+    toast('หน้านี้สำหรับเจ้าหน้าที่เท่านั้น','info'); viewName='member-home';
+  }
+  if(!member && viewName!=='dashboard' && !isAdmin()){ requestAdminLogin(viewName); return; }
+  if(state.currentView==='school-roster' && viewName!=='school-roster') schStopScan();
+  if(state.currentView==='member-learn' && viewName!=='member-learn'){ lnExam=null; lnMemMode='list'; }
+
+  state.currentView=viewName;
+  document.querySelectorAll('.view-section').forEach(s=>s.classList.add('hidden'));
+  const t=document.getElementById('view-'+viewName); if(t) t.classList.remove('hidden');
+  document.querySelectorAll('.nav-link[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===viewName));
+  const ti=VIEW_TITLES[viewName]||['',''];
+  document.getElementById('topbar-title').innerHTML=ti[0]+`<small id="topbar-sub">${ti[1]}</small>`;
+
+  if(['osm-list','osm-households'].includes(viewName)){
+    document.getElementById('grp-osm-sub').classList.remove('closed');
+    document.getElementById('grp-osm').classList.add('open');
+  }
+  if(['activity-checkin','activity-report'].includes(viewName)){
+    document.getElementById('grp-activity-sub').classList.remove('closed');
+    document.getElementById('grp-activity').classList.add('open');
+  }
+  if(SCHOOL_VIEWS2.includes(viewName) || LEARN_VIEWS.includes(viewName)){
+    const sub=document.getElementById('grp-school-sub'), hd=document.getElementById('grp-school');
+    if(sub) sub.classList.remove('closed');
+    if(hd) hd.classList.add('open');
+  }
+  closeSidebar(); renderCurrentView(); window.scrollTo(0,0);
+}
+
+function renderCurrentView(){
+  switch(state.currentView){
+    case 'dashboard':
+      if(dashIsVisitor() && dashLocalEmpty()){ dashRegistryCard(); }
+      else { renderDashboard(); dashRegistryCard(); dgChecklist(); }
+      break;
+    case 'osm-list': renderOsmListView(); impInjectButton(); break;
+    case 'osm-households': renderHouseholdsView(); break;
+    case 'activity-checkin': renderCheckinView(); break;
+    case 'activity-report': renderActivityReportView(); break;
+    case 'school-sessions': renderSchoolSessionsView(); break;
+    case 'school-roster': renderSchoolRosterView(); break;
+    case 'school-report': renderSchoolReportView(); break;
+    case 'school-docs': renderSchoolDocsView(); break;
+    case 'school-members': renderOsmAccountsView(); break;
+    case 'learn-courses': renderLearnCoursesView(); break;
+    case 'learn-report': renderLearnReportView(); break;
+    case 'member-home': renderMemberHome(); break;
+    case 'member-history': renderMemberHistory(); break;
+    case 'member-leave': renderMemberLeave(); break;
+    case 'member-profile': renderMemberProfile(); break;
+    case 'member-households': renderMemberHouseholds(); break;
+    case 'member-activity': renderMemberActivity(); break;
+    case 'member-minutes': renderMemberMinutes(); break;
+    case 'member-learn': renderMemberLearn(); break;
+    case 'meetings': renderMeetingsView(); break;
+    case 'export': renderExportView(); break;
+    case 'admin': renderAdminView(); break;
+  }
+}
+
+/* 5) สร้าง section และเมนูเมื่อหน้าเว็บพร้อม */
+(function lnBoot(){
+  const addSection=(id, afterId)=>{
+    if(document.getElementById('view-'+id)) return;
+    const sec=document.createElement('section');
+    sec.className='view-section hidden'; sec.id='view-'+id;
+    const ref=document.getElementById('view-'+afterId);
+    const host=document.querySelector('.content')||document.body;
+    if(ref&&ref.parentNode) ref.parentNode.insertBefore(sec, ref.nextSibling); else host.appendChild(sec);
+  };
+  const go=()=>{
+    lnInit();
+    addSection('learn-courses','school-docs');
+    addSection('learn-report','learn-courses');
+    addSection('member-learn','member-minutes');
+
+    // เมนูเจ้าหน้าที่ — อยู่ใต้กลุ่ม "โรงเรียน อสม. ออนไลน์"
+    const sub=document.getElementById('grp-school-sub');
+    if(sub && !sub.querySelector('[data-view="learn-courses"]')){
+      [['learn-courses','หลักสูตรและคลังความรู้'],['learn-report','รายงานการวัดผล (ก่อน–หลังเรียน)']]
+      .forEach(([v,lab])=>{
+        const b=document.createElement('button');
+        b.className='nav-link'; b.dataset.view=v; b.textContent=lab;
+        b.addEventListener('click',()=>switchView(v));
+        sub.appendChild(b);
+      });
+    }
+    // เมนูของ อสม.
+    const g=document.getElementById('mp-nav-group');
+    if(g && !g.querySelector('[data-view="member-learn"]')){
+      const b=document.createElement('button');
+      b.className='nav-link'; b.dataset.view='member-learn';
+      b.innerHTML='<i class="fa-solid fa-graduation-cap nav-ic"></i><span>ห้องเรียนของฉัน</span>';
+      b.addEventListener('click',()=>switchView('member-learn'));
+      const first=g.querySelector('[data-view="member-history"]');
+      if(first) g.insertBefore(b, first.nextSibling); else g.appendChild(b);
+    }
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(go,520));
+  else setTimeout(go,520);
+})();
 
 </script>
 <script type="module">
